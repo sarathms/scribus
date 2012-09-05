@@ -1332,12 +1332,12 @@ bool ScribusMainWindow::eventFilter( QObject* /*o*/, QEvent *e )
 
 void ScribusMainWindow::inputMethodEvent ( QInputMethodEvent * event )
 {
-	qDebug() << "IMEmw" << event->commitString() << event->preeditString() << "attributes:" << event->attributes().count();
+	//qDebug() << "IMEmw" << event->commitString() << event->preeditString() << "attributes:" << event->attributes().count();
 }
 
 QVariant ScribusMainWindow::inputMethodQuery ( Qt::InputMethodQuery query ) const
 {
-	qDebug() << "IMQmw" << query;
+	//qDebug() << "IMQmw" << query;
 	return QVariant();
 }
 
@@ -3883,9 +3883,17 @@ bool ScribusMainWindow::loadDoc(QString fileName)
 			is12doc=true;
 		}
 
+		QDir docProfileDir(fi.absolutePath() + "/profiles");
 		ScCore->getCMSProfilesDir(fi.absolutePath()+"/", false, false);
+		if (docProfileDir.exists())
+			ScCore->getCMSProfilesDir(fi.absolutePath()+"/profiles", false, false);
+
+		QDir docFontDir(fi.absolutePath() + "/fonts");
 		prefsManager->appPrefs.fontPrefs.AvailFonts.AddScalableFonts(fi.absolutePath()+"/", FName);
+		if (docFontDir.exists())
+			prefsManager->appPrefs.fontPrefs.AvailFonts.AddScalableFonts(fi.absolutePath()+"/fonts", FName);
 		prefsManager->appPrefs.fontPrefs.AvailFonts.updateFontMap();
+
 		doc=new ScribusDoc();
 		doc->is12doc=is12doc;
 		doc->appMode = modeNormal;
@@ -4109,6 +4117,8 @@ bool ScribusMainWindow::loadDoc(QString fileName)
 		}
 //		RestoreBookMarks();
 		doc->setMasterPageMode(false);
+		/*QTime t;
+		t.start();*/
 		int docItemsCount=doc->Items->count();
 		for (int azz=0; azz<docItemsCount; ++azz)
 		{
@@ -4123,6 +4133,7 @@ bool ScribusMainWindow::loadDoc(QString fileName)
 			if(ite->nextInChain() == NULL)
 				ite->layout();
 		}
+		/*qDebug("Time elapsed: %d ms", t.elapsed());*/
 		doc->RePos = false;
 		doc->setModified(false);
 		updateRecent(FName);
@@ -9355,27 +9366,24 @@ void ScribusMainWindow::initHyphenator()
 	//For each hyphenation file, grab the strings and the hyphenation data.
 	QString lang = QString(QLocale::system().name()).left(2);
 	LangTransl.clear();
-	prefsManager->appPrefs.hyphPrefs.Language = "en_US";
+	prefsManager->appPrefs.hyphPrefs.Language = "en_GB";
 	if ((hyphDir.exists()) && (hyphDir.count() != 0))
 	{
 		LanguageManager *langmgr(LanguageManager::instance());
 // 		langmgr.init(false);
-		QString datein = "";
+		QString tLang = "";
 		for (uint dc = 0; dc < hyphDir.count(); ++dc)
 		{
 			QFileInfo fi(hyphDir[dc]);
-			QString fileLangAbbrev=fi.baseName().section('_', 1);
-			datein = langmgr->getLangFromAbbrev(fileLangAbbrev);
-			QString tDatein = datein;
-			datein = GetLang(datein);
-			LangTransl.insert(datein, tDatein);
+			QString fileLangAbbrev = fi.baseName().section('_', 1);
+			tLang = langmgr->getLangFromAbbrev(fileLangAbbrev);
+			LangTransl.insert(fileLangAbbrev, tLang);
 			langmgr->addHyphLang(fileLangAbbrev, hyphDir[dc]);
-// 			Sprachen.insert(datein, hyphDir[dc]);
 			if (fileLangAbbrev == lang)
 				prefsManager->appPrefs.hyphPrefs.Language = fileLangAbbrev;
 		}
-		if (datein.isEmpty())
-			prefsManager->appPrefs.hyphPrefs.Language = "en_US";
+		if (tLang.isEmpty())
+			prefsManager->appPrefs.hyphPrefs.Language = "en_GB";
 	}
 }
 
@@ -9385,7 +9393,7 @@ QString ScribusMainWindow::GetLang(QString inLang)
  	for (QMap<QString, QStringList>::Iterator itl = InstLang.begin(); itl != itlend; ++itl)
 	{
 		if (itl.value().contains(inLang))
-			return LanguageManager::instance()->getLangFromAbbrev(itl.key());
+			return LanguageManager::instance()->getLangFromAbbrev(itl.key(), false);
 	}
 	return inLang;
 }
