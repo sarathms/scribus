@@ -60,6 +60,9 @@ protected:
 	void dropEvent(QDropEvent *e);
 	void startDrag(Qt::DropActions supportedActions);
 
+signals:
+	void objectDropped(QString);
+
 private:
 	ScListWidgetDelegate* delegate;
 };
@@ -85,12 +88,14 @@ public slots:
 	void handlePasteToItem();
 	void handleEditItem();
 	void handleDoubleClick(QListWidgetItem *item);
+	void handleDeleteItem();
 	void handleUpdateRequest(int);
 	void languageChange();
 
 signals:
 	void startEdit(int);
 	void endEdit();
+	void objectDropped(QString);
 
 protected:
 	InlineView *InlineViewWidget;

@@ -145,6 +145,7 @@ Annota::Annota(QWidget* parent, PageItem *it, int Seite, int b, int h, ScribusVi
 	SpinBox1->setDecimals(0);
 	SpinBox1->setMinimum(1);
 	SpinBox1->setMaximum(((item->annotation().ActionType() == 7) || (item->annotation().ActionType() == 9)) ? 1000 : Seite);
+	SpinBox1->setSuffix("");
 	TextLabel3 = new QLabel( tr("&Page:"), GroupBox1);
 	TextLabel3->setBuddy(SpinBox1);
 	GroupBox1Layout->addWidget( TextLabel3, 2, 0 );
@@ -285,7 +286,7 @@ void Annota::SetValues()
 			else
 				item->annotation().setActionType(7);
 		}
-		item->annotation().setType(11);
+		item->annotation().setType(Annotation::Link);
 		break;
 	case 13:
 		item->annotation().setAction("");
@@ -294,7 +295,7 @@ void Annota::SetValues()
 			item->annotation().setExtern(Destfile->text());
 			item->annotation().setActionType(8);
 		}
-		item->annotation().setType(11);
+		item->annotation().setType(Annotation::Link);
 		break;
 	}
 	accept();

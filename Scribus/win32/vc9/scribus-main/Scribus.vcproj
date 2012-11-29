@@ -571,6 +571,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\ui\clockwidget.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\cmserrorhandling.cpp"
 				>
 			</File>
@@ -971,6 +975,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\langdef.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\langmgr.cpp"
 				>
 			</File>
@@ -1020,6 +1028,30 @@
 			</File>
 			<File
 				RelativePath="..\..\..\scribus\ui\marginwidget.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\mark2item.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\mark2mark.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\markanchor.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\marknote.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\marksmanager.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\markvariabletext.cpp"
 				>
 			</File>
 			<File
@@ -1103,6 +1135,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\notesstyles.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\notesstyleseditor.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\observable.cpp"
 				>
 			</File>
@@ -1136,6 +1176,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\scribus\pageitem_line.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\pageitem_noteframe.cpp"
 				>
 			</File>
 			<File
@@ -3096,6 +3140,24 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\ui\clockwidget.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\cmserrorhandling.h"
 				>
 			</File>
@@ -4260,6 +4322,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\langdef.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\langmgr.h"
 				>
 			</File>
@@ -4417,6 +4483,136 @@
 			</File>
 			<File
 				RelativePath="..\..\..\scribus\ui\marginwidget.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\mark2item.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\mark2mark.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\markanchor.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\markinsert.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\marknote.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\marks.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\marksmanager.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\markvariabletext.h"
 				>
 				<FileConfiguration
 					Name="Debug-cairo|Win32"
@@ -4738,6 +4934,42 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\notesstyles.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\notesstyleseditor.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\observable.h"
 				>
 				<FileConfiguration
@@ -4883,6 +5115,24 @@
 			</File>
 			<File
 				RelativePath="..\..\..\scribus\pageitem_line.h"
+				>
+				<FileConfiguration
+					Name="Debug-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release-cairo|Win32"
+					>
+					<Tool
+						Name="moc"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\pageitem_noteframe.h"
 				>
 				<FileConfiguration
 					Name="Debug-cairo|Win32"
@@ -8597,6 +8847,30 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\ui\ui_mark2item.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\ui_mark2mark.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\ui_markanchor.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\ui_marknote.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\ui_marksmanager.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\ui_markvariabletext.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\ui\ui_measurementsbase.h"
 				>
 			</File>
@@ -8610,6 +8884,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\scribus\ui\ui_newmarginwidgetbase.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\ui_notesstyleseditor.h"
 				>
 			</File>
 			<File
@@ -9070,6 +9348,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\ui\moc_clockwidget.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\ui\moc_cmsprefs.cpp"
 				>
 			</File>
@@ -9322,6 +9604,34 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\ui\moc_mark2item.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\moc_mark2mark.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\moc_markanchor.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\moc_markinsert.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\moc_marknote.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\moc_marksmanager.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\moc_markvariabletext.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\ui\moc_masterpagepalette.cpp"
 				>
 			</File>
@@ -9386,6 +9696,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\moc_notesstyles.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\moc_notesstyleseditor.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\moc_observable.cpp"
 				>
 			</File>
@@ -9419,6 +9737,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\scribus\moc_pageitem_line.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\moc_pageitem_noteframe.cpp"
 				>
 			</File>
 			<File
@@ -10195,6 +10517,30 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\scribus\ui\mark2item.ui"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\mark2mark.ui"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\markanchor.ui"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\marknote.ui"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\marksmanager.ui"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\markvariabletext.ui"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\scribus\ui\measurementsbase.ui"
 				>
 			</File>
@@ -10216,6 +10562,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\scribus\ui\nftwidget.ui"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\scribus\ui\notesstyleseditor.ui"
 				>
 			</File>
 			<File

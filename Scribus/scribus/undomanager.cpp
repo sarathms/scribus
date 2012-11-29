@@ -992,6 +992,15 @@ void UndoManager::languageChange()
 	UndoManager::ImportText         = tr("Import text");
 	UndoManager::ClearText          = tr("Clear text");
 	UndoManager::AddLoremIpsum      = tr("Add Lorem Ipsum");
+	UndoManager::InsertMark         = tr("Insert mark");
+	UndoManager::InsertNote         = tr("Insert note");
+	UndoManager::EditMark           = tr("Edit mark");
+	UndoManager::DeleteMark         = tr("Delete mark");
+	UndoManager::DeleteNote         = tr("Delete note");
+	UndoManager::NewNotesStyle      = tr("Add note style");
+	UndoManager::EditNotesStyle     = tr("Edit note style");
+	UndoManager::DeleteNotesStyle   = tr("Delete note style");
+	UndoManager::DeleteNotesStyle   = tr("Delete note style");
 	UndoManager::DeletePage         = tr("Delete page");
 	UndoManager::DeletePages        = tr("Delete pages");
 	UndoManager::ChangePageProps    = tr("Change page properties");
@@ -1042,6 +1051,7 @@ void UndoManager::languageChange()
 	UndoManager::PathOperation		= tr("Path Operation");
 	UndoManager::ChangePageAttrs    = tr("Change Page Attributes");
 	UndoManager::Transform          = tr("Transform");
+	UndoManager::WeldItems          = tr("Weld Items");
 }
 
 void UndoManager::initIcons()
@@ -1255,6 +1265,14 @@ QString UndoManager::ClearText          = "";
 QString UndoManager::ReplaceText        = "";
 QString UndoManager::InsertText         = "";
 QString UndoManager::AddLoremIpsum      = "";
+QString UndoManager::EditMark           = "";
+QString UndoManager::InsertMark         = "";
+QString UndoManager::DeleteMark         = "";
+QString UndoManager::InsertNote         = "";
+QString UndoManager::DeleteNote         = "";
+QString UndoManager::NewNotesStyle      = "";
+QString UndoManager::EditNotesStyle      = "";
+QString UndoManager::DeleteNotesStyle   = "";
 QString UndoManager::DeletePage         = "";
 QString UndoManager::DeletePages        = "";
 QString UndoManager::ChangePageProps    = "";
@@ -1305,6 +1323,7 @@ QString UndoManager::ClearImage         = "";
 QString UndoManager::PathOperation      = "";
 QString UndoManager::ChangePageAttrs    = "";
 QString UndoManager::Transform          = "";
+QString UndoManager::WeldItems          = "";
 
 /*** Icons for UndoObjects *******************************************/
 QPixmap *UndoManager::IImageFrame      = 0;

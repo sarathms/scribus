@@ -40,10 +40,12 @@ for which a new license (GPL+exception) is in place.
 #include "util_icon.h"
 
 
-ScDockPalette::ScDockPalette(  QWidget * parent, const QString& prefsContext, Qt::WFlags f)
-	: QDockWidget ( parent, f | Qt::Tool | Qt::CustomizeWindowHint
-			| Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint
-			| Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint ),
+ScDockPalette::ScDockPalette( QWidget * parent, const QString& prefsContext, Qt::WFlags f)
+#if defined(Q_OS_MAC) || defined(Q_OS_WIN)
+	: QDockWidget ( parent, f | Qt::Tool  | Qt::CustomizeWindowHint | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint ),
+#else
+	: QDockWidget ( parent, f | Qt::Tool  | Qt::CustomizeWindowHint ),
+#endif
 	palettePrefs(0),
 	prefsContextName(QString::null),
 	visibleOnStartup(false)
@@ -152,7 +154,7 @@ void ScDockPalette::showEvent(QShowEvent *showEvent)
 	// According to Qt doc, non-spontaneous show events are sent to widgets
 	// immediately before they are shown. We want to restore geometry for those
 	// events as spontaneous events are delivered after dialog has been shown
-	if (palettePrefs && !showEvent->spontaneous())
+	if (palettePrefs && !showEvent->spontaneous() && isFloating())
 	{
 		QDesktopWidget *d = QApplication::desktop();
 		QSize gStrut = QApplication::globalStrut();

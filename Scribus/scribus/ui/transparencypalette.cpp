@@ -217,8 +217,7 @@ void Tpalette::updateGradientList()
 		pb.fillRect(0, 0, 48, 12, b);
 		pb.end();
 		ScPainter *p = new ScPainter(&pixm, 48, 12);
-		p->setPen(Qt::black);
-		p->setLineWidth(1);
+		p->setPen(Qt::black, 1, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
 		p->setFillMode(2);
 		p->fill_gradient = gr;
 		p->setGradient(VGradient::linear, FPoint(0,6), FPoint(48, 6), FPoint(0,0), 1, 0);
@@ -496,6 +495,8 @@ void Tpalette::changePatternProps()
 	PatternPropsDialog *dia = new PatternPropsDialog(this, currentUnit, false);
 	dia->spinXscaling->setValue(m_Pattern_scaleX);
 	dia->spinYscaling->setValue(m_Pattern_scaleY);
+	if (m_Pattern_scaleX == m_Pattern_scaleY)
+		dia->keepScaleRatio->setChecked(true);
 	dia->spinXoffset->setValue(m_Pattern_offsetX);
 	dia->spinYoffset->setValue(m_Pattern_offsetY);
 	dia->spinAngle->setValue(m_Pattern_rotation);

@@ -39,7 +39,7 @@ HunspellPluginImpl::HunspellPluginImpl() : QObject(0)
 
 HunspellPluginImpl::~HunspellPluginImpl()
 {
-	foreach (Hunspell* h, hspellerMap)
+	foreach (HunspellDict* h, hspellerMap)
 	{
 		delete h;
 		h = NULL;
@@ -64,14 +64,14 @@ bool HunspellPluginImpl::run(const QString & target, ScribusDoc* doc)
 
 bool HunspellPluginImpl::initHunspell()
 {
-	bool dictPathFound=LanguageManager::instance()->findDictionaries(dictionaryPaths);
+	bool dictPathFound=LanguageManager::instance()->findSpellingDictionaries(dictionaryPaths);
 	if (!dictPathFound)
 	{
 		qDebug()<<"No preinstalled dictonary paths found";
 		return false;
 	}
 	dictionaryMap.clear();
-	LanguageManager::instance()->findDictionarySets(dictionaryPaths, dictionaryMap);
+	LanguageManager::instance()->findSpellingDictionarySets(dictionaryPaths, dictionaryMap);
 //	numDicts=dictionaryMap.count();
 	if (dictionaryMap.count()==0)
 		return false;
@@ -80,8 +80,8 @@ bool HunspellPluginImpl::initHunspell()
 	QMap<QString, QString>::iterator it = dictionaryMap.begin();
 	while (it != dictionaryMap.end())
 	{
-		hspellerMap.insert(it.key(), new Hunspell((it.value()+".aff").toLocal8Bit().constData(),
-											 (it.value()+".dic").toLocal8Bit().constData()));
+		//qDebug()<<"hunspell init:"<<it.key()<<it.value();
+		hspellerMap.insert(it.key(), new HunspellDict(it.value()+".aff", it.value()+".dic"));
 		++it;
 	}
 	return true;
@@ -113,25 +113,47 @@ bool HunspellPluginImpl::checkWithHunspellSE()
 
 bool HunspellPluginImpl::parseTextFrame(StoryText *iText)
 {
-	int len=iText->length();
-	int currPos=0, wordStart=0;
-	while (currPos<len)
+	int len = iText->length();
+	int currPos = iText->firstWord(), wordStart;
+	while (currPos < len)
 	{
-		wordStart=iText->nextWord(currPos);
-		int wordEnd=iText->endOfWord(wordStart);
-		currPos=wordStart;
-		QString word=iText->text(wordStart,wordEnd-wordStart);
-		QString wordLang=iText->charStyle(wordStart).language();
-		wordLang=LanguageManager::instance()->getAbbrevFromLang(wordLang, true, false);
+		wordStart = currPos;
+		int wordEnd = iText->endOfWord(wordStart);
+		QString word = iText->text(wordStart,wordEnd - wordStart);
+		QString wordLang = iText->charStyle(wordStart).language();
+
+		if (wordLang.isEmpty())
+		{
+			const StyleSet<CharStyle> &tmp(m_doc->charStyles());
+			for (int i = 0; i < tmp.count(); ++i)
+				if(tmp[i].isDefaultStyle())
+				{
+					//check out why we are getting "German" back here next
+					wordLang=tmp[i].language();
+					//qDebug()<<"Default char style lang"<<tmp[i].language();
+				}
+		}
+		//we now use the abbreviation
+		//wordLang=LanguageManager::instance()->getAbbrevFromLang(wordLang, true, false);
 		//A little hack as for some reason our en dictionary from the aspell plugin was not called en_GB or en_US but en, content was en_GB though. Meh.
 		if (wordLang=="en")
 			wordLang="en_GB";
 		int spellerIndex=0;
+		//qDebug()<<"Word:"<<word<<wordLang;
 		if (!dictionaryMap.contains(wordLang))
-			qDebug()<<"Spelling language to match style language not installed ("<<wordLang<<")";
+		{
+			//qDebug()<<"Spelling language to match style language NOT installed ("<<wordLang<<")";
+			QString altLang=LanguageManager::instance()->getAlternativeAbbrevfromAbbrev(wordLang);
+			if (altLang!="")
+			{
+				//qDebug()<<"altLang"<<altLang<<dictionaryMap.contains(altLang);
+				wordLang=altLang;
+			}
+		}
 		else
 		{
-			int i=0;
+			//qDebug()<<"Spelling language to match style language IS installed ("<<wordLang<<")";
+			int i = 0;
 			QMap<QString, QString>::iterator it = dictionaryMap.begin();
 			while (it != dictionaryMap.end())
 			{
@@ -140,26 +162,24 @@ bool HunspellPluginImpl::parseTextFrame(StoryText *iText)
 				++i;
 				++it;
 			}
-			spellerIndex=i;
+			spellerIndex = i;
 		}
-		if (hspellerMap.contains(wordLang) && hspellerMap[wordLang]->spell(word.toUtf8().constData())==0)
+
+		if (hspellerMap.contains(wordLang) && hspellerMap[wordLang]->spell(word)==0)
 		{
+			//qDebug()<<"hspellerMap.contains(wordLang)"<<hspellerMap.contains(wordLang)<< "hspellerMap[wordLang]->spell(word)"<<hspellerMap[wordLang]->spell(word);
 			struct WordsFound wf;
-			wf.start=currPos;
+			wf.start=wordStart;
 			wf.end=wordEnd;
 			wf.w=word;
 			wf.changed=false;
 			wf.ignore=false;
 			wf.changeOffset=0;
-			wf.lang=wordLang;
-			wf.replacements.clear();
-			char **sugglist = NULL;
-			int suggCount=hspellerMap[wordLang]->suggest(&sugglist, word.toUtf8().constData());
-			for (int j=0; j < suggCount; ++j)
-				wf.replacements << QString::fromUtf8(sugglist[j]);
-			hspellerMap[wordLang]->free_list(&sugglist, suggCount);
+			wf.lang = wordLang;
+			wf.replacements = hspellerMap[wordLang]->suggest(word);
 			wordsToCorrect.append(wf);
 		}
+		currPos = iText->nextWord(wordStart);
 	}
 	return true;
 }

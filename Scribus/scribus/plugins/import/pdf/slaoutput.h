@@ -26,28 +26,70 @@ for which a new license (GPL+exception) is in place.
 #include "selection.h"
 #include "vgradient.h"
 
-#include <goo/gtypes.h>
-#include <Object.h>
-#include <OutputDev.h>
-#include <Gfx.h>
-#include <GfxState.h>
-#include <Stream.h>
-#include <GfxFont.h>
-#include <PDFDoc.h>
-#include <Error.h>
-#include <Page.h>
-#include <Catalog.h>
-#include <CharCodeToUnicode.h>
-#include <FontEncodingTables.h>
-#include <fofi/FoFiTrueType.h>
-#include <splash/SplashFontFileID.h>
-#include <splash/SplashFontFile.h>
-#include <splash/SplashFontEngine.h>
-#include <splash/SplashFont.h>
-#include <splash/SplashMath.h>
-#include <splash/SplashPath.h>
-#include <splash/SplashGlyphBitmap.h>
+#include <poppler/goo/gtypes.h>
+#include <poppler/Object.h>
+#include <poppler/OutputDev.h>
+#include <poppler/Gfx.h>
+#include <poppler/GfxState.h>
+#include <poppler/Stream.h>
+#include <poppler/GfxFont.h>
+#include <poppler/Link.h>
+#include <poppler/PDFDoc.h>
+#include <poppler/Error.h>
+#include <poppler/Form.h>
+#include <poppler/Page.h>
+#include <poppler/Catalog.h>
+#include <poppler/CharCodeToUnicode.h>
+#include <poppler/FontEncodingTables.h>
+#include <poppler/splash/SplashFontFileID.h>
+#include <poppler/splash/SplashFontFile.h>
+#include <poppler/splash/SplashFontEngine.h>
+#include <poppler/splash/SplashFont.h>
+#include <poppler/splash/SplashMath.h>
+#include <poppler/splash/SplashPath.h>
+#include <poppler/splash/SplashGlyphBitmap.h>
 
+//------------------------------------------------------------------------
+// LinkSubmitData
+//------------------------------------------------------------------------
+
+class LinkSubmitForm: public LinkAction
+{
+public:
+	// Build a LinkImportData from an action dictionary.
+	LinkSubmitForm(Object *actionObj);
+	// Destructor.
+	virtual ~LinkSubmitForm();
+	// Was the LinkImportData created successfully?
+	virtual GBool isOk() { return fileName != NULL; }
+	// Accessors.
+	virtual LinkActionKind getKind() { return actionUnknown; }
+	GooString *getFileName() { return fileName; }
+	int getFlags() { return m_flags; }
+private:
+	GooString *fileName;		// file name
+	int m_flags;
+};
+
+//------------------------------------------------------------------------
+// LinkImportData
+//------------------------------------------------------------------------
+
+class LinkImportData: public LinkAction
+{
+public:
+	// Build a LinkImportData from an action dictionary.
+	LinkImportData(Object *actionObj);
+	// Destructor.
+	virtual ~LinkImportData();
+	// Was the LinkImportData created successfully?
+	virtual GBool isOk() { return fileName != NULL; }
+	// Accessors.
+	virtual LinkActionKind getKind() { return actionUnknown; }
+	GooString *getFileName() { return fileName; }
+private:
+	GooString *fileName;		// file name
+};
 //------------------------------------------------------------------------
 // SplashOutFontFileID
 //------------------------------------------------------------------------
@@ -64,8 +106,37 @@ public:
 	}
 
 private:
-
 	Ref r;
+};
+
+
+class AnoOutputDev : public OutputDev
+{
+public:
+	AnoOutputDev(ScribusDoc* doc, QStringList *importedColors);
+	virtual ~AnoOutputDev();
+	GBool isOk() { return gTrue; }
+	virtual GBool upsideDown() { return gTrue; }
+	virtual GBool useDrawChar() { return gFalse; }
+	virtual GBool interpretType3Chars() { return gFalse; }
+	virtual GBool useTilingPatternFill() { return gFalse; }
+	virtual GBool useShadedFills(int type) { return gFalse; }
+	virtual GBool useFillColorStop() { return gFalse; }
+	virtual GBool useDrawForm() { return gFalse; }
+	virtual void stroke(GfxState *state);
+	virtual void eoFill(GfxState *state);
+	virtual void fill(GfxState *state);
+	virtual void drawString(GfxState *state, GooString *s);
+	QString CurrColorText;
+	QString CurrColorFill;
+	QString CurrColorStroke;
+	double m_fontSize;
+	GooString *m_fontName;
+	GooString *m_itemText;
+private:
+	QString getColor(GfxColorSpace *color_space, GfxColor *color, int *shade);
+	ScribusDoc* m_doc;
+	QStringList *m_importedColors;
 };
 
 
@@ -74,6 +145,14 @@ class SlaOutputDev : public OutputDev
 public:
 	SlaOutputDev(ScribusDoc* doc, QList<PageItem*> *Elements, QStringList *importedColors, int flags);
 	virtual ~SlaOutputDev();
+	LinkAction* SC_getAction(AnnotWidget *ano);
+	LinkAction* SC_getAdditionalAction(const char *key, AnnotWidget *ano);
+	static GBool annotations_callback(Annot *annota, void *user_data);
+	bool handleTextAnnot(Annot* annota, double xCoor, double yCoor, double width, double height);
+	bool handleLinkAnnot(Annot* annota, double xCoor, double yCoor, double width, double height);
+	bool handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, double width, double height);
+	void applyTextStyle(PageItem* ite, QString fontName, QString textColor, double fontSize);
+	void handleActions(PageItem* ite, AnnotWidget *ano);
 	void startDoc(PDFDoc *doc, XRef *xrefA, Catalog *catA);
 
 	GBool isOk() { return gTrue; }
@@ -84,7 +163,7 @@ public:
 	virtual GBool useShadedFills(int type) { return type <= 7; }
 	virtual GBool useFillColorStop() { return gTrue; }
 	virtual GBool useDrawForm() { return gFalse; }
-	virtual void startPage(int, GfxState *);
+	virtual void startPage(int pageNum, GfxState *);
 	virtual void endPage();
 	// grapics state
 	virtual void saveState(GfxState *state);
@@ -94,8 +173,7 @@ public:
 	virtual void stroke(GfxState *state);
 	virtual void fill(GfxState *state);
 	virtual void eoFill(GfxState *state);
-	virtual GBool tilingPatternFill(GfxState *state, Catalog *cat, Object *str, double *pmat, int paintType, Dict *resDict,
-				  double *mat, double *bbox, int x0, int y0, int x1, int y1, double xStep, double yStep);
+	GBool tilingPatternFill(GfxState *state, Gfx *gfx, Catalog *cat, Object *str, double *pmat, int paintType, int tilingType, Dict *resDict, double *mat, double *bbox, int x0, int y0, int x1, int y1, double xStep, double yStep);
 	virtual GBool axialShadedFill(GfxState *state, GfxAxialShading *shading, double tMin, double tMax);
 	virtual GBool axialShadedSupportExtend(GfxState *state, GfxAxialShading *shading) { return (shading->getExtend0() == shading->getExtend1()); }
 	virtual GBool radialShadedFill(GfxState *state, GfxRadialShading *shading, double sMin, double sMax);
@@ -176,6 +254,7 @@ public:
 private:
 	void getPenState(GfxState *state);
 	QString getColor(GfxColorSpace *color_space, GfxColor *color, int *shade);
+	QString getAnnotationColor(AnnotColor *color);
 	QString convertPath(GfxPath *path);
 	int getBlendMode(GfxState *state);
 	void applyMask(PageItem *ite);
@@ -192,7 +271,6 @@ private:
 	struct clipEntry
 	{
 		PageItem* ClipItem;
-		FPointArray ClipCoords;
 		int grStackDepth;
 	};
 	QStack<clipEntry> m_clipStack;
@@ -241,6 +319,8 @@ private:
 	Catalog *catalog;
 	SplashFontEngine *m_fontEngine;
 	SplashFont *m_font;
+	FormPageWidgets *m_formWidgets;
+	int m_actPage;
 };
 
 #endif

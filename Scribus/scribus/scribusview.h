@@ -65,6 +65,7 @@ class QMimeData;
 #include "observable.h"
 #include "scribusapi.h"
 #include "scribusdoc.h"
+#include "ui/clockwidget.h"
 
 class Canvas;
 class CanvasMode;
@@ -83,7 +84,6 @@ class Selection;
 class UndoManager;
 class UndoTransaction;
 class TransactionSettings;
-
 
 /**
  * This class provides an incomplete base for your application view.
@@ -130,17 +130,20 @@ public:
 	QToolButton *zoomInToolbarButton;
 	QToolButton *cmsToolbarButton;
 	QToolButton *previewToolbarButton;
+	QToolButton *editOnPreviewToolbarButton;
 #else
 	QPushButton *zoomDefaultToolbarButton;
 	QPushButton *zoomOutToolbarButton;
 	QPushButton *zoomInToolbarButton;
 	QPushButton *cmsToolbarButton;
 	QPushButton *previewToolbarButton;
+	QPushButton *editOnPreviewToolbarButton;
 #endif
 	QComboBox *layerMenu; //Menu for layers at bottom of view
 	QComboBox *unitSwitcher; //Menu for units at bottom of view
 	QComboBox *previewQualitySwitcher; //Menu for image preview quality
 	QComboBox *visualMenu;
+	ClockWidget *clockLabel;
   /** Dokument zu dem die Seite gehoert */
 	ScribusDoc * const Doc;
 	Canvas * const m_canvas;
@@ -253,6 +256,7 @@ public slots: // Public slots
 	void languageChange();
 	void toggleCMS();
 	void switchPreviewVisual(int vis);
+	void togglePreviewEdit();
 	void togglePreview();
 	void unitChange();
 	void setRulersShown(bool isShown);

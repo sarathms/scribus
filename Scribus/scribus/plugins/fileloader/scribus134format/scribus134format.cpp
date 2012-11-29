@@ -9,6 +9,7 @@ for which a new license (GPL+exception) is in place.
 
 #include "../../formatidlist.h"
 #include "commonstrings.h"
+#include "langmgr.h"
 #include "ui/missing.h"
 #include "hyphenator.h"
 #include "pageitem_latexframe.h"
@@ -726,7 +727,8 @@ bool Scribus134Format::loadFile(const QString & fileName, const FileFormat & /* 
 
 	// start auto save timer if needed
 	if (m_Doc->autoSave()  && ScCore->usingGUI())
-		m_Doc->autoSaveTimer->start(m_Doc->autoSaveTime());
+		m_Doc->restartAutoSaveTimer();
+//		m_Doc->autoSaveTimer->start(m_Doc->autoSaveTime());
 	
 	if (m_mwProgressBar!=0)
 		m_mwProgressBar->setValue(reader.characterOffset());
@@ -1214,7 +1216,18 @@ void Scribus134Format::readCharacterStyleAttrs(ScribusDoc *doc, ScXmlStreamAttri
 
 	static const QString LANGUAGE("LANGUAGE");
 	if (attrs.hasAttribute(LANGUAGE))
-		newStyle.setLanguage(attrs.valueAsString(LANGUAGE));
+	{
+		QString l(attrs.valueAsString(LANGUAGE));
+		if (LanguageManager::instance()->langTableIndex(l)!=-1)
+			newStyle.setLanguage(l); //new style storage
+		else
+		{ //old style storage
+			QString lnew=LanguageManager::instance()->getAbbrevFromLang(l, true, false);
+			if (lnew.isEmpty())
+				lnew=LanguageManager::instance()->getAbbrevFromLang(l, false, false);
+			newStyle.setLanguage(lnew);
+		}
+	}
 
 	static const QString SHORTCUT("SHORTCUT");
 	if (attrs.hasAttribute(SHORTCUT))
@@ -3519,6 +3532,7 @@ bool Scribus134Format::readCharStyles(const QString& fileName, ScribusDoc* doc, 
 		if (tagName == "CHARSTYLE")
 		{
 			cstyle.erase();
+			attrs = reader.scAttributes();
 			readNamedCharacterStyleAttrs(doc, attrs, cstyle);
 			docCharStyles.create(cstyle);
 		}

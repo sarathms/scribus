@@ -27,7 +27,7 @@ class SCRIBUS_API PageSelector : public QWidget
 	Q_OBJECT
 
 public:
-	PageSelector( QWidget* parent, int maxPg );
+	PageSelector( QWidget* parent, int maxPg = 0 );
 	~PageSelector() {};
 	
 	virtual void changeEvent(QEvent *e);
@@ -35,6 +35,7 @@ public:
 	bool hasFocus();
 	void focusPolicy(Qt::FocusPolicy policy);
 	void setFont ( const QFont & );
+	int getCurrentPage();
 
 #if OPTION_USE_QTOOLBUTTON
 	QToolButton* Start;

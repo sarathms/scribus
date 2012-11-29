@@ -1083,7 +1083,7 @@ void TabPDFOptions::restoreDefaults(PDFOptions & Optionen,
 				if (((pgit->itemType() == PageItem::TextFrame) || (pgit->itemType() == PageItem::PathText)) && (pgit->isAnnotation()))
 				{
 					int annotType  = pgit->annotation().Type();
-					bool mustEmbed = ((annotType >= 2) && (annotType <= 6) && (annotType != 4));
+					bool mustEmbed = ((annotType >= Annotation::Button) && (annotType <= Annotation::Listbox) && (annotType != Annotation::Checkbox));
 					if (pgit->itemText.length() > 0 || mustEmbed)
 						AnnotationFonts.insert(pgit->itemText.defaultStyle().charStyle().font().replacementName(), "");
 				}
@@ -1103,7 +1103,7 @@ void TabPDFOptions::restoreDefaults(PDFOptions & Optionen,
 				if (((pgit->itemType() == PageItem::TextFrame) || (pgit->itemType() == PageItem::PathText)) && (pgit->isAnnotation()))
 				{
 					int annotType  = pgit->annotation().Type();
-					bool mustEmbed = ((annotType >= 2) && (annotType <= 6) && (annotType != 4));
+					bool mustEmbed = ((annotType >= Annotation::Button) && (annotType <= Annotation::Listbox) && (annotType != Annotation::Checkbox));
 					if (pgit->itemText.length() > 0 || mustEmbed)
 						AnnotationFonts.insert(pgit->itemText.defaultStyle().charStyle().font().replacementName(), "");
 				}
@@ -1123,7 +1123,7 @@ void TabPDFOptions::restoreDefaults(PDFOptions & Optionen,
 				if (((pgit->itemType() == PageItem::TextFrame) || (pgit->itemType() == PageItem::PathText)) && (pgit->isAnnotation()))
 				{
 					int annotType  = pgit->annotation().Type();
-					bool mustEmbed = ((annotType >= 2) && (annotType <= 6) && (annotType != 4));
+					bool mustEmbed = ((annotType >= Annotation::Button) && (annotType <= Annotation::Listbox) && (annotType != Annotation::Checkbox));
 					if (pgit->itemText.length() > 0 || mustEmbed)
 						AnnotationFonts.insert(pgit->itemText.defaultStyle().charStyle().font().replacementName(), "");
 				}
@@ -1660,6 +1660,7 @@ void TabPDFOptions::EnablePDFX(int a)
 		X3Group->setEnabled(false);
 		setTabEnabled(indexOf(tabSecurity), true);
 		OutCombo->setEnabled(true);
+		EmbedProfs->setEnabled(true);
 		EmbedProfs2->setEnabled(true);
 		emit hasInfo();
 		if (doc != 0 && pdfExport)
@@ -1670,6 +1671,7 @@ void TabPDFOptions::EnablePDFX(int a)
 				FromEmbed->setEnabled(true);
 			ToEmbed->setEnabled(true);
 		}
+		EnablePr(OutCombo->currentIndex());
 		return;
 	}
 	// PDF/X is selected
@@ -1677,8 +1679,16 @@ void TabPDFOptions::EnablePDFX(int a)
 	OutCombo->setCurrentIndex(1);
 	OutCombo->setEnabled(false);
 	EnablePr(1);
+	if (a == 3) // X1, no profile embedding
+	{
+		EmbedProfs->setChecked(false);
+		EmbedProfs->setEnabled(false);
+		EmbedProfs2->setChecked(false);
+		EmbedProfs2->setEnabled(false);
+	}
 	if ((a == 4) || (a == 5)) // X3 or X4, enforcing color profiles on images
 	{
+		EmbedProfs->setEnabled(true);
 		EmbedProfs2->setChecked(true);
 		EmbedProfs2->setEnabled(false);
 	}

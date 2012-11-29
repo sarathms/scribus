@@ -72,6 +72,11 @@ void InlineView::dropEvent(QDropEvent *e)
 		e->acceptProposedAction();
 		if (e->source() == this)
 			return;
+		QString text = e->mimeData()->text();
+		if ((text.startsWith("<SCRIBUSELEM")) || (text.startsWith("SCRIBUSELEMUTF8")))
+		{
+			emit objectDropped(text);
+		}
 	}
 	else
 		e->ignore();
@@ -80,7 +85,9 @@ void InlineView::dropEvent(QDropEvent *e)
  void InlineView::startDrag(Qt::DropActions supportedActions)
  {
 	QMimeData *mimeData = new QMimeData;
-	QByteArray data = currentItem()->text().toLocal8Bit();
+	int id = currentItem()->data(Qt::UserRole).toInt();
+	QByteArray data;
+	data.setNum(id);
 	mimeData->setData("text/inline", data);
 	QDrag *drag = new QDrag(this);
 	drag->setMimeData(mimeData);
@@ -103,6 +110,7 @@ InlinePalette::InlinePalette( QWidget* parent) : ScDockPalette( parent, "Inline"
 	languageChange();
 	connect(InlineViewWidget, SIGNAL(itemDoubleClicked(QListWidgetItem *)), this, SLOT(handleDoubleClick(QListWidgetItem *)));
 	connect(InlineViewWidget, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(handleContextMenue(QPoint)));
+	connect(InlineViewWidget, SIGNAL(objectDropped(QString)), this, SIGNAL(objectDropped(QString)));
 }
 
 void InlinePalette::handleContextMenue(QPoint p)
@@ -129,6 +137,8 @@ void InlinePalette::handleContextMenue(QPoint p)
 			QAction* editAct = pmenu->addAction( tr("Edit Item"));
 			connect(editAct, SIGNAL(triggered()), this, SLOT(handleEditItem()));
 		}
+		QAction* delAct = pmenu->addAction( tr("Remove Item"));
+		connect(delAct, SIGNAL(triggered()), this, SLOT(handleDeleteItem()));
 		pmenu->exec(QCursor::pos());
 		delete pmenu;
 		actItem = -1;
@@ -161,6 +171,14 @@ void InlinePalette::handleDoubleClick(QListWidgetItem *item)
 {
 	if (item)
 		emit startEdit(item->data(Qt::UserRole).toInt());
+}
+
+void InlinePalette::handleDeleteItem()
+{
+	currDoc->removeInlineFrame(actItem);
+	QListWidgetItem* item = InlineViewWidget->takeItem(InlineViewWidget->currentRow());
+	delete item;
+	InlineViewWidget->update();
 }
 
 void InlinePalette::editingStart()
@@ -197,15 +215,22 @@ void InlinePalette::setDoc(ScribusDoc *newDoc)
 	else
 		currDoc = newDoc;
 	if (currDoc == NULL)
+	{
 		InlineViewWidget->clear();
+		setEnabled(true);
+	}
 	else
+	{
+		setEnabled(!currDoc->drawAsPreview);
 		updateItemList();
+	}
 }
 
 void InlinePalette::unsetDoc()
 {
 	currDoc = NULL;
 	InlineViewWidget->clear();
+	setEnabled(true);
 }
 
 void InlinePalette::handleUpdateRequest(int updateFlags)
