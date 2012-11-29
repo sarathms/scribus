@@ -121,6 +121,8 @@ class SCRIBUS_API FormatsManager
 		//! Returns in the form of "EPS (*.eps *.EPS *.epsf *.EPSF *.epsi *.EPSI)"
 		QString extensionsForFormat(int type);
 		
+		//! Returns a list of extensions matching the type
+ 		QStringList extensionListForFormat(int type);
 		//! Returns in the form of "*.eps *.epsf *.epsi" or "eps|epsf|epsi"
  		QString extensionListForFormat(int type, int listType);
 		

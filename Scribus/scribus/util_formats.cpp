@@ -172,6 +172,18 @@ QString FormatsManager::fileDialogFormatList(int type)
 	return a + b + ";;" +c;
 }
 
+QStringList FormatsManager::extensionListForFormat(int type)
+{
+    QStringList result;
+    if ((JPEG & type) && !m_supportedImageFormats.contains(QByteArray("jpg")))
+        return result;
+    if ((GIF & type) && !m_supportedImageFormats.contains(QByteArray("gif")))
+        return result;
+    if (m_fmts.contains(type))
+        result = m_fmts.value(type);
+	return result;
+}
+
 QString FormatsManager::extensionListForFormat(int type, int listType)
 {
 	QString nameMatch;
