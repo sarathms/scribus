@@ -85,11 +85,18 @@ SET(SCRIBUS_UI_SRC
   ui/inserttablerowsdialog.ui
   ui/latexeditor.ui
   ui/newmarginwidgetbase.ui
+  ui/mark2item.ui
+  ui/mark2mark.ui
+  ui/markanchor.ui
+  ui/marknote.ui
+  ui/marksmanager.ui
+  ui/markvariabletext.ui
   ui/measurementsbase.ui
   ui/multipleduplicate.ui
   ui/multiprogressdialog.ui
   ui/nftdialog.ui
   ui/nftwidget.ui
+  ui/notesstyleseditor.ui
   ui/pageitemattributes.ui
   ui/pagepalette_pagesbase.ui
   ui/pagepalette_masterpagesbase.ui
@@ -210,6 +217,7 @@ SET(SCRIBUS_MOC_CLASSES
   loadsaveplugin.h
   menumanager.h
   navigator.h
+  notesstyles.h
   observable.h
   pageitem.h
   pageitem_arc.h
@@ -225,6 +233,7 @@ SET(SCRIBUS_MOC_CLASSES
   pageitem_symbol.h
   pageitem_table.h
   pageitem_textframe.h
+  pageitem_noteframe.h
   pageitempointer.h
   pdf_analyzer.h
   pdflib.h
@@ -275,6 +284,7 @@ SET(SCRIBUS_MOC_CLASSES
   ui/charselectenhanced.h
   ui/charzoom.h
   ui/checkDocument.h
+  ui/clockwidget.h
   ui/cmsprefs.h
   ui/cmykfw.h
   ui/collectforoutput_ui.h
@@ -316,6 +326,13 @@ SET(SCRIBUS_MOC_CLASSES
   ui/latexeditor.h
   ui/layers.h
   ui/loremipsum.h
+  ui/markinsert.h
+  ui/mark2item.h
+  ui/mark2mark.h
+  ui/markanchor.h
+  ui/marknote.h
+  ui/marksmanager.h
+  ui/markvariabletext.h
   ui/margindialog.h
   ui/marginpresetlayout.h
   ui/marginwidget.h
@@ -331,6 +348,7 @@ SET(SCRIBUS_MOC_CLASSES
   ui/nftdialog.h
   ui/nftwidget.h
   ui/nodeeditpalette.h
+  ui/notesstyleseditor.h
   ui/oneclick.h
   ui/outlinepalette.h
   ui/pageitemattributes.h
@@ -553,6 +571,7 @@ SET(SCRIBUS_SOURCES
   hyphenator.cpp
   ioapi.c
   KarbonCurveFit.cpp
+  langdef.cpp
   langmgr.cpp
   latexhelpers.cpp
   loadsaveplugin.cpp
@@ -563,6 +582,7 @@ SET(SCRIBUS_SOURCES
   nftrcreader.cpp
   nftsettings.cpp
   nfttemplate.cpp
+  notesstyles.cpp
   pageitem.cpp
   pageitem_arc.cpp
   pageitem_group.cpp
@@ -577,6 +597,7 @@ SET(SCRIBUS_SOURCES
   pageitem_symbol.cpp
   pageitem_table.cpp
   pageitem_textframe.cpp
+  pageitem_noteframe.cpp
   pageitempointer.cpp
   pagesize.cpp
   pdf_analyzer.cpp
@@ -706,6 +727,7 @@ SET(SCRIBUS_SOURCES
   ui/charselectenhanced.cpp
   ui/charzoom.cpp
   ui/checkDocument.cpp
+  ui/clockwidget.cpp
   ui/cmsprefs.cpp
   ui/cmykfw.cpp
   ui/collectforoutput_ui.cpp
@@ -748,6 +770,12 @@ SET(SCRIBUS_SOURCES
   ui/linecombo.cpp
   ui/linkbutton.cpp
   ui/loremipsum.cpp
+  ui/mark2item.cpp
+  ui/mark2mark.cpp
+  ui/markanchor.cpp
+  ui/marknote.cpp
+  ui/marksmanager.cpp
+  ui/markvariabletext.cpp
   ui/margindialog.cpp
   ui/marginpresetlayout.cpp
   ui/marginwidget.cpp
@@ -763,6 +791,7 @@ SET(SCRIBUS_SOURCES
   ui/nftdialog.cpp
   ui/nftwidget.cpp
   ui/nodeeditpalette.cpp
+  ui/notesstyleseditor.cpp
   ui/oneclick.cpp
   ui/outlinepalette.cpp
   ui/pageitemattributes.cpp

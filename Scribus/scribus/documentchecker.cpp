@@ -98,6 +98,10 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 		if (layerError.count() != 0)
 			currDoc->docLayerErrors.insert(ll.ID, layerError);
 	}
+
+	//update all marks references and check if that changes anything in doc
+	currDoc->setNotesChanged(currDoc->updateMarks(true));
+
 	QList<PageItem*> allItems;
 	uint masterItemsCount = currDoc->MasterItems.count();
 	for (uint i = 0; i < masterItemsCount; ++i)
@@ -300,7 +304,7 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 			if ((currItem->asTextFrame()) || (currItem->asPathText()))
 			{
 	#ifndef NLS_PROTO
-				if ( currItem->frameOverflows() && (checkerSettings.checkOverflow) && (!((currItem->isAnnotation()) && ((currItem->annotation().Type() == 5) || (currItem->annotation().Type() == 6)))))
+				if ( currItem->frameOverflows() && (checkerSettings.checkOverflow) && (!((currItem->isAnnotation()) && ((currItem->annotation().Type() == Annotation::Combobox) || (currItem->annotation().Type() == Annotation::Listbox)))))
 					itemError.insert(TextOverflow, 0);
 				if (currItem->isAnnotation())
 				{
@@ -591,7 +595,7 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 			if ((currItem->asTextFrame()) || (currItem->asPathText()))
 			{
 	#ifndef NLS_PROTO
-				if ( currItem->frameOverflows() && (checkerSettings.checkOverflow) && (!((currItem->isAnnotation()) && ((currItem->annotation().Type() == 5) || (currItem->annotation().Type() == 6)))))
+				if ( currItem->frameOverflows() && (checkerSettings.checkOverflow) && (!((currItem->isAnnotation()) && ((currItem->annotation().Type() == Annotation::Combobox) || (currItem->annotation().Type() == Annotation::Listbox)))))
 					itemError.insert(TextOverflow, 0);
 				if (currItem->isAnnotation())
 				{

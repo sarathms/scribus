@@ -1,6 +1,15 @@
+/*
+For general Scribus (>=1.3.2) copyright and licensing information please refer
+to the COPYING file provided with the program. Following this notice may exist
+a copyright and/or license notice that predates the release of Scribus 1.3.2
+for which a new license (GPL+exception) is in place.
+*/
+
 #include "slaoutput.h"
-#include <GlobalParams.h>
-#include <poppler-config.h>
+#include <poppler/GlobalParams.h>
+#include <poppler/poppler-config.h>
+#include <poppler/FileSpec.h>
+#include <poppler/fofi/FoFiTrueType.h>
 #include <QApplication>
 #include <QFile>
 #include "commonstrings.h"
@@ -9,6 +18,187 @@
 #include "util.h"
 #include "util_math.h"
 
+LinkSubmitForm::LinkSubmitForm(Object *actionObj)
+{
+	Object obj1, obj2, obj3;
+	fileName = NULL;
+	m_flags = 0;
+	if (actionObj->isDict())
+	{
+		if (!actionObj->dictLookup("F", &obj1)->isNull())
+		{
+			if (obj1.isDict())
+			{
+				if (!obj1.dictLookup("FS", &obj3)->isNull())
+				{
+					if (obj3.isName())
+					{
+						char *name = obj3.getName();
+						if (!strcmp(name, "URL"))
+						{
+							if (!obj1.dictLookup("F", &obj2)->isNull())
+								fileName = obj2.getString()->copy();
+						}
+						obj2.free();
+					}
+				}
+				obj3.free();
+			}
+		}
+		obj1.free();
+		if (!actionObj->dictLookup("Flags", &obj1)->isNull())
+		{
+			if (obj1.isNum())
+				m_flags = obj1.getInt();
+		}
+		obj1.free();
+	}
+}
+
+LinkSubmitForm::~LinkSubmitForm()
+{
+	if (fileName)
+		delete fileName;
+}
+
+LinkImportData::LinkImportData(Object *actionObj)
+{
+	Object obj1, obj3;
+	fileName = NULL;
+	if (actionObj->isDict())
+	{
+		if (!actionObj->dictLookup("F", &obj1)->isNull())
+		{
+			if (getFileSpecNameForPlatform (&obj1, &obj3))
+			{
+				fileName = obj3.getString()->copy();
+				obj3.free();
+			}
+		}
+		obj1.free();
+	}
+}
+
+LinkImportData::~LinkImportData()
+{
+	if (fileName)
+		delete fileName;
+}
+
+AnoOutputDev::~AnoOutputDev()
+{
+	if (m_fontName)
+		delete m_fontName;
+	if (m_itemText)
+		delete m_itemText;
+}
+
+AnoOutputDev::AnoOutputDev(ScribusDoc* doc, QStringList *importedColors)
+{
+	m_doc = doc;
+	m_importedColors = importedColors;
+	CurrColorStroke = CommonStrings::None;
+	CurrColorFill = CommonStrings::None;
+	CurrColorText = "Black";
+	m_fontSize = 12.0;
+	m_fontName = NULL;
+	m_itemText = NULL;
+}
+
+void AnoOutputDev::eoFill(GfxState *state)
+{
+	int shade = 100;
+	CurrColorFill = getColor(state->getFillColorSpace(), state->getFillColor(), &shade);
+}
+
+void AnoOutputDev::fill(GfxState *state)
+{
+	int shade = 100;
+	CurrColorFill = getColor(state->getFillColorSpace(), state->getFillColor(), &shade);
+}
+
+void AnoOutputDev::stroke(GfxState *state)
+{
+	int shade = 100;
+	CurrColorStroke = getColor(state->getStrokeColorSpace(), state->getStrokeColor(), &shade);
+}
+
+void AnoOutputDev::drawString(GfxState *state, GooString *s)
+{
+	int shade = 100;
+	CurrColorText = getColor(state->getFillColorSpace(), state->getFillColor(), &shade);
+	m_fontSize = state->getFontSize();
+	if (state->getFont())
+		m_fontName = state->getFont()->getName()->copy();
+	m_itemText = s->copy();
+}
+
+QString AnoOutputDev::getColor(GfxColorSpace *color_space, GfxColor *color, int *shade)
+{
+	QString fNam;
+	QString namPrefix = "FromPDF";
+	ScColor tmp;
+	tmp.setSpotColor(false);
+	tmp.setRegistrationColor(false);
+	*shade = 100;
+	if ((color_space->getMode() == csDeviceRGB) || (color_space->getMode() == csCalRGB))
+	{
+		GfxRGB rgb;
+		color_space->getRGB(color, &rgb);
+		int Rc = qRound(colToDbl(rgb.r) * 255);
+		int Gc = qRound(colToDbl(rgb.g) * 255);
+		int Bc = qRound(colToDbl(rgb.b) * 255);
+		tmp.setColorRGB(Rc, Gc, Bc);
+		fNam = m_doc->PageColors.tryAddColor(namPrefix+tmp.name(), tmp);
+	}
+	else if (color_space->getMode() == csDeviceCMYK)
+	{
+		GfxCMYK cmyk;
+		color_space->getCMYK(color, &cmyk);
+		int Cc = qRound(colToDbl(cmyk.c) * 255);
+		int Mc = qRound(colToDbl(cmyk.m) * 255);
+		int Yc = qRound(colToDbl(cmyk.y) * 255);
+		int Kc = qRound(colToDbl(cmyk.k) * 255);
+		tmp.setColor(Cc, Mc, Yc, Kc);
+		fNam = m_doc->PageColors.tryAddColor(namPrefix+tmp.name(), tmp);
+	}
+	else if ((color_space->getMode() == csCalGray) || (color_space->getMode() == csDeviceGray))
+	{
+		GfxGray gray;
+		color_space->getGray(color, &gray);
+		int Kc = 255 - qRound(colToDbl(gray) * 255);
+		tmp.setColor(0, 0, 0, Kc);
+		fNam = m_doc->PageColors.tryAddColor(namPrefix+tmp.name(), tmp);
+	}
+	else if (color_space->getMode() == csSeparation)
+	{
+		GfxCMYK cmyk;
+		color_space->getCMYK(color, &cmyk);
+		int Cc = qRound(colToDbl(cmyk.c) * 255);
+		int Mc = qRound(colToDbl(cmyk.m) * 255);
+		int Yc = qRound(colToDbl(cmyk.y) * 255);
+		int Kc = qRound(colToDbl(cmyk.k) * 255);
+		tmp.setColor(Cc, Mc, Yc, Kc);
+		tmp.setSpotColor(true);
+		QString nam = QString(((GfxSeparationColorSpace*)color_space)->getName()->getCString());
+		fNam = m_doc->PageColors.tryAddColor(nam, tmp);
+		*shade = qRound(colToDbl(color->c[0]) * 100);
+	}
+	else
+	{
+		GfxRGB rgb;
+		color_space->getRGB(color, &rgb);
+		int Rc = qRound(colToDbl(rgb.r) * 255);
+		int Gc = qRound(colToDbl(rgb.g) * 255);
+		int Bc = qRound(colToDbl(rgb.b) * 255);
+		tmp.setColorRGB(Rc, Gc, Bc);
+		fNam = m_doc->PageColors.tryAddColor(namPrefix+tmp.name(), tmp);
+	//	qDebug() << "update fill color other colorspace" << color_space->getMode() << "treating as rgb" << Rc << Gc << Bc;
+	}
+	if (fNam == namPrefix+tmp.name())
+		m_importedColors->append(fNam);
+	return fNam;
+}
 
 SlaOutputDev::SlaOutputDev(ScribusDoc* doc, QList<PageItem*> *Elements, QStringList *importedColors, int flags)
 {
@@ -44,6 +234,829 @@ SlaOutputDev::~SlaOutputDev()
 	delete m_fontEngine;
 }
 
+/* get Actions not implemented by Poppler */
+LinkAction* SlaOutputDev::SC_getAction(AnnotWidget *ano)
+{
+	LinkAction *linkAction = NULL;
+	Object obj;
+	Ref refa = ano->getRef();
+	Object additionalActions;
+	Object *act = xref->fetch(refa.num, refa.gen, &obj);
+	if (act)
+	{
+		if (act->isDict())
+		{
+			Dict* adic = act->getDict();
+			adic->lookupNF("A", &additionalActions);
+			Object additionalActionsObject;
+			if (additionalActions.fetch(pdfDoc->getXRef(), &additionalActionsObject)->isDict())
+			{
+				Object actionObject;
+				additionalActionsObject.dictLookup("S", &actionObject);
+				if (actionObject.isName("ImportData"))
+				{
+					linkAction = new LinkImportData(&additionalActionsObject);
+				}
+				else if (actionObject.isName("SubmitForm"))
+				{
+					linkAction = new LinkSubmitForm(&additionalActionsObject);
+				}
+				actionObject.free();
+			}
+			additionalActionsObject.free();
+			additionalActions.free();
+		}
+	}
+	obj.free();
+	return linkAction;
+}
+
+/* Replacement for the crippled Poppler function LinkAction* AnnotWidget::getAdditionalAction(AdditionalActionsType type) */
+LinkAction* SlaOutputDev::SC_getAdditionalAction(const char *key, AnnotWidget *ano)
+{
+	LinkAction *linkAction = NULL;
+	Object obj;
+	Ref refa = ano->getRef();
+	Object additionalActions;
+	Object *act = xref->fetch(refa.num, refa.gen, &obj);
+	if (act)
+	{
+		if (act->isDict())
+		{
+			Dict* adic = act->getDict();
+			adic->lookupNF("AA", &additionalActions);
+			Object additionalActionsObject;
+			if (additionalActions.fetch(pdfDoc->getXRef(), &additionalActionsObject)->isDict())
+			{
+				Object actionObject;
+				if (additionalActionsObject.dictLookup(key, &actionObject)->isDict())
+					linkAction = LinkAction::parseAction(&actionObject, pdfDoc->getCatalog()->getBaseURI());
+				actionObject.free();
+			}
+			additionalActionsObject.free();
+			additionalActions.free();
+		}
+	}
+	obj.free();
+	return linkAction;
+}
+
+GBool SlaOutputDev::annotations_callback(Annot *annota, void *user_data)
+{
+	SlaOutputDev *dev = (SlaOutputDev*)user_data;
+	PDFRectangle *box = annota->getRect();
+	double xCoor = dev->m_doc->currentPage()->xOffset() + box->x1;
+	double yCoor = dev->m_doc->currentPage()->yOffset() + dev->m_doc->currentPage()->height() - box->y2;
+	double width = box->x2 - box->x1;
+	double height = box->y2 - box->y1;
+	bool retVal = true;
+	if (annota->getType() == Annot::typeText)
+		retVal = !dev->handleTextAnnot(annota, xCoor, yCoor, width, height);
+	else if (annota->getType() == Annot::typeLink)
+		retVal = !dev->handleLinkAnnot(annota, xCoor, yCoor, width, height);
+	else if (annota->getType() == Annot::typeWidget)
+		retVal = !dev->handleWidgetAnnot(annota, xCoor, yCoor, width, height);
+	return retVal;
+}
+
+bool SlaOutputDev::handleTextAnnot(Annot* annota, double xCoor, double yCoor, double width, double height)
+{
+	int z = m_doc->itemAdd(PageItem::TextFrame, PageItem::Rectangle, xCoor, yCoor, width, height, 0, CommonStrings::None, CommonStrings::None, true);
+	PageItem *ite = m_doc->Items->at(z);
+	ite->ClipEdited = true;
+	ite->FrameType = 3;
+	ite->setFillEvenOdd(false);
+	ite->Clip = FlattenPath(ite->PoLine, ite->Segments);
+	ite->ContourLine = ite->PoLine.copy();
+	ite->setTextFlowMode(PageItem::TextFlowDisabled);
+	m_Elements->append(ite);
+	if (m_groupStack.count() != 0)
+	{
+		m_groupStack.top().Items.append(ite);
+		applyMask(ite);
+	}
+	ite->setIsAnnotation(true);
+	ite->AutoName = false;
+	ite->annotation().setType(Annotation::Text);
+	ite->annotation().setActionType(0);
+	ite->setItemName( CommonStrings::itemName_TextAnnotation + QString("%1").arg(m_doc->TotalItems));
+	ite->itemText.insertChars(UnicodeParsedString(annota->getContents()));
+	return true;
+}
+
+bool SlaOutputDev::handleLinkAnnot(Annot* annota, double xCoor, double yCoor, double width, double height)
+{
+	AnnotLink *anl = (AnnotLink*)annota;
+	LinkAction *act = anl->getAction();
+	bool validLink = false;
+	int pagNum = 0;
+	int xco = 0;
+	int yco = 0;
+	QString fileName = "";
+	if (act->getKind() == actionGoTo)
+	{
+		LinkGoTo *gto = (LinkGoTo*)act;
+		LinkDest *dst = gto->getDest();
+		if (dst)
+		{
+			if (dst->getKind() == destXYZ)
+			{
+				if (dst->isPageRef())
+				{
+					Ref dstr = dst->getPageRef();
+					pagNum = pdfDoc->findPage(dstr.num, dstr.gen);
+				}
+				else
+					pagNum = dst->getPageNum();
+				xco = dst->getLeft();
+				yco = dst->getTop();
+				validLink = true;
+			}
+		}
+		else
+		{
+			GooString *ndst = gto->getNamedDest();
+			if (ndst)
+			{
+				LinkDest *dstn = pdfDoc->findDest(ndst);
+				if (dstn)
+				{
+					if (dstn->getKind() == destXYZ)
+					{
+						if (dstn->isPageRef())
+						{
+							Ref dstr = dstn->getPageRef();
+							pagNum = pdfDoc->findPage(dstr.num, dstr.gen);
+						}
+						else
+							pagNum = dstn->getPageNum();
+						xco = dstn->getLeft();
+						yco = dstn->getTop();
+						validLink = true;
+					}
+				}
+			}
+		}
+	}
+	else if (act->getKind() == actionGoToR)
+	{
+		LinkGoToR *gto = (LinkGoToR*)act;
+		fileName = UnicodeParsedString(gto->getFileName());
+		LinkDest *dst = gto->getDest();
+		if (dst)
+		{
+			if (dst->getKind() == destXYZ)
+			{
+				pagNum = dst->getPageNum();
+				xco = dst->getLeft();
+				yco = dst->getTop();
+				validLink = true;
+			}
+		}
+		else
+		{
+			GooString *ndst = gto->getNamedDest();
+			if (ndst)
+			{
+				LinkDest *dstn = pdfDoc->findDest(ndst);
+				if (dstn)
+				{
+					if (dstn->getKind() == destXYZ)
+					{
+						pagNum = dstn->getPageNum();
+						xco = dstn->getLeft();
+						yco = dstn->getTop();
+						validLink = true;
+					}
+				}
+			}
+		}
+	}
+	else if (act->getKind() == actionURI)
+	{
+		LinkURI *gto = (LinkURI*)act;
+		validLink = true;
+		fileName = UnicodeParsedString(gto->getURI());
+	}
+	if (validLink)
+	{
+		int z = m_doc->itemAdd(PageItem::TextFrame, PageItem::Rectangle, xCoor, yCoor, width, height, 0, CommonStrings::None, CommonStrings::None, true);
+		PageItem *ite = m_doc->Items->at(z);
+		ite->ClipEdited = true;
+		ite->FrameType = 3;
+		ite->setFillEvenOdd(false);
+		ite->Clip = FlattenPath(ite->PoLine, ite->Segments);
+		ite->ContourLine = ite->PoLine.copy();
+		ite->setTextFlowMode(PageItem::TextFlowDisabled);
+		m_Elements->append(ite);
+		if (m_groupStack.count() != 0)
+		{
+			m_groupStack.top().Items.append(ite);
+			applyMask(ite);
+		}
+		ite->setIsAnnotation(true);
+		ite->AutoName = false;
+		if (act->getKind() == actionGoTo)
+		{
+			ite->annotation().setZiel(pagNum - 1);
+			ite->annotation().setAction(QString("%1 %2").arg(xco).arg(yco));
+			ite->annotation().setActionType(2);
+		}
+		else if (act->getKind() == actionGoToR)
+		{
+			ite->annotation().setZiel(pagNum - 1);
+			ite->annotation().setExtern(fileName);
+			ite->annotation().setAction(QString("%1 %2").arg(xco).arg(yco));
+			ite->annotation().setActionType(9);
+		}
+		else if (act->getKind() == actionURI)
+		{
+			ite->annotation().setAction("");
+			ite->annotation().setExtern(fileName);
+			ite->annotation().setActionType(8);
+		}
+		ite->annotation().setType(Annotation::Link);
+		ite->setItemName( CommonStrings::itemName_LinkAnnotation + QString("%1").arg(m_doc->TotalItems));
+	}
+	return validLink;
+}
+
+bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, double width, double height)
+{
+	bool retVal = false;
+	int formcount = m_formWidgets->getNumWidgets();
+	for (int i = 0; i < formcount; ++i)
+	{
+		FormWidget *fm = m_formWidgets->getWidget(i);
+		if (fm)
+		{
+			AnnotWidget *ano = fm->getWidgetAnnotation();
+			if (ano)
+			{
+				if (ano == (AnnotWidget*)annota)
+				{
+					int wtyp = -1;
+					if (fm->getType() == formButton)
+					{
+						FormWidgetButton *btn = (FormWidgetButton*)fm;
+						if (btn)
+						{
+							if (btn->getButtonType() == formButtonCheck)
+							{
+								wtyp = 4;
+								retVal = true;
+							}
+							else if (btn->getButtonType() == formButtonPush)
+							{
+								wtyp = 2;
+								retVal = true;
+							}
+							else if (btn->getButtonType() == formButtonRadio)
+							{
+								retVal = false;
+							}
+						}
+					}
+					else if (fm->getType() == formText)
+					{
+						wtyp = 3;
+						retVal = true;
+					}
+					else if (fm->getType() == formChoice)
+					{
+						FormWidgetChoice *btn = (FormWidgetChoice*)fm;
+						if (btn)
+						{
+							if (btn->isCombo())
+							{
+								wtyp = 5;
+								retVal = true;
+							}
+							else if (btn->isListBox())
+							{
+								wtyp = 6;
+								retVal = true;
+							}
+						}
+					}
+					if (retVal)
+					{
+						AnnotAppearanceCharacs *achar = ano->getAppearCharacs();
+						if (achar)
+						{
+							AnnotColor *bgCol = achar->getBackColor();
+							if (bgCol)
+								CurrColorFill = getAnnotationColor(bgCol);
+							else
+								CurrColorFill = CommonStrings::None;
+							AnnotColor *fgCol = achar->getBorderColor();
+							if (fgCol)
+								CurrColorStroke = getAnnotationColor(fgCol);
+							else
+							{
+								fgCol = achar->getBackColor();
+								if (fgCol)
+									CurrColorStroke = getAnnotationColor(fgCol);
+								else
+									CurrColorStroke = CommonStrings::None;
+							}
+						}
+						QString CurrColorText = "Black";
+						double fontSize = 12;
+						QString fontName = "";
+						QString itemText = "";
+						AnnotAppearance *apa = annota->getAppearStreams();
+						if (apa || !achar)
+						{
+							AnoOutputDev *Adev = new AnoOutputDev(m_doc, m_importedColors);
+							Gfx *gfx;
+#ifdef POPPLER_VERSION
+							gfx = new Gfx(pdfDoc, Adev, pdfDoc->getPage(m_actPage)->getResourceDict(), annota->getRect(), NULL);
+#else
+							gfx = new Gfx(xref, Adev, pdfDoc->getPage(m_actPage)->getResourceDict(), catalog, annota->getRect(), NULL);
+#endif
+							annota->draw(gfx, false);
+							CurrColorFill = Adev->CurrColorFill;
+							CurrColorStroke = Adev->CurrColorStroke;
+							CurrColorText = Adev->CurrColorText;
+							fontSize = Adev->m_fontSize;
+							fontName = UnicodeParsedString(Adev->m_fontName);
+							itemText = UnicodeParsedString(Adev->m_itemText);
+							delete gfx;
+							delete Adev;
+						}
+						int z = m_doc->itemAdd(PageItem::TextFrame, PageItem::Rectangle, xCoor, yCoor, width, height, 0, CurrColorFill, CommonStrings::None, true);
+						PageItem *ite = m_doc->Items->at(z);
+						ite->ClipEdited = true;
+						ite->FrameType = 3;
+						ite->setFillEvenOdd(false);
+						ite->Clip = FlattenPath(ite->PoLine, ite->Segments);
+						ite->ContourLine = ite->PoLine.copy();
+						ite->setTextFlowMode(PageItem::TextFlowDisabled);
+						m_Elements->append(ite);
+						if (m_groupStack.count() != 0)
+						{
+							m_groupStack.top().Items.append(ite);
+							applyMask(ite);
+						}
+						ite->setIsAnnotation(true);
+						ite->AutoName = false;
+						AnnotBorder *brd = annota->getBorder();
+						if (brd)
+						{
+							int bsty = brd->getStyle();
+							if (bsty == AnnotBorder::borderDashed)
+								bsty = 1;
+							else if (bsty == AnnotBorder::borderBeveled)
+								bsty = 3;
+							else if (bsty == AnnotBorder::borderInset)
+								bsty = 4;
+							else if (bsty == AnnotBorder::borderUnderlined)
+								bsty = 2;
+							ite->annotation().setBsty(bsty);
+							ite->annotation().setBorderColor(CurrColorStroke);
+							ite->annotation().setBwid(qRound(brd->getWidth()));
+						}
+						else
+						{
+							ite->annotation().setBsty(0);
+							ite->annotation().setBorderColor(CommonStrings::None);
+							ite->annotation().setBwid(0);
+						}
+						QString tmTxt = "";
+						tmTxt = UnicodeParsedString(fm->getPartialName());
+						if (!tmTxt.isEmpty())
+							ite->setItemName(tmTxt);
+						tmTxt = "";
+						tmTxt = UnicodeParsedString(fm->getAlternateUiName());
+						if (!tmTxt.isEmpty())
+							ite->annotation().setToolTip(tmTxt);
+						tmTxt = "";
+						if (achar)
+						{
+							tmTxt = UnicodeParsedString(achar->getRolloverCaption());
+							if (!tmTxt.isEmpty())
+								ite->annotation().setRollOver(tmTxt);
+							tmTxt = "";
+							tmTxt = UnicodeParsedString(achar->getAlternateCaption());
+							if (!tmTxt.isEmpty())
+								ite->annotation().setDown(tmTxt);
+						}
+						ite->annotation().setType(wtyp);
+						ite->annotation().setFlag(ano->getFlags());
+						if (wtyp == 2) // Button
+						{
+							ite->setFillColor(CurrColorFill);
+							if (achar)
+								ite->itemText.insertChars(UnicodeParsedString(achar->getNormalCaption()));
+							else
+								ite->itemText.insertChars(itemText);
+							applyTextStyle(ite, fontName, CurrColorText, fontSize);
+							ite->annotation().addToFlag(65536);
+							handleActions(ite, ano);
+						}
+						else if (wtyp == 3) // Textfield
+						{
+							FormWidgetText *btn = (FormWidgetText*)fm;
+							if (btn)
+							{
+								ite->itemText.insertChars(UnicodeParsedString(btn->getContent()));
+								applyTextStyle(ite, fontName, CurrColorText, fontSize);
+								if (btn->isMultiline())
+									ite->annotation().addToFlag(4096);
+								if (btn->isPassword())
+									ite->annotation().addToFlag(8192);
+								if (btn->noSpellCheck())
+									ite->annotation().addToFlag(4194304);
+								if (btn->noScroll())
+									ite->annotation().addToFlag(8388608);
+								int mxLen = btn->getMaxLen();
+								if (mxLen > 0)
+									ite->annotation().setMaxChar(mxLen);
+								else
+									ite->annotation().setMaxChar(-1);
+								handleActions(ite, ano);
+							}
+						}
+						else if (wtyp == 4) // Checkbox
+						{
+							FormWidgetButton *btn = (FormWidgetButton*)fm;
+							if (btn)
+							{
+								ite->annotation().setIsChk(btn->getState());
+								handleActions(ite, ano);
+								if (itemText == "4")
+									ite->annotation().setChkStil(0);
+								else if (itemText == "5")
+									ite->annotation().setChkStil(1);
+								else if (itemText == "F")
+									ite->annotation().setChkStil(2);
+								else if (itemText == "l")
+									ite->annotation().setChkStil(3);
+								else if (itemText == "H")
+									ite->annotation().setChkStil(4);
+								else if (itemText == "n")
+									ite->annotation().setChkStil(5);
+							//	qDebug() << "Font" << fontName << "\nSize" << fontSize << "\nText" << itemText;
+							}
+						}
+						else if ((wtyp == 5) || (wtyp == 6)) // Combobox + Listbox
+						{
+							FormWidgetChoice *btn = (FormWidgetChoice*)fm;
+							if (btn)
+							{
+								if (wtyp == 5)
+									ite->annotation().addToFlag(131072);
+								int co = btn->getNumChoices();
+								if (co > 0)
+								{
+									QString inh = UnicodeParsedString(btn->getChoice(0));
+									for (int a = 1; a < co; a++)
+									{
+										inh += "\n" + UnicodeParsedString(btn->getChoice(a));
+									}
+									ite->itemText.insertChars(inh);
+								}
+								applyTextStyle(ite, fontName, CurrColorText, fontSize);
+								if (!btn->isReadOnly())
+									ite->annotation().addToFlag(262144);
+								handleActions(ite, ano);
+							}
+						}
+					}
+					break;
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+void SlaOutputDev::applyTextStyle(PageItem* ite, QString fontName, QString textColor, double fontSize)
+{
+	CharStyle newStyle;
+	newStyle.setFillColor(textColor);
+	newStyle.setFontSize(fontSize * 10);
+	if (!fontName.isEmpty())
+	{
+		SCFontsIterator it(*m_doc->AllFonts);
+		for ( ; it.hasNext() ; it.next())
+		{
+			ScFace& face(it.current());
+			if ((face.psName() == fontName) && (face.usable()) && (face.type() == ScFace::TTF))
+			{
+				newStyle.setFont(face);
+				break;
+			}
+			else if ((face.family() == fontName) && (face.usable()) && (face.type() == ScFace::TTF))
+			{
+				newStyle.setFont(face);
+				break;
+			}
+			else if ((face.scName() == fontName) && (face.usable()) && (face.type() == ScFace::TTF))
+			{
+				newStyle.setFont(face);
+				break;
+			}
+		}
+	}
+	ParagraphStyle dstyle(ite->itemText.defaultStyle());
+	dstyle.charStyle().applyCharStyle(newStyle);
+	ite->itemText.setDefaultStyle(dstyle);
+	ite->itemText.applyCharStyle(0, ite->itemText.length(), newStyle);
+	ite->invalid = true;
+}
+
+void SlaOutputDev::handleActions(PageItem* ite, AnnotWidget *ano)
+{
+	LinkAction *Lact = ano->getAction();
+	if (Lact)
+	{
+		if (Lact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Lact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setActionType(1);
+				ite->annotation().setAction(UnicodeParsedString(jsa->getScript()));
+			}
+		}
+		else if (Lact->getKind() == actionGoTo)
+		{
+			int pagNum = 0;
+			int xco = 0;
+			int yco = 0;
+			LinkGoTo *gto = (LinkGoTo*)Lact;
+			LinkDest *dst = gto->getDest();
+			if (dst)
+			{
+				if (dst->getKind() == destXYZ)
+				{
+					if (dst->isPageRef())
+					{
+						Ref dstr = dst->getPageRef();
+						pagNum = pdfDoc->findPage(dstr.num, dstr.gen);
+					}
+					else
+						pagNum = dst->getPageNum();
+					xco = dst->getLeft();
+					yco = dst->getTop();
+					ite->annotation().setZiel(pagNum - 1);
+					ite->annotation().setAction(QString("%1 %2").arg(xco).arg(yco));
+					ite->annotation().setActionType(2);
+				}
+			}
+			else
+			{
+				GooString *ndst = gto->getNamedDest();
+				if (ndst)
+				{
+					LinkDest *dstn = pdfDoc->findDest(ndst);
+					if (dstn)
+					{
+						if (dstn->getKind() == destXYZ)
+						{
+							if (dstn->isPageRef())
+							{
+								Ref dstr = dstn->getPageRef();
+								pagNum = pdfDoc->findPage(dstr.num, dstr.gen);
+							}
+							else
+								pagNum = dstn->getPageNum();
+							xco = dstn->getLeft();
+							yco = dstn->getTop();
+							ite->annotation().setZiel(pagNum - 1);
+							ite->annotation().setAction(QString("%1 %2").arg(xco).arg(yco));
+							ite->annotation().setActionType(2);
+						}
+					}
+				}
+			}
+		}
+		else if (Lact->getKind() == actionGoToR)
+		{
+			int pagNum = 0;
+			int xco = 0;
+			int yco = 0;
+			LinkGoToR *gto = (LinkGoToR*)Lact;
+			QString fileName = UnicodeParsedString(gto->getFileName());
+			LinkDest *dst = gto->getDest();
+			if (dst)
+			{
+				if (dst->getKind() == destXYZ)
+				{
+					pagNum = dst->getPageNum();
+					xco = dst->getLeft();
+					yco = dst->getTop();
+					ite->annotation().setZiel(pagNum - 1);
+					ite->annotation().setExtern(fileName);
+					ite->annotation().setAction(QString("%1 %2").arg(xco).arg(yco));
+					ite->annotation().setActionType(9);
+				}
+			}
+			else
+			{
+				GooString *ndst = gto->getNamedDest();
+				if (ndst)
+				{
+					LinkDest *dstn = pdfDoc->findDest(ndst);
+					if (dstn)
+					{
+						if (dstn->getKind() == destXYZ)
+						{
+							pagNum = dstn->getPageNum();
+							xco = dstn->getLeft();
+							yco = dstn->getTop();
+							ite->annotation().setZiel(pagNum - 1);
+							ite->annotation().setExtern(fileName);
+							ite->annotation().setAction(QString("%1 %2").arg(xco).arg(yco));
+							ite->annotation().setActionType(9);
+						}
+					}
+				}
+			}
+		}
+		else if (Lact->getKind() == actionUnknown)
+		{
+			LinkUnknown *uno = (LinkUnknown*)Lact;
+			QString actString = UnicodeParsedString(uno->getAction());
+			if (actString == "ResetForm")
+			{
+				ite->annotation().setActionType(4);
+			}
+			else
+			{
+				LinkAction* scact = SC_getAction(ano);
+				if (scact)
+				{
+					if (actString == "ImportData")
+					{
+						LinkImportData *impo = (LinkImportData*)scact;
+						if (impo->isOk())
+						{
+							ite->annotation().setActionType(5);
+							ite->annotation().setAction(UnicodeParsedString(impo->getFileName()));
+						}
+					}
+					else if (actString == "SubmitForm")
+					{
+						LinkSubmitForm *impo = (LinkSubmitForm*)scact;
+						if (impo->isOk())
+						{
+							ite->annotation().setActionType(3);
+							ite->annotation().setAction(UnicodeParsedString(impo->getFileName()));
+							int fl = impo->getFlags();
+							if (fl == 0)
+								ite->annotation().setHTML(0);
+							else if (fl == 4)
+								ite->annotation().setHTML(1);
+							else if (fl == 64)
+								ite->annotation().setHTML(2);
+							else if (fl == 512)
+								ite->annotation().setHTML(3);
+						}
+					}
+				}
+			}
+		}
+		else if (Lact->getKind() == actionNamed)
+		{
+			LinkNamed *uno = (LinkNamed*)Lact;
+			ite->annotation().setActionType(10);
+			ite->annotation().setAction(UnicodeParsedString(uno->getName()));
+		}
+		else
+			qDebug() << "Found unsupported Action of type" << Lact->getKind();
+	}
+	LinkAction *Aact = SC_getAdditionalAction("D", ano);
+	if (Aact)
+	{
+		if (Aact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Aact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setD_act(UnicodeParsedString(jsa->getScript()));
+				ite->annotation().setAAact(true);
+			}
+		}
+		Aact = NULL;
+	}
+	Aact = SC_getAdditionalAction("E", ano);
+	if (Aact)
+	{
+		if (Aact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Aact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setE_act(UnicodeParsedString(jsa->getScript()));
+				ite->annotation().setAAact(true);
+			}
+		}
+		Aact = NULL;
+	}
+	Aact = SC_getAdditionalAction("X", ano);
+	if (Aact)
+	{
+		if (Aact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Aact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setX_act(UnicodeParsedString(jsa->getScript()));
+				ite->annotation().setAAact(true);
+			}
+		}
+		Aact = NULL;
+	}
+	Aact = SC_getAdditionalAction("Fo", ano);
+	if (Aact)
+	{
+		if (Aact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Aact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setFo_act(UnicodeParsedString(jsa->getScript()));
+				ite->annotation().setAAact(true);
+			}
+		}
+		Aact = NULL;
+	}
+	Aact = SC_getAdditionalAction("Bl", ano);
+	if (Aact)
+	{
+		if (Aact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Aact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setBl_act(UnicodeParsedString(jsa->getScript()));
+				ite->annotation().setAAact(true);
+			}
+		}
+		Aact = NULL;
+	}
+	Aact = SC_getAdditionalAction("C", ano);
+	if (Aact)
+	{
+		if (Aact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Aact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setC_act(UnicodeParsedString(jsa->getScript()));
+				ite->annotation().setAAact(true);
+			}
+		}
+		Aact = NULL;
+	}
+	Aact = SC_getAdditionalAction("F", ano);
+	if (Aact)
+	{
+		if (Aact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Aact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setF_act(UnicodeParsedString(jsa->getScript()));
+				ite->annotation().setAAact(true);
+				ite->annotation().setFormat(5);
+			}
+		}
+		Aact = NULL;
+	}
+	Aact = SC_getAdditionalAction("K", ano);
+	if (Aact)
+	{
+		if (Aact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Aact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setK_act(UnicodeParsedString(jsa->getScript()));
+				ite->annotation().setAAact(true);
+				ite->annotation().setFormat(5);
+			}
+		}
+		Aact = NULL;
+	}
+	Aact = SC_getAdditionalAction("V", ano);
+	if (Aact)
+	{
+		if (Aact->getKind() == actionJavaScript)
+		{
+			LinkJavaScript *jsa = (LinkJavaScript*)Aact;
+			if (jsa->isOk())
+			{
+				ite->annotation().setV_act(UnicodeParsedString(jsa->getScript()));
+				ite->annotation().setAAact(true);
+			}
+		}
+		Aact = NULL;
+	}
+}
 
 void SlaOutputDev::startDoc(PDFDoc *doc, XRef *xrefA, Catalog *catA)
 {
@@ -63,8 +1076,10 @@ void SlaOutputDev::startDoc(PDFDoc *doc, XRef *xrefA, Catalog *catA)
 	true);
 }
 
-void SlaOutputDev::startPage(int, GfxState *)
+void SlaOutputDev::startPage(int pageNum, GfxState *)
 {
+	m_formWidgets = pdfDoc->getPage(pageNum)->getFormWidgets();
+	m_actPage = pageNum;
 }
 
 void SlaOutputDev::endPage()
@@ -99,15 +1114,72 @@ void SlaOutputDev::restoreState(GfxState *state)
 					{
 						m_Elements->removeAll(gElements.Items.at(d));
 					}
-					m_doc->groupObjectsToItem(ite, gElements.Items);
-					ite->setFillTransparency(1.0 - state->getFillOpacity());
-					ite->setFillBlendmode(getBlendMode(state));
+					PageItem *sing = gElements.Items.first();
+					if ((gElements.Items.count() == 1)
+						 && (sing->isImageFrame() || sing->isGroup() || sing->isPolygon() || sing->isPolyLine())
+						 && (ite->patternMask().isEmpty() || sing->patternMask().isEmpty() || (sing->patternMask() == ite->patternMask()))
+						 && (state->getFillOpacity() == (1.0 - ite->fillTransparency()))
+					   )
+					{
+						m_Elements->replace(m_Elements->indexOf(ite), sing);
+						m_doc->Items->removeAll(sing);
+						m_doc->Items->replace(m_doc->Items->indexOf(ite), sing);
+						m_groupStack.top().Items.replace(m_groupStack.top().Items.indexOf(ite), sing);
+						sing->setFillTransparency(1.0 - (state->getFillOpacity() * (1.0 - ite->fillTransparency())));
+						sing->setFillBlendmode(getBlendMode(state));
+						if (!ite->patternMask().isEmpty())
+						{
+							sing->setPatternMask(ite->patternMask());
+							sing->setMaskType(ite->maskType());
+						}
+						if (sing->isGroup() || (sing->lineColor() == CommonStrings::None))
+						{
+							double dx = sing->xPos() - ite->xPos();
+							double dy = sing->yPos() - ite->yPos();
+							sing->PoLine.translate(dx, dy);
+							if (sing->isGroup())
+							{
+								QList<PageItem*> allItems = sing->asGroupFrame()->getItemList();
+								for (int si = 0; si < allItems.count(); si++)
+								{
+									allItems[si]->moveBy(dx, dy, true);
+								}
+							}
+							QPainterPath input1 = sing->PoLine.toQPainterPath(true);
+							if (sing->fillEvenOdd())
+								input1.setFillRule(Qt::OddEvenFill);
+							else
+								input1.setFillRule(Qt::WindingFill);
+							QPainterPath input2 = ite->PoLine.toQPainterPath(true);
+							if (ite->fillEvenOdd())
+								input2.setFillRule(Qt::OddEvenFill);
+							else
+								input2.setFillRule(Qt::WindingFill);
+							QPainterPath result = input1.intersected(input2);
+							sing->setXYPos(ite->xPos(), ite->yPos(), true);
+							sing->setWidthHeight(ite->width(), ite->height(), true);
+							sing->groupWidth = ite->width();
+							sing->groupHeight = ite->height();
+							sing->PoLine.fromQPainterPath(result);
+							m_doc->AdjustItemSize(sing);
+							if (sing->isGroup())
+								sing->asGroupFrame()->adjustXYPosition();
+						}
+						delete ite;
+					}
+					else
+					{
+						m_doc->groupObjectsToItem(ite, gElements.Items);
+						ite->setFillTransparency(1.0 - state->getFillOpacity());
+						ite->setFillBlendmode(getBlendMode(state));
+					}
 				}
 				else
 				{
 					m_Elements->removeAll(ite);
 					m_doc->Items->removeAll(ite);
 					m_groupStack.top().Items.removeAll(ite);
+					delete ite;
 				}
 			}
 			if (m_clipStack.count() == 0)
@@ -137,16 +1209,16 @@ void SlaOutputDev::endTransparencyGroup(GfxState *state)
 		tmpSel->clear();
 		if (gElements.Items.count() > 0)
 		{
-			for (int dre = 0; dre < gElements.Items.count(); ++dre)
-			{
-				tmpSel->addItem(gElements.Items.at(dre), true);
-				m_Elements->removeAll(gElements.Items.at(dre));
-			}
-			PageItem *ite = m_doc->groupObjectsSelection(tmpSel);
-			ite->setFillTransparency(1.0 - state->getFillOpacity());
-			ite->setFillBlendmode(getBlendMode(state));
 			if (gElements.forSoftMask)
 			{
+				for (int dre = 0; dre < gElements.Items.count(); ++dre)
+				{
+					tmpSel->addItem(gElements.Items.at(dre), true);
+					m_Elements->removeAll(gElements.Items.at(dre));
+				}
+				PageItem *ite = m_doc->groupObjectsSelection(tmpSel);
+				ite->setFillTransparency(1.0 - state->getFillOpacity());
+				ite->setFillBlendmode(getBlendMode(state));
 				ScPattern pat = ScPattern();
 				pat.setDoc(m_doc);
 				m_doc->DoDrawing = true;
@@ -169,13 +1241,25 @@ void SlaOutputDev::endTransparencyGroup(GfxState *state)
 			}
 			else
 			{
+				PageItem *ite;
+				for (int dre = 0; dre < gElements.Items.count(); ++dre)
+				{
+					tmpSel->addItem(gElements.Items.at(dre), true);
+					m_Elements->removeAll(gElements.Items.at(dre));
+				}
+				if (gElements.Items.count() != 1)
+					ite = m_doc->groupObjectsSelection(tmpSel);
+				else
+					ite = gElements.Items.first();
+				ite->setFillTransparency(1.0 - state->getFillOpacity());
+				ite->setFillBlendmode(getBlendMode(state));
 				for (int as = 0; as < tmpSel->count(); ++as)
 				{
 					m_Elements->append(tmpSel->itemAt(as));
 				}
+				if (m_groupStack.count() != 0)
+					applyMask(ite);
 			}
-			if (m_groupStack.count() != 0)
-				applyMask(ite);
 		}
 		if (m_groupStack.count() != 0)
 		{
@@ -224,6 +1308,8 @@ void SlaOutputDev::clip(GfxState *state)
 	QString output = convertPath(state->getPath());
 	FPointArray out;
 	out.parseSVG(output);
+	if (!pathIsClosed)
+		out.svgClosePath();
 	m_ctm = QTransform(ctm[0], ctm[1], ctm[2], ctm[3], ctm[4], ctm[5]);
 	out.map(m_ctm);
 	double xmin, ymin, xmax, ymax;
@@ -234,7 +1320,9 @@ void SlaOutputDev::clip(GfxState *state)
 	PageItem *ite = m_doc->Items->at(z);
 	FPoint wh(getMinClipF(&out));
 	out.translate(-wh.x(), -wh.y());
-	ite->PoLine = out.copy();  //FIXME: try to avoid copy if FPointArray when properly shared
+	FPoint dim = out.WidthHeight();
+	if (!((dim.x() == 0.0) || (dim.y() == 0.0)))		// avoid degenerate clipping paths
+		ite->PoLine = out.copy();  //FIXME: try to avoid copy if FPointArray when properly shared
 	ite->ClipEdited = true;
 	ite->FrameType = 3;
 	ite->setFillEvenOdd(false);
@@ -249,7 +1337,6 @@ void SlaOutputDev::clip(GfxState *state)
 		applyMask(ite);
 	}
 	clipEntry clp;
-	clp.ClipCoords = out.copy();
 	clp.ClipItem = ite;
 	clp.grStackDepth = grStackDepth;
 	m_clipStack.push(clp);
@@ -265,6 +1352,8 @@ void SlaOutputDev::eoClip(GfxState *state)
 	QString output = convertPath(state->getPath());
 	FPointArray out;
 	out.parseSVG(output);
+	if (!pathIsClosed)
+		out.svgClosePath();
 	m_ctm = QTransform(ctm[0], ctm[1], ctm[2], ctm[3], ctm[4], ctm[5]);
 	out.map(m_ctm);
 	double xmin, ymin, xmax, ymax;
@@ -275,7 +1364,9 @@ void SlaOutputDev::eoClip(GfxState *state)
 	PageItem *ite = m_doc->Items->at(z);
 	FPoint wh(getMinClipF(&out));
 	out.translate(-wh.x(), -wh.y());
-	ite->PoLine = out.copy();  //FIXME: try to avoid copy if FPointArray when properly shared
+	FPoint dim = out.WidthHeight();
+	if (!((dim.x() == 0.0) || (dim.y() == 0.0)))		// avoid degenerate clipping paths
+		ite->PoLine = out.copy();  //FIXME: try to avoid copy if FPointArray when properly shared
 	ite->ClipEdited = true;
 	ite->FrameType = 3;
 	ite->setFillEvenOdd(true);
@@ -290,7 +1381,6 @@ void SlaOutputDev::eoClip(GfxState *state)
 		applyMask(ite);
 	}
 	clipEntry clp;
-	clp.ClipCoords = out.copy();
 	clp.ClipItem = ite;
 	clp.grStackDepth = grStackDepth;
 	m_clipStack.push(clp);
@@ -339,19 +1429,54 @@ void SlaOutputDev::stroke(GfxState *state)
 			ite->PoLine = out.copy();
 			ite->ClipEdited = true;
 			ite->FrameType = 3;
-			ite->setLineShade(shade);
-			ite->setLineTransparency(1.0 - state->getStrokeOpacity());
-			ite->setLineBlendmode(getBlendMode(state));
-			ite->setLineEnd(PLineEnd);
-			ite->setLineJoin(PLineJoin);
-			ite->setDashes(DashValues);
-			ite->setDashOffset(DashOffset);
 			ite->setWidthHeight(wh.x(),wh.y());
-			ite->setTextFlowMode(PageItem::TextFlowDisabled);
 			m_doc->AdjustItemSize(ite);
-			m_Elements->append(ite);
-			if (m_groupStack.count() != 0)
-				m_groupStack.top().Items.append(ite);
+			if (m_Elements->count() != 0)
+			{
+				PageItem* lItem = m_Elements->last();
+				if ((lItem->lineColor() == CommonStrings::None) && (lItem->PoLine == ite->PoLine))
+				{
+					lItem->setLineColor(CurrColorStroke);
+					lItem->setLineWidth(state->getTransformedLineWidth());
+					lItem->setLineShade(shade);
+					lItem->setLineTransparency(1.0 - state->getStrokeOpacity());
+					lItem->setLineBlendmode(getBlendMode(state));
+					lItem->setLineEnd(PLineEnd);
+					lItem->setLineJoin(PLineJoin);
+					lItem->setDashes(DashValues);
+					lItem->setDashOffset(DashOffset);
+					lItem->setTextFlowMode(PageItem::TextFlowDisabled);
+					m_doc->Items->removeAll(ite);
+				}
+				else
+				{
+					ite->setLineShade(shade);
+					ite->setLineTransparency(1.0 - state->getStrokeOpacity());
+					ite->setLineBlendmode(getBlendMode(state));
+					ite->setLineEnd(PLineEnd);
+					ite->setLineJoin(PLineJoin);
+					ite->setDashes(DashValues);
+					ite->setDashOffset(DashOffset);
+					ite->setTextFlowMode(PageItem::TextFlowDisabled);
+					m_Elements->append(ite);
+					if (m_groupStack.count() != 0)
+						m_groupStack.top().Items.append(ite);
+				}
+			}
+			else
+			{
+				ite->setLineShade(shade);
+				ite->setLineTransparency(1.0 - state->getStrokeOpacity());
+				ite->setLineBlendmode(getBlendMode(state));
+				ite->setLineEnd(PLineEnd);
+				ite->setLineJoin(PLineJoin);
+				ite->setDashes(DashValues);
+				ite->setDashOffset(DashOffset);
+				ite->setTextFlowMode(PageItem::TextFlowDisabled);
+				m_Elements->append(ite);
+				if (m_groupStack.count() != 0)
+					m_groupStack.top().Items.append(ite);
+			}
 		}
 	}
 }
@@ -879,7 +2004,7 @@ GBool SlaOutputDev::patchMeshShadedFill(GfxState *state, GfxPatchMeshShading *sh
 	return gTrue;
 }
 
-GBool SlaOutputDev::tilingPatternFill(GfxState *state, Catalog *cat, Object *str, double *pmat, int paintType, Dict *resDict, double *mat, double *bbox, int x0, int y0, int x1, int y1, double xStep, double yStep)
+GBool SlaOutputDev::tilingPatternFill(GfxState *state, Gfx * /*gfx*/, Catalog *cat, Object *str, double *pmat, int paintType, int tilingType, Dict *resDict, double *mat, double *bbox, int x0, int y0, int x1, int y1, double xStep, double yStep)
 {
 	PDFRectangle box;
 	Gfx *gfx;
@@ -906,11 +2031,13 @@ GBool SlaOutputDev::tilingPatternFill(GfxState *state, Catalog *cat, Object *str
 	m_ctm = QTransform(ctm[0], ctm[1], ctm[2], ctm[3], ctm[4], ctm[5]);
 	QTransform mm = QTransform(mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
 	QTransform mmx = mm * m_ctm;
+
 #ifdef POPPLER_VERSION
 	gfx = new Gfx(pdfDoc, this, resDict, &box, NULL);
 #else
 	gfx = new Gfx(xref, this, resDict, catalog, &box, NULL);
 #endif
+
 	gfx->display(str);
 	gElements = m_groupStack.pop();
 	tmpSel->clear();
@@ -2264,7 +3391,11 @@ void SlaOutputDev::endTextObject(GfxState *state)
 				tmpSel->addItem(gElements.Items.at(dre), true);
 				m_Elements->removeAll(gElements.Items.at(dre));
 			}
-			PageItem *ite = m_doc->groupObjectsSelection(tmpSel);
+			PageItem *ite;
+			if (gElements.Items.count() != 1)
+				ite = m_doc->groupObjectsSelection(tmpSel);
+			else
+				ite = gElements.Items.first();
 			ite->setFillTransparency(1.0 - state->getFillOpacity());
 			ite->setFillBlendmode(getBlendMode(state));
 			for (int as = 0; as < tmpSel->count(); ++as)
@@ -2351,6 +3482,46 @@ QString SlaOutputDev::getColor(GfxColorSpace *color_space, GfxColor *color, int 
 		tmp.setColorRGB(Rc, Gc, Bc);
 		fNam = m_doc->PageColors.tryAddColor(namPrefix+tmp.name(), tmp);
 	//	qDebug() << "update fill color other colorspace" << color_space->getMode() << "treating as rgb" << Rc << Gc << Bc;
+	}
+	if (fNam == namPrefix+tmp.name())
+		m_importedColors->append(fNam);
+	return fNam;
+}
+
+QString SlaOutputDev::getAnnotationColor(AnnotColor *color)
+{
+	QString fNam;
+	QString namPrefix = "FromPDF";
+	ScColor tmp;
+	tmp.setSpotColor(false);
+	tmp.setRegistrationColor(false);
+	if (color->getSpace() == AnnotColor::colorTransparent)
+		return CommonStrings::None;
+	else if (color->getSpace() == AnnotColor::colorRGB)
+	{
+		const double *color_data = color->getValues();
+		int Rc = qRound(color_data[0] * 255);
+		int Gc = qRound(color_data[1] * 255);
+		int Bc = qRound(color_data[2] * 255);
+		tmp.setColorRGB(Rc, Gc, Bc);
+		fNam = m_doc->PageColors.tryAddColor(namPrefix+tmp.name(), tmp);
+	}
+	else if (color->getSpace() == AnnotColor::colorCMYK)
+	{
+		const double *color_data = color->getValues();
+		int Cc = qRound(color_data[0] * 255);
+		int Mc = qRound(color_data[1] * 255);
+		int Yc = qRound(color_data[2] * 255);
+		int Kc = qRound(color_data[3] * 255);
+		tmp.setColor(Cc, Mc, Yc, Kc);
+		fNam = m_doc->PageColors.tryAddColor(namPrefix+tmp.name(), tmp);
+	}
+	else if (color->getSpace() == AnnotColor::colorGray)
+	{
+		const double *color_data = color->getValues();
+		int Kc = 255 - qRound(color_data[0] * 255);
+		tmp.setColor(0, 0, 0, Kc);
+		fNam = m_doc->PageColors.tryAddColor(namPrefix+tmp.name(), tmp);
 	}
 	if (fNam == namPrefix+tmp.name())
 		m_importedColors->append(fNam);

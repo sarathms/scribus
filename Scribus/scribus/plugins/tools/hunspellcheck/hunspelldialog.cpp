@@ -30,7 +30,7 @@ HunspellDialog::HunspellDialog(QWidget *parent, ScribusDoc *doc, StoryText *iTex
 	m_primaryLangIndex=0;
 }
 
-void HunspellDialog::set(QMap<QString, QString>* dictionaryMap, QMap<QString, Hunspell*> *hspellerMap, QList<WordsFound> *wfList)
+void HunspellDialog::set(QMap<QString, QString>* dictionaryMap, QMap<QString, HunspellDict*> *hspellerMap, QList<WordsFound> *wfList)
 {
 	m_dictionaryMap=dictionaryMap;
 	m_hspellerMap=hspellerMap;
@@ -38,12 +38,15 @@ void HunspellDialog::set(QMap<QString, QString>* dictionaryMap, QMap<QString, Hu
 	bool b=languagesComboBox->blockSignals(true);
 	languagesComboBox->clear();
 	QMap<QString, QString>::iterator it = m_dictionaryMap->begin();
+	QStringList langsToAdd;
 	while (it != dictionaryMap->end())
 	{
 		QString lang=LanguageManager::instance()->getLangFromAbbrev(it.key(), true);
-		languagesComboBox->addItem(!lang.isEmpty() ? lang : it.key());
+		if (!langsToAdd.contains(lang))
+			langsToAdd<<(!lang.isEmpty() ? lang : it.key());
 		++it;
 	}
+	languagesComboBox->addItems(langsToAdd);
 	languagesComboBox->setCurrentIndex(0);
 	m_primaryLangIndex=0;
 	languagesComboBox->blockSignals(b);
@@ -149,19 +152,18 @@ void HunspellDialog::languageComboChanged(const QString &newLanguage)
 	QString wordLang=LanguageManager::instance()->getAbbrevFromLang(newLanguage, true, false);
 	if (!m_hspellerMap->contains(wordLang) )
 	{
-		qDebug()<<"hspeller"<<wordLang<<"does not exist";
+		//qDebug()<<"hspeller"<<wordLang<<"does not exist";
 		return;
 	}
-
+	//qDebug()<<wordLang<<newLanguage;
+	if (m_wfList->count()==0)
+		return;
+	if (wfListIndex>=m_wfList->count())
+		wfListIndex=0;
 	QString word=m_wfList->at(wfListIndex).w;
-	if ((*m_hspellerMap)[wordLang]->spell(word.toUtf8().constData())==0)
+	if ((*m_hspellerMap)[wordLang]->spell(word)==0)
 	{
-		char **sugglist = NULL;
-		int suggCount=(*m_hspellerMap)[wordLang]->suggest(&sugglist, word.toUtf8().constData());
-		QStringList replacements;
-		for (int j=0; j < suggCount; ++j)
-			replacements << QString::fromUtf8(sugglist[j]);
-		(*m_hspellerMap)[wordLang]->free_list(&sugglist, suggCount);
+		QStringList replacements = (*m_hspellerMap)[wordLang]->suggest(word);
 		updateSuggestions(replacements);
 	}
 	else

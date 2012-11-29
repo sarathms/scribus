@@ -660,7 +660,8 @@ void ScPainter::strokePath()
 {
 //	if( LineWidth == 0 )
 //		return;
-	strokePathHelper();
+	if (strokeMode != 0)
+		strokePathHelper();
 }
 
 QColor ScPainter::pen()
@@ -2014,6 +2015,77 @@ void ScPainter::setupPolygon(FPointArray *points, bool closed)
 		cairo_close_path( m_cr );
 }
 
+void ScPainter::setupSharpPolygon(FPointArray *points, bool closed)
+{
+	bool nPath = true;
+	bool first = true;
+	FPoint np, np1, np2, np3, np4, firstP;
+
+	if (points->size() <= 3)
+		return;
+
+	newPath();
+	for (uint poi=0; poi<points->size()-3; poi += 4)
+	{
+		if (points->point(poi).x() > 900000)
+		{
+			nPath = true;
+			continue;
+		}
+		if (nPath)
+		{
+			np = points->point(poi);
+			if ((!first) && (closed) && (np4 == firstP))
+				cairo_close_path( m_cr );
+			sharpLineHelper(np);
+			cairo_move_to( m_cr, np.x(), np.y());
+			first = nPath = false;
+			firstP = np4 = np;
+		}
+		np  = points->point(poi);
+		np1 = points->point(poi + 1);
+		np2 = points->point(poi + 3);
+		np3 = points->point(poi + 2);
+		if (np4 == np3)
+			continue;
+#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 6)
+		if ((np == np1) && (np2 == np3))
+		{
+			sharpLineHelper(np3);
+			cairo_line_to( m_cr, np3.x(), np3.y());
+		}
+		else
+#endif
+			cairo_curve_to(m_cr, np1.x(), np1.y(), np2.x(), np2.y(), np3.x(), np3.y());
+		np4 = np3;
+	}
+	if (closed)
+		cairo_close_path( m_cr );
+}
+
+void ScPainter::sharpLineHelper(FPoint &pp)
+{
+	double x1 = pp.x();
+	double y1 = pp.y();
+	cairo_user_to_device (m_cr, &x1, &y1);
+	x1 = floor(x1) + 0.5;
+	y1 = floor(y1) + 0.5;
+	cairo_device_to_user (m_cr, &x1, &y1);
+	pp.setXY(x1, y1);
+}
+
+void ScPainter::sharpLineHelper(QPointF &pp)
+{
+	double x1 = pp.x();
+	double y1 = pp.y();
+	cairo_user_to_device (m_cr, &x1, &y1);
+	x1 = floor(x1) + 0.5;
+	y1 = floor(y1) + 0.5;
+	cairo_device_to_user (m_cr, &x1, &y1);
+	pp.setX(x1);
+	pp.setY(y1);
+}
+
 void ScPainter::drawPolygon()
 {
 	fillPath();
@@ -2040,46 +2112,90 @@ void ScPainter::drawLine(const QPointF& start, const QPointF& end)
 	strokePath();
 }
 
+void ScPainter::drawSharpLine(FPoint start, FPoint end)
+{
+	newPath();
+	sharpLineHelper(start);
+	sharpLineHelper(end);
+	moveTo(start.x(), start.y());
+	lineTo(end.x(), end.y());
+	strokePath();
+}
+
+void ScPainter::drawSharpLine(QPointF start, QPointF end)
+{
+	newPath();
+	sharpLineHelper(start);
+	sharpLineHelper(end);
+	moveTo(start.x(), start.y());
+	lineTo(end.x(), end.y());
+	strokePath();
+}
+
 void ScPainter::drawRect(double x, double y, double w, double h)
 {
 	newPath();
 	cairo_rectangle(m_cr, x, y, w, h);
-//	moveTo( x, y );
-//	lineTo( x+w, y );
-//	lineTo( x+w, y+h );
-//	lineTo( x, y+h );
-//	lineTo( x, y );
-//	cairo_close_path( m_cr );
 	fillPath();
 	strokePath();
 }
 
-void ScPainter::drawText(QRectF area, QString text)
+void ScPainter::drawSharpRect(double x, double y, double w, double h)
+{
+	newPath();
+	double x1 = x;
+	double y1 = y;
+	double w1 = w;
+	double h1 = h;
+	// see http://www.cairographics.org/FAQ/#sharp_lines
+	cairo_user_to_device (m_cr, &x1, &y1);
+	cairo_user_to_device (m_cr, &w1, &h1);
+	x1 = floor(x1) + 0.5;
+	y1 = floor(y1) + 0.5;
+	w1 = floor(w1) + 0.5;
+	h1 = floor(h1) + 0.5;
+	cairo_device_to_user (m_cr, &x1, &y1);
+	cairo_device_to_user (m_cr, &w1, &h1);
+	cairo_rectangle(m_cr, x1, y1, w1, h1);
+	fillPath();
+	strokePath();
+}
+
+void ScPainter::drawText(QRectF area, QString text, bool filled, int align)
 {
 	cairo_text_extents_t extents;
 	cairo_font_extents_t extentsF;
-	double x = area.center().x();
-	double y;
+	double x;
+	if (align == 0)
+		x = area.center().x();
+	else
+		x = area.x();
+	double y = area.y();
 	double ww = 0;
 	double hh = 0;
 	double r, g, b;
-	cairo_select_font_face(m_cr, m_font.family().toLatin1(), CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+	cairo_select_font_face(m_cr, m_font.family().toLatin1(), m_font.italic() ? CAIRO_FONT_SLANT_ITALIC : CAIRO_FONT_SLANT_NORMAL, m_font.bold() ? CAIRO_FONT_WEIGHT_BOLD : CAIRO_FONT_WEIGHT_NORMAL);
 	cairo_set_font_size(m_cr, m_font.pointSizeF());
 	cairo_font_extents (m_cr, &extentsF);
 	QStringList textList = text.split("\n");
 	for (int a = 0; a < textList.count(); ++a)
 	{
 		cairo_text_extents (m_cr, textList[a].toUtf8(), &extents);
-		x = qMin(area.center().x() - (extents.width / 2.0 + extents.x_bearing), x);
+		if (align == 0)
+			x = qMin(area.center().x() - (extents.width / 2.0 + extents.x_bearing), x);
 		ww = qMax(ww, extents.width);
 	}
 	hh = extentsF.height * textList.count();
-	y = area.center().y() - ((extentsF.height * textList.count()) / 2.0);
-	m_fill.getRgbF(&r, &g, &b);
-	cairo_set_source_rgba( m_cr, r, g, b, fill_trans );
-	cairo_new_path( m_cr );
-	cairo_rectangle(m_cr, x, y, ww, hh);
-	cairo_fill( m_cr );
+	if ((align == 0) || (align == 1))
+		y = area.center().y() - ((extentsF.height * textList.count()) / 2.0);
+	if (filled)
+	{
+		m_fill.getRgbF(&r, &g, &b);
+		cairo_set_source_rgba( m_cr, r, g, b, fill_trans );
+		cairo_new_path( m_cr );
+		cairo_rectangle(m_cr, x, y, ww, hh);
+		cairo_fill( m_cr );
+	}
 	cairo_new_path( m_cr );
 	y += extentsF.ascent;
 	cairo_move_to (m_cr, x, y);
@@ -2090,5 +2206,50 @@ void ScPainter::drawText(QRectF area, QString text)
 		cairo_show_text (m_cr, textList[a].toUtf8());
 		y += extentsF.height;
 		cairo_move_to (m_cr, x, y);
+	}
+}
+
+void ScPainter::drawShadePanel(const QRect &r, const QPalette &pal, bool sunken, int lineWidth)
+{
+	QColor shade = pal.dark().color();
+	QColor light = pal.light().color();
+	setStrokeMode(1);
+	setLineWidth(1.2);
+	if (sunken)
+		setPen(shade, 1.2, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
+	else
+		setPen(light, 1.2, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
+	int x1, y1, x2, y2, x3, y3;
+	x1 = r.x();
+	x2 = r.x();
+	x3 = r.x() + r.width();
+	y1 = r.y() + r.height();
+	y2 = r.y();
+	y3 = r.y();
+	for (int i = 0; i < lineWidth; i++)
+	{
+		newPath();
+		moveTo(x1++, y1--);
+		lineTo(x2++, y2++);
+		lineTo(x3--, y3++);
+		strokePath();
+	}
+	if (sunken)
+		setPen(light, 1.2, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
+	else
+		setPen(shade, 1.2, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
+	x1 = r.x();
+	x2 = r.x() + r.width();
+	x3 = r.x() + r.width();
+	y1 = r.y() + r.height();
+	y2 = r.y() + r.height();
+	y3 = r.y();
+	for (int i = 0; i < lineWidth; i++)
+	{
+		newPath();
+		moveTo(x1++, y1--);
+		lineTo(x2--, y2--);
+		lineTo(x3--, y3++);
+		strokePath();
 	}
 }

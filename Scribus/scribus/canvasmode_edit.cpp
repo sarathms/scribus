@@ -315,6 +315,11 @@ void CanvasMode_Edit::mouseDoubleClickEvent(QMouseEvent *m)
 				currItem->itemText.extendSelection(start, stop);
 				currItem->itemText.setCursorPosition(stop);
 			}
+			else if ((currItem->itemText.cursorPosition() < currItem->itemText.length()) && (currItem->itemText.item(currItem->itemText.cursorPosition())->mark != NULL))
+			{	//invoke edit marker dialog
+				m_ScMW->slotEditMark();
+				return;
+			}
 			else
 			{	//Double click in a frame to select a word
 				oldCp = currItem->itemText.cursorPosition();
@@ -441,9 +446,9 @@ void CanvasMode_Edit::mouseMoveEvent(QMouseEvent *m)
 				if (currItem->locked())
 					break;
 				int hitTest = m_canvas->frameHitTest(QPointF(mousePointDoc.x(),mousePointDoc.y()), currItem);
-				if(hitTest >= 0)
+				if (hitTest >= 0)
 				{
-					if((hitTest == Canvas::INSIDE))
+					if (hitTest == Canvas::INSIDE)
 					{
 						if (currItem->asTextFrame())
 							qApp->changeOverrideCursor(QCursor(Qt::IBeamCursor));

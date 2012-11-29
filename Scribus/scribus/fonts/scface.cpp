@@ -201,35 +201,35 @@ const ScFace& ScFace::none()
 	return NONE; 
 }
 
-QString ScFace::ascentAsString() const
+QString ScFace::pdfAscentAsString() const
 {
 	if (m->status == ScFace::UNKNOWN) {
 		m->load();
 	}
-	return m->ascentAsString();
+	return m->pdfAscentAsString();
 }
 
-QString ScFace::descentAsString() const
+QString ScFace::pdfDescentAsString() const
 {
 	if (m->status == ScFace::UNKNOWN) {
 		m->load();
 	}
-	return m->descentAsString();
+	return m->pdfDescentAsString();
 }
-QString ScFace::capHeightAsString() const
+QString ScFace::pdfCapHeightAsString() const
 {
 	if (m->status == ScFace::UNKNOWN) {
 		m->load();
 	}
-	return m->capHeightAsString();
+	return m->pdfCapHeightAsString();
 }
 
-QString ScFace::fontBBoxAsString() const
+QString ScFace::pdfFontBBoxAsString() const
 {
 	if (m->status == ScFace::UNKNOWN) {
 		m->load();
 	}
-	return m->FontBBoxAsString();
+	return m->pdfFontBBoxAsString();
 }
 
 QString ScFace::italicAngleAsString() const
@@ -343,7 +343,7 @@ uint ScFace::emulateGlyph(QChar ch) const
 	if (ch == SpecialChars::LINEBREAK || ch == SpecialChars::PARSEP 
 		|| ch == SpecialChars::FRAMEBREAK || ch == SpecialChars::COLBREAK 
 		|| ch == SpecialChars::TAB || ch == SpecialChars::SHYPHEN
-		 || ch == SpecialChars::ZWSPACE || ch == SpecialChars::ZWNBSPACE)
+		 || ch == SpecialChars::ZWSPACE || ch == SpecialChars::ZWNBSPACE || ch==SpecialChars::OBJECT)
 		return CONTROL_GLYPHS + ch.unicode();
 	else if (ch == SpecialChars::NBSPACE)
 		return  m->char2CMap(QChar(' '));
