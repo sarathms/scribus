@@ -31,12 +31,13 @@ for which a new license (GPL+exception) is in place.
 #include <QEventLoop>
 #include <QFile>
 #include <QList>
-#include <QtAlgorithms>
-#include <QTime>
+#include <QMessageBox>
 #include <QPainter>
 #include <QPixmap>
 #include <QPointer>
 #include <QProgressBar>
+#include <QtAlgorithms>
+#include <QTime>
 #include <qtconcurrentmap.h>
 
 #include "canvas.h"
@@ -112,7 +113,6 @@ for which a new license (GPL+exception) is in place.
 #include "ui/markanchor.h"
 #include "ui/markvariabletext.h"
 #include "ui/marksmanager.h"
-#include "ui/scmessagebox.h"
 #include "ui/storyeditor.h"
 
 // static const bool FRAMESELECTION_EDITS_DEFAULTSTYLE = false;
@@ -255,6 +255,7 @@ ScribusDoc::ScribusDoc() : UndoObject( tr("Document")), Observable<ScribusDoc>(N
 	BookMarks(),
 	OldBM(false),
 	hasName(false),
+	isConverted(false),
 	autoSaveTimer(new QTimer(this)),
 	MLineStyles(),
 	WinHan(0),
@@ -357,6 +358,7 @@ ScribusDoc::ScribusDoc(const QString& docName, int unitindex, const PageSize& pa
 	BookMarks(),
 	OldBM(false),
 	hasName(false),
+	isConverted(false),
 	autoSaveTimer(new QTimer(this)),
 	MLineStyles(),
 	WinHan(0),
@@ -4836,6 +4838,7 @@ bool ScribusDoc::save(const QString& fileName, QString* savedFile)
 		setName(fileName);
 		setModified(false);
 		hasName = true;
+		isConverted = false;
 	}
 	return ret;
 }
@@ -11184,7 +11187,7 @@ void ScribusDoc::itemSelection_ClearItem(Selection* customSelection)
 			if (currItem->itemText.length() != 0 && (currItem->nextInChain() == 0 || currItem->prevInChain() == 0))
 			{
 				int btnYesToAll = (i < (selectedItemCount - 1)) ? QMessageBox::YesToAll : 0;
-				int t = ScMessageBox::warning(m_ScMW, CommonStrings::trWarning,
+				int t = QMessageBox::warning(m_ScMW, CommonStrings::trWarning,
 									tr("Do you really want to clear all your text?"),
 									QMessageBox::Yes, QMessageBox::No | QMessageBox::Default, btnYesToAll);
 				if (t == QMessageBox::No)
@@ -14880,150 +14883,167 @@ PageItem * ScribusDoc::itemSelection_GroupObjects(bool changeLock, bool lock, Se
 void ScribusDoc::itemSelection_UnGroupObjects(Selection* customSelection)
 {
 	Selection* itemSelection = (customSelection!=0) ? customSelection : m_Selection;
-	if (itemSelection->count() != 0)
+	if (itemSelection->count() == 0)
+		return;
+
+	uint docSelectionCount = itemSelection->count();
+	PageItem *currItem;
+	UndoTransaction *activeTransaction= NULL;
+	if(UndoManager::undoEnabled())
+		activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IGroup,Um::Ungroup,"",Um::IGroup));
+	QList<PageItem*> toDelete;
+	for (uint a=0; a < docSelectionCount; ++a)
 	{
-		uint docSelectionCount = itemSelection->count();
-		PageItem *currItem;
-		UndoTransaction *activeTransaction= NULL;
+		currItem = itemSelection->itemAt(a);
+		if (currItem->isGroup())
+			toDelete.append(currItem);
+	}
+	bool wasLoad = isLoading();
+	// Remove group control objects
+	setLoading(true);
+	itemSelection->delaySignalsOn();
+	for (int b = 0; b < toDelete.count(); b++)
+	{
+	/*	currItem = toDelete.at(b);
+		QList<PageItem*> *list = Items;
+		list = parentGroup(currItem, Items);
+		int d = list->indexOf(currItem);
+		list->removeAt(d);
+		itemSelection->removeItem(currItem);
+		Selection tempSelection(this, false);
+		tempSelection.delaySignalsOn();
+		int gcount = currItem->groupItemList.count() - 1;
+		for (int c = gcount; c >= 0; c--)
+		{
+			PageItem* gItem = currItem->groupItemList.at(c);
+			gItem->Parent = currItem->Parent;
+			gItem->setXYPos(currItem->xPos() + gItem->gXpos, currItem->yPos() + gItem->gYpos, true);
+			list->insert(d, gItem);
+			itemSelection->addItem(currItem->groupItemList.at(gcount - c));
+			tempSelection.addItem(currItem->groupItemList.at(gcount - c));
+		}
+		if ((currItem->width() != currItem->groupWidth) || (currItem->height() != currItem->groupHeight))
+			scaleGroup(currItem->width() / currItem->groupWidth, currItem->height() / currItem->groupHeight, true, &tempSelection, true);
+		QTransform ma = currItem->getTransform();
+		FPoint n;
+		for (int a = 0; a < tempSelection.count(); ++a)
+		{
+			PageItem* rItem = tempSelection.itemAt(a);
+			if (rItem->isGroup())
+			{
+				rItem->groupWidth = rItem->width() / (currItem->width() / currItem->groupWidth);
+				rItem->groupHeight = rItem->height() / (currItem->height() / currItem->groupHeight);
+			}
+			n = FPoint(rItem->xPos() - currItem->xPos(), rItem->yPos() - currItem->yPos());
+			rItem->setXYPos(ma.m11() * n.x() + ma.m21() * n.y() + ma.dx(), ma.m22() * n.y() + ma.m12() * n.x() + ma.dy());
+			rItem->rotateBy(currItem->rotation());
+			QTransform itemTrans = rItem->getTransform();
+			if (itemTrans.m11() < 0)
+			{
+				rItem->gXpos -= rItem->width();
+				if (rItem->isImageFrame() || rItem->isTextFrame() || rItem->isLatexFrame() || rItem->isOSGFrame() || rItem->isSymbol() || rItem->isGroup() || rItem->isSpiral())
+					rItem->flipImageH();
+				if (rItem->itemType() != PageItem::Line)
+				{
+					QTransform ma;
+					ma.scale(-1, 1);
+					rItem->PoLine.map(ma);
+					rItem->PoLine.translate(rItem->width(), 0);
+				}
+			}
+			if (itemTrans.m22() < 0)
+			{
+				rItem->gYpos -= rItem->height();
+				if (rItem->isImageFrame() || rItem->isTextFrame() || rItem->isLatexFrame() || rItem->isOSGFrame() || rItem->isSymbol() || rItem->isGroup() || rItem->isSpiral())
+					rItem->flipImageV();
+				if (rItem->itemType() != PageItem::Line)
+				{
+					QTransform ma;
+					ma.scale(1, -1);
+					rItem->PoLine.map(ma);
+					rItem->PoLine.translate(0, rItem->height());
+				}
+			}
+			setRedrawBounding(rItem);
+			rItem->OwnPage = OnPage(rItem);
+		}
+
 		if(UndoManager::undoEnabled())
-			activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IGroup,Um::Ungroup,"",Um::IGroup));
-		QList<PageItem*> toDelete;
-		for (uint a=0; a < docSelectionCount; ++a)
 		{
-			currItem = itemSelection->itemAt(a);
-			if (currItem->isGroup())
-				toDelete.append(currItem);
+			ScItemState<QList<QPointer<PageItem> > > *is = new ScItemState<QList<QPointer<PageItem> > >(UndoManager::Ungroup);
+			is->set("UNGROUP", "ungroup");
+			tempSelection.addItem(currItem,true);
+			is->setItem(tempSelection.selectionList());
+			undoManager->action(this, is);
 		}
-		bool wasLoad = isLoading();
-		// Remove group control objects
-		setLoading(true);
-		itemSelection->delaySignalsOn();
-		for (int b = 0; b < toDelete.count(); b++)
+
+		tempSelection.clear();
+		tempSelection.delaySignalsOff();*/
+		currItem = toDelete.at(b);
+		QList<PageItem*> *list = Items;
+		list = parentGroup(currItem, Items);
+		int d = list->indexOf(currItem);
+		list->removeAt(d);
+		itemSelection->removeItem(currItem);
+		int gcount = currItem->groupItemList.count();
+		for (int c = 0; c < gcount; c++)
 		{
-			currItem = toDelete.at(b);
-			QList<PageItem*> *list = Items;
-			list = parentGroup(currItem, Items);
-			int d = list->indexOf(currItem);
-			list->removeAt(d);
-			itemSelection->removeItem(currItem);
-			Selection tempSelection(this, false);
-			tempSelection.delaySignalsOn();
-			int gcount = currItem->groupItemList.count() - 1;
-			for (int c = gcount; c >= 0; c--)
+			PageItem* gItem = currItem->groupItemList.last();
+			removeFromGroup(gItem);
+			if (currItem->Parent == NULL)
 			{
-				PageItem* gItem = currItem->groupItemList.at(c);
-				gItem->Parent = currItem->Parent;
-				gItem->setXYPos(currItem->xPos() + gItem->gXpos, currItem->yPos() + gItem->gYpos, true);
+				Items->insert(d, gItem);
+				gItem->OwnPage = OnPage(gItem);
+			}
+			else
+			{
+				addToGroup(currItem->Parent, gItem);
 				list->insert(d, gItem);
-				itemSelection->addItem(currItem->groupItemList.at(gcount - c));
-				tempSelection.addItem(currItem->groupItemList.at(gcount - c));
 			}
-			if ((currItem->width() != currItem->groupWidth) || (currItem->height() != currItem->groupHeight))
-				scaleGroup(currItem->width() / currItem->groupWidth, currItem->height() / currItem->groupHeight, true, &tempSelection, true);
-			QTransform ma = currItem->getTransform();
-			FPoint n;
-			for (int a = 0; a < tempSelection.count(); ++a)
-			{
-				PageItem* rItem = tempSelection.itemAt(a);
-				n = FPoint(rItem->xPos() - currItem->xPos(), rItem->yPos() - currItem->yPos());
-				rItem->setXYPos(ma.m11() * n.x() + ma.m21() * n.y() + ma.dx(), ma.m22() * n.y() + ma.m12() * n.x() + ma.dy());
-				rItem->rotateBy(currItem->rotation());
-				QTransform itemTrans = rItem->getTransform();
-				if (itemTrans.m11() < 0)
-				{
-					rItem->gXpos -= rItem->width();
-					if (rItem->isImageFrame() || rItem->isTextFrame() || rItem->isLatexFrame() || rItem->isOSGFrame() || rItem->isSymbol() || rItem->isGroup() || rItem->isSpiral())
-						rItem->flipImageH();
-					if (rItem->itemType() != PageItem::Line)
-					{
-						QTransform ma;
-						ma.scale(-1, 1);
-						rItem->PoLine.map(ma);
-						rItem->PoLine.translate(rItem->width(), 0);
-					}
-				}
-				if (itemTrans.m22() < 0)
-				{
-					rItem->gYpos -= rItem->height();
-					if (rItem->isImageFrame() || rItem->isTextFrame() || rItem->isLatexFrame() || rItem->isOSGFrame() || rItem->isSymbol() || rItem->isGroup() || rItem->isSpiral())
-						rItem->flipImageV();
-					if (rItem->itemType() != PageItem::Line)
-					{
-						QTransform ma;
-						ma.scale(1, -1);
-						rItem->PoLine.map(ma);
-						rItem->PoLine.translate(0, rItem->height());
-					}
-				}
-				setRedrawBounding(rItem);
-				rItem->OwnPage = OnPage(rItem);
-			}
-
-			if(UndoManager::undoEnabled())
-			{
-				ScItemState<QList<QPointer<PageItem> > > *is = new ScItemState<QList<QPointer<PageItem> > >(UndoManager::Ungroup);
-				is->set("UNGROUP", "ungroup");
-				tempSelection.addItem(currItem,true);
-				is->setItem(tempSelection.selectionList());
-				undoManager->action(this, is);
-			}
-
-			tempSelection.clear();
-			tempSelection.delaySignalsOff();
-		/*	currItem = toDelete.at(b);
-			QList<PageItem*> *list = Items;
-			list = parentGroup(currItem, Items);
-			int d = list->indexOf(currItem);
-			list->removeAt(d);
-			itemSelection->removeItem(currItem);
-			int gcount = currItem->groupItemList.count();
-			for (int c = 0; c < gcount; c++)
-			{
-				PageItem* gItem = currItem->groupItemList.last();
-				removeFromGroup(gItem);
-				if (currItem->Parent == NULL)
-					Items->insert(d, gItem);
-				else
-				{
-					addToGroup(currItem->Parent, gItem);
-					list->insert(d, gItem);
-				}
-				itemSelection->addItem(gItem);
-			} */
+			itemSelection->addItem(gItem);
 		}
-		setLoading(wasLoad);
-		itemSelection->delaySignalsOff();
-
-		// Delete items after delaySignalsOff() call so that palette are updated before item deletion
-		for (int b = 0; b < toDelete.count(); b++)
+		if(UndoManager::undoEnabled())
 		{
-			currItem = toDelete.at(0);
-			delete currItem;
+			ScItemState<QList<QPointer<PageItem> > > *is = new ScItemState<QList<QPointer<PageItem> > >(UndoManager::Ungroup);
+			is->set("UNGROUP", "ungroup");
+			Selection tempSelection(this, false);
+			tempSelection.addItem(currItem,true);
+			is->setItem(tempSelection.selectionList());
+			undoManager->action(this, is);
 		}
-		if(activeTransaction)
-		{
-			activeTransaction->commit();
-			delete activeTransaction;
-			activeTransaction = NULL;
-		}
+	}
+	setLoading(wasLoad);
+	itemSelection->delaySignalsOff();
+
+	// Delete items after delaySignalsOff() call so that palette are updated before item deletion
+	for (int i = 0; i < toDelete.count(); i++)
+	{
+		currItem = toDelete.at(i);
+		delete currItem;
+	}
+	if(activeTransaction)
+	{
+		activeTransaction->commit();
+		delete activeTransaction;
+		activeTransaction = NULL;
+	}
 
 /*		QMap<int, QList<PageItem*> >::iterator groupIt;
-		for (it = toDelete.begin(); it != toDelete.end(); ++it)
-		{
+	for (it = toDelete.begin(); it != toDelete.end(); ++it)
+	{
 //			PageItem* groupItem = it.key();
-			int groupId = it.value();
-			groupIt = groupObjects.find(groupId);
-			if (groupIt == groupObjects.end()) 
-				continue;
-			QList<PageItem*> groupItems = groupIt.value();
-		}*/
-		double x, y, w, h;
-		itemSelection->connectItemToGUI();
-		itemSelection->getGroupRect(&x, &y, &w, &h);
-		emit docChanged();
-		m_ScMW->HaveNewSel(itemSelection->itemAt(0)->itemType());
-		regionsChanged()->update(QRectF(x-5, y-5, w+10, h+10));
-	}
+		int groupId = it.value();
+		groupIt = groupObjects.find(groupId);
+		if (groupIt == groupObjects.end()) 
+			continue;
+		QList<PageItem*> groupItems = groupIt.value();
+	}*/
+	double x, y, w, h;
+	itemSelection->connectItemToGUI();
+	itemSelection->getGroupRect(&x, &y, &w, &h);
+	emit docChanged();
+	m_ScMW->HaveNewSel(itemSelection->itemAt(0)->itemType());
+	regionsChanged()->update(QRectF(x-5, y-5, w+10, h+10));
 }
 
 void ScribusDoc::addToGroup(PageItem* group, PageItem* item)
@@ -17888,14 +17908,14 @@ bool ScribusDoc::validateNSet(NotesStyle NS, QString newName)
 			continue;
 		if (NS.range() == NS2->range())
 		{
-				if ((NS.getType() == NS2->getType()) && (NS.prefix() == NS2->prefix()) && (NS.suffix() == NS2->suffix()))
-					errStr.append(NS.name() + tr("Notes style has document as range and provide same numbering style as set ") + NS2->name() + "\n");
+			if ((NS.getType() == NS2->getType()) && (NS.prefix() == NS2->prefix()) && (NS.suffix() == NS2->suffix()))
+				errStr.append(tr("%1 note style has document as range and provide same numbering style as set %2").arg(NS.name()).arg(NS2->name()) + "\n");
 		}
 	}
 
 	if (!errStr.isEmpty() && ScCore->usingGUI())
 	{
-		ScMessageBox::warning(this->scMW(), QObject::tr("Unaceptable settings for Notes Style"), "<qt>"+ errStr +"</qt>", QMessageBox::Ok, QMessageBox::Abort | QMessageBox::Default);
+		QMessageBox::warning(this->scMW(), QObject::tr("Unaceptable settings for note style"), "<qt>"+ errStr +"</qt>", QMessageBox::Ok, QMessageBox::Abort | QMessageBox::Default);
 		return false;
 	}
 	return true;
