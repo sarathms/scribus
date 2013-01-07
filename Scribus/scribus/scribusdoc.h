@@ -41,6 +41,7 @@ for which a new license (GPL+exception) is in place.
 #include "scribusapi.h"
 #include "colormgmt/sccolormgmtengine.h"
 #include "documentinformation.h"
+#include "numeration.h"
 #include "marks.h"
 #include "notesstyles.h"
 #include "observable.h"
@@ -938,7 +939,7 @@ public:
 	 * @brief Add a section to the document sections list
 	 * Set number to -1 to add in the default section if the map is empty
 	 */
-	void addSection(const int number=0, const QString& name=QString::null, const uint fromindex=0, const uint toindex=0, const  DocumentSectionType type=Type_1_2_3, const uint sectionstartindex=0, const bool reversed=false, const bool active=true, const QChar fillChar=QChar(), int fieldWidth=0);
+	void addSection(const int number=0, const QString& name=QString::null, const uint fromindex=0, const uint toindex=0, const  NumFormat type=Type_1_2_3, const uint sectionstartindex=0, const bool reversed=false, const bool active=true, const QChar fillChar=QChar(), int fieldWidth=0);
 	/**
 	 * @brief Delete a section from the document sections list
 	 */
@@ -1054,6 +1055,7 @@ public:
 	void itemSelection_SetLineSpacingMode(int w, Selection* customSelection=0);
 	//void ChLocalXY(double x, double y);
 	//void ChLocalSc(double x, double y);
+	void itemSetFont(const QString& newFont);
 	void itemSelection_SetFont(QString fon, Selection* customSelection=0);
 	void itemSelection_SetFillColor(QString farbe, Selection* customSelection=0);
 	void itemSelection_SetFillShade(int sha, Selection* customSelection=0);
@@ -1215,6 +1217,7 @@ public: // Public attributes
 	int Last;
 	int viewCount;
 	int viewID;
+	bool SnapGrid;
 	bool SnapGuides;
 	bool SnapElement;
 	bool GuideLock;
@@ -1222,6 +1225,8 @@ public: // Public attributes
 	/** \brief Minimum and Maximum Points of Document */
 	FPoint minCanvasCoordinate;
 	FPoint maxCanvasCoordinate;
+	FPoint stored_minCanvasCoordinate;
+	FPoint stored_maxCanvasCoordinate;
 	double rulerXoffset;
 	double rulerYoffset;
 	/** \brief List of Pages */
@@ -1240,6 +1245,7 @@ public: // Public attributes
 	QList<PageItem*> DocItems;
 	QHash<int, PageItem*> FrameItems;
 	QList<PageItem*> EditFrameItems;
+	PageItem *currentEditedTextframe;
 	Selection* const m_Selection;
 	/** \brief Number of Columns */
 	double PageSp;
@@ -1249,8 +1255,6 @@ public: // Public attributes
 	//int currentPageLayout;
 	/** \brief Erste Seitennummer im Dokument */
 	int FirstPnum;
-	/** \brief Flag fuer Rasterbenutzung */
-	bool useRaster;
 	/** \brief Im Dokument benutzte Farben */
 	ColorList PageColors;
 	int appMode;
@@ -1769,6 +1773,26 @@ public slots:
 	void itemSelection_Weld();
 	void itemSelection_EditWeld();
 	void restartAutoSaveTimer();
+
+//auto-numerations
+public:
+	QMap<QString, NumStruct*> numerations;
+	QStringList orgNumNames; //orgNumerations keeps original settings read from paragraph styles for reset settings overrided localy
+	void setupNumerations(); //read styles for used auto-numerations, initialize numCounters
+	QString getNumberStr(QString numName, int level, bool reset, ParagraphStyle &style);
+	void setNumerationCounter(QString numName, int level, int number);
+	bool flag_Renumber;
+	bool flag_NumUpdateRequest;
+	// for local numeration of paragraphs
+	bool updateLocalNums(StoryText& itemText); //return true if any num strings were updated and item need s invalidation
+	void updateNumbers(bool updateNumerations = false);
+	void itemSelection_ClearBulNumStrings(Selection *customSelection);
+/* Functions for PDF Form Actions */
+
+public:
+	void SubmitForm();
+	void ImportData();
+	void ResetFormFields();
 };
 
 Q_DECLARE_METATYPE(ScribusDoc*);

@@ -85,6 +85,7 @@ public:
 	//simplify conditions checking if frame is in chain
 	//FIX: use it in other places
 	bool isInChain() { return ((prevInChain() != NULL) || (nextInChain() != NULL)); }
+	void setTextAnnotationOpen(bool open);
 
 	double columnWidth();
 #ifdef NLS_PROTO
@@ -113,7 +114,8 @@ protected:
 	bool unicodeTextEditMode;
 	int unicodeInputCount;
 	QString unicodeInputString;
-	
+
+	void drawNoteIcon(ScPainter *p);
 	virtual bool createInfoGroup(QFrame *, QGridLayout *);
 	virtual void applicableActions(QStringList& actionList);
 	virtual QString infoDescription();
@@ -133,13 +135,14 @@ private:
 	QString currentShadow;
 	QMap<QString,StoryText> shadows;
 	bool checkKeyIsShortcut(QKeyEvent *k);
+	QRectF m_origAnnotPos;
 	
 private slots:
 	void slotInvalidateLayout();
 
 public:
 	//for footnotes/endnotes
-	bool hasMark(NotesStyle* NS = NULL);
+	bool hasNoteMark(NotesStyle* NS = NULL);
 	bool hasNoteFrame(NotesStyle* NS, bool inChain = false);
 	//bool hasNoteFrame(PageItem_NoteFrame* nF) { return m_notesFramesMap.contains(nF); }
 	void delAllNoteFrames(bool doUpdate = false);

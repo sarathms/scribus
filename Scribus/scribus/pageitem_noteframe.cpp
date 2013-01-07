@@ -101,9 +101,9 @@ PageItem_NoteFrame::PageItem_NoteFrame(PageItem_TextFrame* inFrame, NotesStyle *
 		frameHeight = newStyle.charStyle().fontSize()/10;
 	Height = oldHeight = frameHeight;
 	oldWidth = Width;
-	oldRot = Rot;
-	oldXpos = Xpos;
-	Ypos = oldYpos =m_masterFrame->yPos() + m_masterFrame->height();
+	oldRot = m_rotation;
+	oldXpos = m_xPos;
+	m_yPos = oldYpos =m_masterFrame->yPos() + m_masterFrame->height();
 
 	textFlowModeVal = TextFlowUsesFrameShape;
 	setColumns(1);
@@ -206,7 +206,7 @@ void PageItem_NoteFrame::layout()
 		if (frameOverflows())
 		{
 			//increase height while text don`t fit in frame
-			double maxH = m_Doc->currentPage()->height() - Xpos;
+			double maxH = m_Doc->currentPage()->height() - m_xPos;
 			while (frameOverflows())
 			{
 				oldHeight = Height += 8;
@@ -218,7 +218,7 @@ void PageItem_NoteFrame::layout()
 			}
 		}
 		double hackValue = 0.5;
-		oldHeight = Height = ceil(maxY) + BExtra + hackValue;
+		oldHeight = Height = ceil(maxY) + m_textDistanceMargins.Bottom + hackValue;
 		updateConstants();
 		updateClip();
 		invalid = true;

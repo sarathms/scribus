@@ -347,7 +347,6 @@ ScribusView::ScribusView(QWidget* win, ScribusMainWindow* mw, ScribusDoc *doc) :
 	connect(cmsToolbarButton, SIGNAL(clicked()), this, SLOT(toggleCMS()));
 	connect(visualMenu, SIGNAL(activated(int)), this, SLOT(switchPreviewVisual(int)));
 	connect(this, SIGNAL(HaveSel(int)), Doc, SLOT(selectionChanged()));
-	languageChange();
 // Commented out to fix bug #7865
 //	m_dragTimer = new QTimer(this);
 //	connect(m_dragTimer, SIGNAL(timeout()), this, SLOT(dragTimerTimeOut()));
@@ -356,7 +355,12 @@ ScribusView::ScribusView(QWidget* win, ScribusMainWindow* mw, ScribusDoc *doc) :
 	clockLabel = new ClockWidget(this, Doc);
 	clockLabel->setGeometry(m_vhRulerHW + 1, height() - m_vhRulerHW - 61, 60, 60);
 	clockLabel->setVisible(false);
+	endEditButton = new QPushButton(loadIcon("22/exit.png"), tr("End Edit"), this);
+	endEditButton->setGeometry(m_vhRulerHW + 1, height() - m_vhRulerHW - endEditButton->minimumSizeHint().height() - 1, endEditButton->minimumSizeHint().width(), endEditButton->minimumSizeHint().height());
+	endEditButton->setVisible(false);
+	connect(endEditButton, SIGNAL(clicked()), m_ScMW, SLOT(slotFileClose()));
 	editOnPreviewToolbarButton->hide();
+	languageChange();
 }
 
 ScribusView::~ScribusView()
@@ -395,6 +399,7 @@ void ScribusView::languageChange()
 	previewToolbarButton->setToolTip( tr("Enable/disable the Preview Mode"));
 	editOnPreviewToolbarButton->setToolTip( tr("Enable/disable editing the Preview Mode"));
 	visualMenu->setToolTip( tr("Select the visual appearance of the display. You can choose between normal and several color blindness forms"));
+	endEditButton->setToolTip( tr("Click here to leave this special edit mode."));
 	disconnect(visualMenu, SIGNAL(activated(int)), this, SLOT(switchPreviewVisual(int)));
 	visualMenu->clear();
 	visualMenu->addItem(CommonStrings::trVisionNormal);
@@ -444,6 +449,7 @@ void ScribusView::togglePreviewEdit()
 {
 	Doc->editOnPreview = !Doc->editOnPreview;
 	m_ScMW->setPreviewToolbar();
+	DrawNew();
 }
 
 void ScribusView::togglePreview()
@@ -474,6 +480,7 @@ void ScribusView::togglePreview()
 	}
 	else
 	{
+		Doc->ResetFormFields();
 		editOnPreviewToolbarButton->hide();
 		Doc->guidesPrefs().framesShown = storedFramesShown;
 		Doc->guidesPrefs().showControls = storedShowControls;
@@ -600,7 +607,6 @@ switches between appmodes:
  - for submodes, activate the appropiate dialog or palette
  - set a new CanvasMode if necessary
  - call ScribusMainWindow::setAppMode(), which de/activates actions
- TODO:av make this simpler
  */
 void ScribusView::requestMode(int appMode)
 {
@@ -609,31 +615,15 @@ void ScribusView::requestMode(int appMode)
 	switch(appMode) // filter submodes
 	{
 		case submodePaintingDone:   // return to normal mode
-//			appMode = m_previousMode < 0 ? modeNormal : m_previousMode;
 			appMode = modeNormal;
 			m_previousMode = -1;
 			updateNecessary = true;
 			break;
 		case submodeEndNodeEdit:     // return from node/shape editing
-//			appMode = m_previousMode < 0 ? modeNormal : m_previousMode;
 			appMode = modeNormal;
 			m_previousMode = -1;
 			updateNecessary = true;
 			break;
-			/*
-			 case submodeToggleNodeEdit:
-				 if (Doc->appMode == modeEditClip)
-				 {
-					 m_ScMW->setAppMode(m_previousMode < 0 ? modeNormal : m_previousMode);
-					 m_previousMode = -1;
-				 }
-				 else
-				 {
-					 m_previousMode = Doc->appMode;
-					 m_ScMW->setAppMode(modeEditClip);
-				 }
-				 return;
-				 */
 		case submodeLoadPic:         // open GetImage dialog
 			m_ScMW->slotGetContent();
 			appMode = Doc->appMode;
@@ -690,10 +680,6 @@ void ScribusView::requestMode(int appMode)
 	}
 	else
 		m_ScMW->setAppMode(appMode);
-//	if (appMode == modeEdit)
-//	{
-//		m_ScMW->activateWindow();
-//	}
 	if (updateNecessary)
 		updateCanvas();
 }
@@ -749,8 +735,8 @@ void ScribusView::contentsDragEnterEvent(QDragEnterEvent *e)
 	{
 		e->acceptProposedAction();
 		double gx, gy, gw, gh;
-		ScriXmlDoc *ss = new ScriXmlDoc();
-		if(ss->ReadElemHeader(text, fromFile, &gx, &gy, &gw, &gh))
+		ScriXmlDoc ss;
+		if(ss.ReadElemHeader(text, fromFile, &gx, &gy, &gw, &gh))
 		{
 			FPoint dragPosDoc = m_canvas->globalToCanvas(widget()->mapToGlobal(e->pos()));
 			dragX = dragPosDoc.x(); //e->pos().x() / m_canvas->scale();
@@ -767,8 +753,6 @@ void ScribusView::contentsDragEnterEvent(QDragEnterEvent *e)
 //				redrawMarker->show();
 			emit ItemGeom();
 		}
-		delete ss;
-		ss=NULL;
 	}
 }
 
@@ -862,12 +846,14 @@ void ScribusView::contentsDropEvent(QDropEvent *e)
 //	int ex = qRound(e->pos().x()/m_canvas->scale());// + Doc->minCanvasCoordinate.x());
 //		int ey = qRound(e->pos().y()/m_canvas->scale());// + Doc->minCanvasCoordinate.y());
 
-	if (ScMimeData::clipboardHasScribusElem() && (Doc->DraggedElem == 0))
+//  Commented out to fix Bug #11254 (fs)
+/*	if (ScMimeData::clipboardHasScribusElem() && (Doc->DraggedElem == 0))
 	{
 		text = ScMimeData::clipboardScribusElem();
 		url  = QUrl(text);
 	}
-	else if (e->mimeData()->hasText())
+	else*/
+	if (e->mimeData()->hasText())
 	{
 		text = e->mimeData()->text();
 		url = QUrl(text);
@@ -1294,7 +1280,7 @@ void ScribusView::contentsDropEvent(QDropEvent *e)
 				Doc->m_Selection->connectItemToGUI();
 				currItem = Doc->m_Selection->itemAt(0);
 				currItem->LayerID = Doc->activeLayer();
-				if (Doc->useRaster)
+				if (Doc->SnapGrid)
 				{
 					double nx = currItem->xPos();
 					double ny = currItem->yPos();
@@ -2003,11 +1989,11 @@ void ScribusView::PasteToPage()
 		activeTransaction = new UndoTransaction(undoManager->beginTransaction(Doc->currentPage()->getUName(), 0, Um::Paste, "", Um::IPaste));
 /*	if (ScMimeData::clipboardHasScribusFragment())
 	{
-		bool savedAlignGrid = Doc->useRaster;
+		bool savedAlignGrid = Doc->SnapGrid;
 		bool savedAlignGuides = Doc->SnapGuides;
 		QByteArray fragment   = ScMimeData::clipboardScribusFragment();
 		Selection pastedObjects = Doc->serializer()->deserializeObjects(fragment);
-		Doc->useRaster = savedAlignGrid;
+		Doc->SnapGrid = savedAlignGrid;
 		Doc->SnapGuides = savedAlignGuides;
 		pastedObjects.setGroupRect();
 		double gx, gy, gh, gw;
@@ -2062,7 +2048,7 @@ void ScribusView::PasteToPage()
 	else if (newObjects.count() == 1)
 	{
 		PageItem *currItem = newObjects.itemAt(0);
-		if (Doc->useRaster)
+		if (Doc->SnapGrid)
 		{
 			double nx = currItem->xPos();
 			double ny = currItem->yPos();
@@ -2114,6 +2100,7 @@ void ScribusView::resizeEvent ( QResizeEvent * event )
 		clockLabel->setGeometry(m_vhRulerHW + 1, height() - m_vhRulerHW - 16, 15, 15);
 		clockLabel->setFixedSize(15, 15);
 	}
+	endEditButton->setGeometry(m_vhRulerHW + 1, height() - m_vhRulerHW - endEditButton->minimumSizeHint().height() - 1, endEditButton->minimumSizeHint().width(), endEditButton->minimumSizeHint().height());
 	m_canvas->m_viewMode.forceRedraw = true;
 	m_canvas->resetRenderMode();
 	// Per Qt doc, not painting should be done in a resizeEvent,
@@ -2710,6 +2697,7 @@ void ScribusView::GotoPage(int Seite)
 		return;
 	setMenTxt(Seite);
 	SetCPo(Doc->currentPage()->xOffset() - 10, Doc->currentPage()->yOffset() - 10);
+	m_ScMW->HaveNewSel(-1);
 }
 
 void ScribusView::showMasterPage(int nr)
@@ -2728,6 +2716,7 @@ void ScribusView::showMasterPage(int nr)
 	oldY = qRound(Doc->currentPage()->yOffset()- 10);
 	SetCPo(Doc->currentPage()->xOffset() - 10, Doc->currentPage()->yOffset() - 10);
 	updateOn = true;
+	endEditButton->setVisible(true);
 	DrawNew();
 }
 
@@ -2738,6 +2727,7 @@ void ScribusView::hideMasterPage()
 		this->requestMode(modeNormal);
 	Doc->setMasterPageMode(false);
 	pageSelector->setEnabled(true);
+	endEditButton->setVisible(false);
 	resizeContents(qRound((Doc->maxCanvasCoordinate.x() - Doc->minCanvasCoordinate.x()) * m_canvas->scale()), qRound((Doc->maxCanvasCoordinate.y() - Doc->minCanvasCoordinate.y()) * m_canvas->scale()));
 }
 
@@ -2757,6 +2747,7 @@ void ScribusView::showSymbolPage(QString symbolName)
 	oldY = qRound(Doc->currentPage()->yOffset()- 10);
 	SetCPo(Doc->currentPage()->xOffset() - 10, Doc->currentPage()->yOffset() - 10);
 	updateOn = true;
+	endEditButton->setVisible(true);
 	DrawNew();
 }
 
@@ -2768,6 +2759,7 @@ void ScribusView::hideSymbolPage()
 		this->requestMode(modeNormal);
 	Doc->setSymbolEditMode(false);
 	updatesOn(true);
+	endEditButton->setVisible(false);
 	Doc->setCurrentPage(Doc->Pages->at(0));
 	pageSelector->setEnabled(true);
 	layerMenu->setEnabled(true);
@@ -2790,6 +2782,7 @@ void ScribusView::showInlinePage(int id)
 	oldY = qRound(Doc->currentPage()->yOffset()- 10);
 	SetCPo(Doc->currentPage()->xOffset() - 10, Doc->currentPage()->yOffset() - 10);
 	updateOn = true;
+	endEditButton->setVisible(true);
 	DrawNew();
 }
 
@@ -2801,6 +2794,7 @@ void ScribusView::hideInlinePage()
 		this->requestMode(modeNormal);
 	Doc->setInlineEditMode(false);
 	updatesOn(true);
+	endEditButton->setVisible(false);
 	Doc->setCurrentPage(Doc->Pages->at(0));
 	pageSelector->setEnabled(true);
 	layerMenu->setEnabled(true);
@@ -3787,14 +3781,11 @@ void ScribusView::TextToPath()
 						{
 							if (hl->hasObject(Doc))
 							{
+								ScriXmlDoc ss;
 								Selection tempSelection(this, false);
 								tempSelection.addItem(hl->getItem(Doc), true);
-								ScriXmlDoc *ss = new ScriXmlDoc();
-								QString dataS = ss->WriteElem(Doc, &tempSelection);
-								delete ss;
-								ss = new ScriXmlDoc();
+								QString dataS = ss.WriteElem(Doc, &tempSelection);
 								emit LoadElem(dataS, currItem->xPos(), currItem->yPos(), false, true, Doc, this);
-								delete ss;
 								bb = Doc->Items->last();
 								int z = Doc->Items->indexOf(bb);
 								bb->setTextFlowMode(currItem->textFlowMode());
@@ -4121,7 +4112,6 @@ void ScribusView::TextToPath()
 				{
 					PageItem* newItem = new PageItem_Polygon(*currItem);
 					newItem->convertTo(PageItem::Polygon);
-					newItem->Frame = false;
 					newItem->ClipEdited = true;
 					newItem->FrameType = 3;
 					newItem->OldB2 = newItem->width();

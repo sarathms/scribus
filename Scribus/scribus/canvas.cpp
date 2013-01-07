@@ -477,7 +477,7 @@ PageItem* Canvas::itemUnderCursor(QPoint globalPos, PageItem* itemAbove, bool al
 			--currNr;
 			continue;
 		}
-		if ((m_doc->drawAsPreview && !m_doc->editOnPreview) && !currItem->isAnnotation())
+		if ((m_doc->drawAsPreview && !m_doc->editOnPreview) && !(currItem->isAnnotation() || currItem->isGroup()))
 		{
 			--currNr;
 			continue;
@@ -500,7 +500,12 @@ PageItem* Canvas::itemUnderCursor(QPoint globalPos, PageItem* itemAbove, bool al
 					currItem->asGroupFrame()->adjustXYPosition();
 					PageItem* ret = itemInGroup(currItem, itemPos, mouseArea);
 					if (ret != NULL)
-						return ret;
+					{
+						if ((m_doc->drawAsPreview && !m_doc->editOnPreview) && !ret->isAnnotation())
+							return NULL;
+						else
+							return ret;
+					}
 				}
 				return currItem;
 			}
@@ -521,6 +526,13 @@ bool Canvas::cursorOverTextFrameControl(QPoint globalPos, PageItem* frame)
 	if(mp.x()>left && mp.x()<right && mp.y()>top && mp.y()<bottom)
 		return true;
 	return false;
+}
+
+bool Canvas::cursorOverFrameControl(QPoint globalPos, QRectF targetRect, PageItem* frame)
+{
+	FPoint mp = globalToCanvas(globalPos);
+	QRectF tg = targetRect.translated(frame->xPos(), frame->yPos());
+	return tg.contains(QPointF(mp.x(), mp.y()));
 }
 
 PageItem* Canvas::itemInGroup(PageItem* group, QTransform itemPos, QRectF mouseArea) const

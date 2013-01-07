@@ -60,6 +60,19 @@ public:
 
 private:
 	inline bool GetItem(PageItem** pi);
+	void handleCheckBoxPress(PageItem* currItem);
+	void handlePushButtonPress(PageItem* currItem);
+	void handleRadioButtonPress(PageItem* currItem);
+	void handleCheckBoxRelease(PageItem* currItem);
+	void handlePushButtonRelease(PageItem* currItem);
+	void handleRadioButtonRelease(PageItem* currItem);
+	void handleJavaAction(PageItem* currItem, int event);
+	void handleNamedAction(PageItem* currItem);
+	void handleLinkAnnotation(PageItem* currItem);
+	void handleFocusOut(PageItem* currItem);
+	void handleFocusIn(PageItem* currItem);
+	void handleMouseLeave(PageItem* currItem);
+	void handleMouseEnter(PageItem* currItem);
 	bool SeleItem(QMouseEvent *m);
 	void createContextMenu(PageItem *currItem, double mx, double my);
 
@@ -76,6 +89,7 @@ private:
 	LineMove* lineMoveGesture;
 	RulerGesture* guideMoveGesture;
 	bool m_lastPosWasOverGuide;
+	PageItem* m_hoveredItem;
 
 public slots:
 	void importToPage();

@@ -224,6 +224,8 @@ SlaOutputDev::SlaOutputDev(ScribusDoc* doc, QList<PageItem*> *Elements, QStringL
 	m_font = 0;
 	updateGUICounter = 0;
 	layersSetByOCG = false;
+	cropOffsetX = 0;
+	cropOffsetY = 0;
 }
 
 SlaOutputDev::~SlaOutputDev()
@@ -305,10 +307,25 @@ GBool SlaOutputDev::annotations_callback(Annot *annota, void *user_data)
 {
 	SlaOutputDev *dev = (SlaOutputDev*)user_data;
 	PDFRectangle *box = annota->getRect();
-	double xCoor = dev->m_doc->currentPage()->xOffset() + box->x1;
-	double yCoor = dev->m_doc->currentPage()->yOffset() + dev->m_doc->currentPage()->height() - box->y2;
+	double xCoor = dev->m_doc->currentPage()->xOffset() + box->x1 - dev->cropOffsetX;
+	double yCoor = dev->m_doc->currentPage()->yOffset() + dev->m_doc->currentPage()->height() - box->y2 + dev->cropOffsetY;
 	double width = box->x2 - box->x1;
 	double height = box->y2 - box->y1;
+	if (dev->rotate == 90)
+	{
+		xCoor = dev->m_doc->currentPage()->xOffset() - dev->cropOffsetX + box->y2;
+		yCoor = dev->m_doc->currentPage()->yOffset() + dev->cropOffsetY + box->x1;
+	}
+	else if (dev->rotate == 180)
+	{
+		xCoor = dev->m_doc->currentPage()->xOffset() - dev->cropOffsetX + dev->m_doc->currentPage()->width() - box->x1;
+		yCoor = dev->m_doc->currentPage()->yOffset() + dev->cropOffsetY + box->y2;
+	}
+	else if (dev->rotate == 270)
+	{
+		xCoor = dev->m_doc->currentPage()->xOffset() - dev->cropOffsetX + dev->m_doc->currentPage()->width() - box->y2;
+		yCoor = dev->m_doc->currentPage()->yOffset() + dev->cropOffsetY + dev->m_doc->currentPage()->height() - box->x1;
+	}
 	bool retVal = true;
 	if (annota->getType() == Annot::typeText)
 		retVal = !dev->handleTextAnnot(annota, xCoor, yCoor, width, height);
@@ -321,8 +338,12 @@ GBool SlaOutputDev::annotations_callback(Annot *annota, void *user_data)
 
 bool SlaOutputDev::handleTextAnnot(Annot* annota, double xCoor, double yCoor, double width, double height)
 {
+	AnnotText *anl = (AnnotText*)annota;
 	int z = m_doc->itemAdd(PageItem::TextFrame, PageItem::Rectangle, xCoor, yCoor, width, height, 0, CommonStrings::None, CommonStrings::None, true);
 	PageItem *ite = m_doc->Items->at(z);
+	int flg = annota->getFlags();
+	if (!(flg & 16))
+		ite->setRotation(rotate, true);
 	ite->ClipEdited = true;
 	ite->FrameType = 3;
 	ite->setFillEvenOdd(false);
@@ -338,7 +359,29 @@ bool SlaOutputDev::handleTextAnnot(Annot* annota, double xCoor, double yCoor, do
 	ite->setIsAnnotation(true);
 	ite->AutoName = false;
 	ite->annotation().setType(Annotation::Text);
-	ite->annotation().setActionType(0);
+	ite->annotation().setActionType(Annotation::Action_None);
+	ite->annotation().setAnOpen(anl->getOpen());
+	QString iconName = UnicodeParsedString(anl->getIcon());
+	if (iconName == "Note")
+		ite->annotation().setIcon(Annotation::Icon_Note);
+	else if (iconName == "Comment")
+		ite->annotation().setIcon(Annotation::Icon_Comment);
+	else if (iconName == "Key")
+		ite->annotation().setIcon(Annotation::Icon_Key);
+	else if (iconName == "Help")
+		ite->annotation().setIcon(Annotation::Icon_Help);
+	else if (iconName == "NewParagraph")
+		ite->annotation().setIcon(Annotation::Icon_NewParagraph);
+	else if (iconName == "Paragraph")
+		ite->annotation().setIcon(Annotation::Icon_Paragraph);
+	else if (iconName == "Insert")
+		ite->annotation().setIcon(Annotation::Icon_Insert);
+	else if (iconName == "Cross")
+		ite->annotation().setIcon(Annotation::Icon_Cross);
+	else if (iconName == "Circle")
+		ite->annotation().setIcon(Annotation::Icon_Circle);
+	else
+		ite->annotation().setIcon(Annotation::Icon_Note);
 	ite->setItemName( CommonStrings::itemName_TextAnnotation + QString("%1").arg(m_doc->TotalItems));
 	ite->itemText.insertChars(UnicodeParsedString(annota->getContents()));
 	return true;
@@ -442,6 +485,9 @@ bool SlaOutputDev::handleLinkAnnot(Annot* annota, double xCoor, double yCoor, do
 	{
 		int z = m_doc->itemAdd(PageItem::TextFrame, PageItem::Rectangle, xCoor, yCoor, width, height, 0, CommonStrings::None, CommonStrings::None, true);
 		PageItem *ite = m_doc->Items->at(z);
+		int flg = annota->getFlags();
+		if (!(flg & 16))
+			ite->setRotation(rotate, true);
 		ite->ClipEdited = true;
 		ite->FrameType = 3;
 		ite->setFillEvenOdd(false);
@@ -484,6 +530,7 @@ bool SlaOutputDev::handleLinkAnnot(Annot* annota, double xCoor, double yCoor, do
 bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, double width, double height)
 {
 	bool retVal = false;
+	bool found = false;
 	int formcount = m_formWidgets->getNumWidgets();
 	for (int i = 0; i < formcount; ++i)
 	{
@@ -495,6 +542,7 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 			{
 				if (ano == (AnnotWidget*)annota)
 				{
+					found = true;
 					int wtyp = -1;
 					if (fm->getType() == formButton)
 					{
@@ -503,23 +551,24 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 						{
 							if (btn->getButtonType() == formButtonCheck)
 							{
-								wtyp = 4;
+								wtyp = Annotation::Checkbox;
 								retVal = true;
 							}
 							else if (btn->getButtonType() == formButtonPush)
 							{
-								wtyp = 2;
+								wtyp = Annotation::Button;
 								retVal = true;
 							}
 							else if (btn->getButtonType() == formButtonRadio)
 							{
-								retVal = false;
+								wtyp = Annotation::RadioButton;
+								retVal = true;
 							}
 						}
 					}
 					else if (fm->getType() == formText)
 					{
-						wtyp = 3;
+						wtyp = Annotation::Textfield;
 						retVal = true;
 					}
 					else if (fm->getType() == formChoice)
@@ -529,12 +578,12 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 						{
 							if (btn->isCombo())
 							{
-								wtyp = 5;
+								wtyp = Annotation::Combobox;
 								retVal = true;
 							}
 							else if (btn->isListBox())
 							{
-								wtyp = 6;
+								wtyp = Annotation::Listbox;
 								retVal = true;
 							}
 						}
@@ -542,16 +591,24 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 					if (retVal)
 					{
 						AnnotAppearanceCharacs *achar = ano->getAppearCharacs();
+						bool fgFound = false;
+						bool bgFound = false;
 						if (achar)
 						{
 							AnnotColor *bgCol = achar->getBackColor();
 							if (bgCol)
+							{
+								bgFound = true;
 								CurrColorFill = getAnnotationColor(bgCol);
+							}
 							else
 								CurrColorFill = CommonStrings::None;
 							AnnotColor *fgCol = achar->getBorderColor();
 							if (fgCol)
+							{
+								fgFound = true;
 								CurrColorStroke = getAnnotationColor(fgCol);
+							}
 							else
 							{
 								fgCol = achar->getBackColor();
@@ -575,9 +632,11 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 #else
 							gfx = new Gfx(xref, Adev, pdfDoc->getPage(m_actPage)->getResourceDict(), catalog, annota->getRect(), NULL);
 #endif
-							annota->draw(gfx, false);
-							CurrColorFill = Adev->CurrColorFill;
-							CurrColorStroke = Adev->CurrColorStroke;
+							ano->draw(gfx, false);
+							if (!bgFound)
+								CurrColorFill = Adev->CurrColorFill;
+							if (!fgFound)
+								CurrColorStroke = Adev->CurrColorStroke;
 							CurrColorText = Adev->CurrColorText;
 							fontSize = Adev->m_fontSize;
 							fontName = UnicodeParsedString(Adev->m_fontName);
@@ -587,6 +646,9 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 						}
 						int z = m_doc->itemAdd(PageItem::TextFrame, PageItem::Rectangle, xCoor, yCoor, width, height, 0, CurrColorFill, CommonStrings::None, true);
 						PageItem *ite = m_doc->Items->at(z);
+						int flg = annota->getFlags();
+						if (!(flg & 16))
+							ite->setRotation(rotate, true);
 						ite->ClipEdited = true;
 						ite->FrameType = 3;
 						ite->setFillEvenOdd(false);
@@ -643,8 +705,12 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 								ite->annotation().setDown(tmTxt);
 						}
 						ite->annotation().setType(wtyp);
-						ite->annotation().setFlag(ano->getFlags());
-						if (wtyp == 2) // Button
+						ite->annotation().setFlag(0);
+						if (flg & 2)
+							ite->annotation().setVis(1);
+						if (flg & 32)
+							ite->annotation().setVis(3);
+						if (wtyp == Annotation::Button)
 						{
 							ite->setFillColor(CurrColorFill);
 							if (achar)
@@ -653,9 +719,12 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 								ite->itemText.insertChars(itemText);
 							applyTextStyle(ite, fontName, CurrColorText, fontSize);
 							ite->annotation().addToFlag(Annotation::Flag_PushButton);
+							FormWidgetButton *btn = (FormWidgetButton*)fm;
+							if (!btn->isReadOnly())
+								ite->annotation().addToFlag(Annotation::Flag_Edit);
 							handleActions(ite, ano);
 						}
-						else if (wtyp == 3) // Textfield
+						else if (wtyp == Annotation::Textfield)
 						{
 							FormWidgetText *btn = (FormWidgetText*)fm;
 							if (btn)
@@ -675,15 +744,18 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 									ite->annotation().setMaxChar(mxLen);
 								else
 									ite->annotation().setMaxChar(-1);
+								if (!btn->isReadOnly())
+									ite->annotation().addToFlag(Annotation::Flag_Edit);
 								handleActions(ite, ano);
 							}
 						}
-						else if (wtyp == 4) // Checkbox
+						else if (wtyp == Annotation::Checkbox)
 						{
 							FormWidgetButton *btn = (FormWidgetButton*)fm;
 							if (btn)
 							{
 								ite->annotation().setIsChk(btn->getState());
+								ite->annotation().setCheckState(ite->annotation().IsChk());
 								handleActions(ite, ano);
 								if (itemText == "4")
 									ite->annotation().setChkStil(0);
@@ -697,10 +769,13 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 									ite->annotation().setChkStil(4);
 								else if (itemText == "n")
 									ite->annotation().setChkStil(5);
-							//	qDebug() << "Font" << fontName << "\nSize" << fontSize << "\nText" << itemText;
+								else
+									ite->annotation().setChkStil(0);
+								if (!btn->isReadOnly())
+									ite->annotation().addToFlag(Annotation::Flag_Edit);
 							}
 						}
-						else if ((wtyp == 5) || (wtyp == 6)) // Combobox + Listbox
+						else if ((wtyp == Annotation::Combobox) || (wtyp == Annotation::Listbox))
 						{
 							FormWidgetChoice *btn = (FormWidgetChoice*)fm;
 							if (btn)
@@ -723,11 +798,66 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 								handleActions(ite, ano);
 							}
 						}
+						else if (wtyp == Annotation::RadioButton)
+						{
+							FormWidgetButton *btn = (FormWidgetButton*)fm;
+							if (btn)
+							{
+								ite->setItemName( CommonStrings::itemName_RadioButton + QString("%1").arg(m_doc->TotalItems));
+								ite->annotation().setIsChk(btn->getState());
+								ite->annotation().setCheckState(ite->annotation().IsChk());
+								handleActions(ite, ano);
+								m_radioButtons.insert(annota->getRef().num, ite);
+							}
+						}
 					}
 					break;
 				}
 			}
 		}
+	}
+	if (!found)
+	{
+		Object obj1;
+		Ref refa = annota->getRef();
+		Object *act = xref->fetch(refa.num, refa.gen, &obj1);
+		if (act)
+		{
+			if (act->isDict())
+			{
+				Dict* dict = act->getDict();
+				Object obj2;
+				//childs
+				if (dict->lookup("Kids", &obj2)->isArray())
+				{
+				  // Load children
+					QList<int> radList;
+					for (int i = 0 ; i < obj2.arrayGetLength(); i++)
+					{
+						Object childRef, childObj;
+						if (!obj2.arrayGetNF(i, &childRef)->isRef())
+						{
+							childRef.free();
+							continue;
+						}
+						if (!obj2.arrayGet(i, &childObj)->isDict())
+						{
+							childObj.free();
+							childRef.free();
+							continue;
+						}
+						const Ref ref = childRef.getRef();
+						radList.append(ref.num);
+						childObj.free();
+						childRef.free();
+					}
+					QString tmTxt = UnicodeParsedString(annota->getName());
+					m_radioMap.insert(tmTxt, radList);
+				}
+				obj2.free();
+			}
+		}
+		obj1.free();
 	}
 	return retVal;
 }
@@ -1079,11 +1209,42 @@ void SlaOutputDev::startDoc(PDFDoc *doc, XRef *xrefA, Catalog *catA)
 void SlaOutputDev::startPage(int pageNum, GfxState *)
 {
 	m_formWidgets = pdfDoc->getPage(pageNum)->getFormWidgets();
+	m_radioMap.clear();
+	m_radioButtons.clear();
 	m_actPage = pageNum;
 }
 
 void SlaOutputDev::endPage()
 {
+	if (!m_radioMap.isEmpty())
+	{
+		QHash<QString, QList<int> >::iterator it;
+		for (it = m_radioMap.begin(); it != m_radioMap.end(); ++it)
+		{
+			tmpSel->clear();
+			QList<int> refList = it.value();
+			for (int a = 0; a < refList.count(); a++)
+			{
+				if (m_radioButtons.contains(refList[a]))
+				{
+					tmpSel->addItem(m_radioButtons[refList[a]], true);
+					m_Elements->removeAll(m_radioButtons[refList[a]]);
+				}
+			}
+			if (!tmpSel->isEmpty())
+			{
+				PageItem *ite = m_doc->groupObjectsSelection(tmpSel);
+				ite->setItemName(it.key());
+				m_Elements->append(ite);
+				if (m_groupStack.count() != 0)
+				{
+					m_groupStack.top().Items.append(ite);
+				}
+			}
+		}
+	}
+	m_radioMap.clear();
+	m_radioButtons.clear();
 //	qDebug() << "ending page";
 }
 
@@ -1139,7 +1300,7 @@ void SlaOutputDev::restoreState(GfxState *state)
 							sing->PoLine.translate(dx, dy);
 							if (sing->isGroup())
 							{
-								QList<PageItem*> allItems = sing->asGroupFrame()->getItemList();
+								QList<PageItem*> allItems = sing->asGroupFrame()->groupItemList;
 								for (int si = 0; si < allItems.count(); si++)
 								{
 									allItems[si]->moveBy(dx, dy, true);
@@ -1305,24 +1466,30 @@ void SlaOutputDev::clip(GfxState *state)
 //	qDebug() << "Clip";
 	double *ctm;
 	ctm = state->getCTM();
+	m_ctm = QTransform(ctm[0], ctm[1], ctm[2], ctm[3], ctm[4], ctm[5]);
 	QString output = convertPath(state->getPath());
 	FPointArray out;
-	out.parseSVG(output);
-	if (!pathIsClosed)
-		out.svgClosePath();
-	m_ctm = QTransform(ctm[0], ctm[1], ctm[2], ctm[3], ctm[4], ctm[5]);
-	out.map(m_ctm);
+	if (!output.isEmpty())
+	{
+		out.parseSVG(output);
+		if (!pathIsClosed)
+			out.svgClosePath();
+		out.map(m_ctm);
+	}
 	double xmin, ymin, xmax, ymax;
 	state->getClipBBox(&xmin, &ymin, &xmax, &ymax);
 	QRectF crect = QRectF(QPointF(xmin, ymin), QPointF(xmax, ymax));
 	crect = crect.normalized();
 	int z = m_doc->itemAdd(PageItem::Group, PageItem::Rectangle, crect.x() + m_doc->currentPage()->xOffset(), crect.y() + m_doc->currentPage()->yOffset(), crect.width(), crect.height(), 0, CommonStrings::None, CommonStrings::None, true);
 	PageItem *ite = m_doc->Items->at(z);
-	FPoint wh(getMinClipF(&out));
-	out.translate(-wh.x(), -wh.y());
-	FPoint dim = out.WidthHeight();
-	if (!((dim.x() == 0.0) || (dim.y() == 0.0)))		// avoid degenerate clipping paths
-		ite->PoLine = out.copy();  //FIXME: try to avoid copy if FPointArray when properly shared
+	if (!output.isEmpty())
+	{
+		FPoint wh(getMinClipF(&out));
+		out.translate(-wh.x(), -wh.y());
+		FPoint dim = out.WidthHeight();
+		if (!((dim.x() == 0.0) || (dim.y() == 0.0)))		// avoid degenerate clipping paths
+			ite->PoLine = out.copy();  //FIXME: try to avoid copy if FPointArray when properly shared
+	}
 	ite->ClipEdited = true;
 	ite->FrameType = 3;
 	ite->setFillEvenOdd(false);
@@ -1349,24 +1516,30 @@ void SlaOutputDev::eoClip(GfxState *state)
 //	qDebug() << "EoClip";
 	double *ctm;
 	ctm = state->getCTM();
+	m_ctm = QTransform(ctm[0], ctm[1], ctm[2], ctm[3], ctm[4], ctm[5]);
 	QString output = convertPath(state->getPath());
 	FPointArray out;
-	out.parseSVG(output);
-	if (!pathIsClosed)
-		out.svgClosePath();
-	m_ctm = QTransform(ctm[0], ctm[1], ctm[2], ctm[3], ctm[4], ctm[5]);
-	out.map(m_ctm);
+	if (!output.isEmpty())
+	{
+		out.parseSVG(output);
+		if (!pathIsClosed)
+			out.svgClosePath();
+		out.map(m_ctm);
+	}
 	double xmin, ymin, xmax, ymax;
 	state->getClipBBox(&xmin, &ymin, &xmax, &ymax);
 	QRectF crect = QRectF(QPointF(xmin, ymin), QPointF(xmax, ymax));
 	crect = crect.normalized();
 	int z = m_doc->itemAdd(PageItem::Group, PageItem::Rectangle, crect.x() + m_doc->currentPage()->xOffset(), crect.y() + m_doc->currentPage()->yOffset(), crect.width(), crect.height(), 0, CommonStrings::None, CommonStrings::None, true);
 	PageItem *ite = m_doc->Items->at(z);
-	FPoint wh(getMinClipF(&out));
-	out.translate(-wh.x(), -wh.y());
-	FPoint dim = out.WidthHeight();
-	if (!((dim.x() == 0.0) || (dim.y() == 0.0)))		// avoid degenerate clipping paths
-		ite->PoLine = out.copy();  //FIXME: try to avoid copy if FPointArray when properly shared
+	if (!output.isEmpty())
+	{
+		FPoint wh(getMinClipF(&out));
+		out.translate(-wh.x(), -wh.y());
+		FPoint dim = out.WidthHeight();
+		if (!((dim.x() == 0.0) || (dim.y() == 0.0)))		// avoid degenerate clipping paths
+			ite->PoLine = out.copy();  //FIXME: try to avoid copy if FPointArray when properly shared
+	}
 	ite->ClipEdited = true;
 	ite->FrameType = 3;
 	ite->setFillEvenOdd(true);
@@ -2040,21 +2213,24 @@ GBool SlaOutputDev::tilingPatternFill(GfxState *state, Gfx * /*gfx*/, Catalog *c
 
 	gfx->display(str);
 	gElements = m_groupStack.pop();
-	tmpSel->clear();
+	m_doc->m_Selection->clear();
 	double pwidth = 0;
 	double pheight = 0;
 	if (gElements.Items.count() > 0)
 	{
 		for (int dre = 0; dre < gElements.Items.count(); ++dre)
 		{
-			tmpSel->addItem(gElements.Items.at(dre), true);
+			m_doc->m_Selection->addItem(gElements.Items.at(dre), true);
 			m_Elements->removeAll(gElements.Items.at(dre));
 		}
-		ite = m_doc->groupObjectsSelection(tmpSel);
+		m_doc->itemSelection_FlipV();
+		PageItem *ite;
+		if (m_doc->m_Selection->count() > 1)
+			ite = m_doc->groupObjectsSelection();
+		else
+			ite = m_doc->m_Selection->itemAt(0);
 		ite->setFillTransparency(1.0 - state->getFillOpacity());
 		ite->setFillBlendmode(getBlendMode(state));
-		m_doc->m_Selection->addItem(ite, true);
-		m_doc->itemSelection_FlipV();
 		m_doc->m_Selection->clear();
 		ScPattern pat = ScPattern();
 		pat.setDoc(m_doc);
@@ -2074,7 +2250,6 @@ GBool SlaOutputDev::tilingPatternFill(GfxState *state, Gfx * /*gfx*/, Catalog *c
 		m_doc->Items->removeAll(ite);
 		id = QString("Pattern_from_PDF_%1").arg(m_doc->docPatterns.count() + 1);
 		m_doc->addPattern(id, pat);
-		tmpSel->clear();
 	}
 	double xCoor = m_doc->currentPage()->xOffset();
 	double yCoor = m_doc->currentPage()->yOffset();
@@ -3273,19 +3448,22 @@ void SlaOutputDev::endType3Char(GfxState *state)
 	double *ctm;
 	ctm = state->getCTM();
 	groupEntry gElements = m_groupStack.pop();
-	tmpSel->clear();
+	m_doc->m_Selection->clear();
 	if (gElements.Items.count() > 0)
 	{
 		for (int dre = 0; dre < gElements.Items.count(); ++dre)
 		{
-			tmpSel->addItem(gElements.Items.at(dre), true);
+			m_doc->m_Selection->addItem(gElements.Items.at(dre), true);
 			m_Elements->removeAll(gElements.Items.at(dre));
 		}
-		PageItem *ite = m_doc->groupObjectsSelection(tmpSel);
+		m_doc->itemSelection_FlipV();
+		PageItem *ite;
+		if (m_doc->m_Selection->count() > 1)
+			ite = m_doc->groupObjectsSelection();
+		else
+			ite = m_doc->m_Selection->itemAt(0);
 		ite->setFillTransparency(1.0 - state->getFillOpacity());
 		ite->setFillBlendmode(getBlendMode(state));
-		m_doc->m_Selection->addItem(ite, true);
-		m_doc->itemSelection_FlipV();
 		m_doc->m_Selection->clear();
 		ScPattern pat = ScPattern();
 		pat.setDoc(m_doc);

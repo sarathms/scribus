@@ -272,6 +272,8 @@ void CanvasMode::drawSelection(QPainter* psx, bool drawHandles)
 	m_pen["selection-group-inside"].setCosmetic(true);
 	QPen ba = QPen(Qt::white, 3.0, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
 	ba.setCosmetic(true);
+	QPen bb = QPen(Qt::black, 1.0, Qt::DotLine, Qt::FlatCap, Qt::MiterJoin);
+	bb.setCosmetic(true);
 	psx->scale(m_canvas->scale(), m_canvas->scale());
 	psx->translate(-m_doc->minCanvasCoordinate.x(), -m_doc->minCanvasCoordinate.y());
 	
@@ -371,16 +373,28 @@ void CanvasMode::drawSelection(QPainter* psx, bool drawHandles)
 				x = -currItem->visualLineWidth() / 2.0;
 				y = -currItem->visualLineWidth() / 2.0;
 				psx->setBrush(Qt::NoBrush);
-				psx->setPen(ba);
 				QRectF drRect = QRectF(x, y, w, h).normalized();
-				psx->drawRect(drRect);
-				if (drawHandles)
-					drawSelectionHandles(psx, QRectF(x, y, w, h), true, true, sx, sy);
-				psx->setPen(m_pen["selection-group-inside"]);
-				psx->setBrush(m_brush["selection-group-inside"]);
-				psx->drawRect(drRect);
-				if (drawHandles)
-					drawSelectionHandles(psx, QRectF(x, y, w, h), false, true, sx, sy);
+				if (m_doc->drawAsPreview && !m_doc->editOnPreview)
+				{
+					if (!currItem->annotation().IsOpen())
+					{
+						psx->setPen(bb);
+						psx->setBrush(Qt::NoBrush);
+						psx->drawRect(drRect.adjusted(-1, -1, 1, 1));
+					}
+				}
+				else
+				{
+					psx->setPen(ba);
+					psx->drawRect(drRect);
+					if (drawHandles)
+						drawSelectionHandles(psx, QRectF(x, y, w, h), true, true, sx, sy);
+					psx->setPen(m_pen["selection-group-inside"]);
+					psx->setBrush(m_brush["selection-group-inside"]);
+					psx->drawRect(drRect);
+					if (drawHandles)
+						drawSelectionHandles(psx, QRectF(x, y, w, h), false, true, sx, sy);
+				}
 			}
 			else
 			{
@@ -401,13 +415,25 @@ void CanvasMode::drawSelection(QPainter* psx, bool drawHandles)
 					y = currItem->asLine() ? 0 : -lineAdjust;
 				}
 				psx->setBrush(Qt::NoBrush);
-				psx->setPen(ba);
-				psx->drawRect(QRectF(x, y, w, h));
-				if(drawHandles && !currItem->locked() && !currItem->isLine())
-					drawSelectionHandles(psx, QRectF(x, y, w, h), true);
-				psx->setPen(m_pen["selection"]);
-				psx->setBrush(m_brush["selection"]);
-				psx->drawRect(QRectF(x, y, w, h));
+				if (m_doc->drawAsPreview && !m_doc->editOnPreview)
+				{
+					if (!currItem->annotation().IsOpen())
+					{
+						psx->setPen(bb);
+						psx->setBrush(Qt::NoBrush);
+						psx->drawRect(QRectF(x, y, w, h).adjusted(-1, -1, 1, 1));
+					}
+				}
+				else
+				{
+					psx->setPen(ba);
+					psx->drawRect(QRectF(x, y, w, h));
+					if(drawHandles && !currItem->locked() && !currItem->isLine())
+						drawSelectionHandles(psx, QRectF(x, y, w, h), true);
+					psx->setPen(m_pen["selection"]);
+					psx->setBrush(m_brush["selection"]);
+					psx->drawRect(QRectF(x, y, w, h));
+				}
 				if(drawHandles && !currItem->locked())
 				{
 					if(currItem->asLine())
@@ -733,6 +759,7 @@ QCursor CanvasMode::modeCursor()
 		case modeEditMeshPatch:
 		case modeEditWeldPoint:
 		case modeInsertPDFButton:
+		case modeInsertPDFRadioButton:
 		case modeInsertPDFTextfield:
 		case modeInsertPDFCheckbox:
 		case modeInsertPDFCombobox:
@@ -1371,9 +1398,9 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 						/* as the user might be trying to fine tune a position */
 							bool sav1 = m_doc->SnapGuides;
 							bool sav3 = m_doc->SnapElement;
-							bool sav2 = m_doc->useRaster;
+							bool sav2 = m_doc->SnapGrid;
 							m_doc->SnapGuides = false;
-							m_doc->useRaster = false;
+							m_doc->SnapGrid   = false;
 							m_doc->SnapElement = false;
 							if (m_doc->m_Selection->count() > 1)
 								m_view->startGroupTransaction(Um::Move, "", Um::IMove);
@@ -1382,7 +1409,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 								m_view->endGroupTransaction();
 							m_doc->SnapElement = sav3;
 							m_doc->SnapGuides = sav1;
-							m_doc->useRaster = sav2;
+							m_doc->SnapGrid = sav2;
 						}
 					}
 					else
@@ -1444,10 +1471,10 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 						/* Don't use Grid or Guide Snapping when dragging Items or Groups with the keyboard */
 						/* as the user might be trying to fine tune a position */
 							bool sav1 = m_doc->SnapGuides;
-							bool sav2 = m_doc->useRaster;
+							bool sav2 = m_doc->SnapGrid;
 							bool sav3 = m_doc->SnapElement;
 							m_doc->SnapGuides = false;
-							m_doc->useRaster = false;
+							m_doc->SnapGrid = false;
 							m_doc->SnapElement = false;
 							if (m_doc->m_Selection->count() > 1)
 								m_view->startGroupTransaction(Um::Move, "", Um::IMove);
@@ -1455,7 +1482,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 							if (m_doc->m_Selection->count() > 1)
 								m_view->endGroupTransaction();
 							m_doc->SnapGuides = sav1;
-							m_doc->useRaster = sav2;
+							m_doc->SnapGrid = sav2;
 							m_doc->SnapElement = sav3;
 						}
 					}
@@ -1518,10 +1545,10 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 						/* Don't use Grid or Guide Snapping when dragging Items or Groups with the keyboard */
 						/* as the user might be trying to fine tune a position */
 							bool sav1 = m_doc->SnapGuides;
-							bool sav2 = m_doc->useRaster;
+							bool sav2 = m_doc->SnapGrid;
 							bool sav3 = m_doc->SnapElement;
 							m_doc->SnapGuides = false;
-							m_doc->useRaster = false;
+							m_doc->SnapGrid = false;
 							m_doc->SnapElement = false;
 							if (m_doc->m_Selection->count() > 1)
 								m_view->startGroupTransaction(Um::Move, "", Um::IMove);
@@ -1529,7 +1556,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 							if (m_doc->m_Selection->count() > 1)
 								m_view->endGroupTransaction();
 							m_doc->SnapGuides = sav1;
-							m_doc->useRaster = sav2;
+							m_doc->SnapGrid = sav2;
 							m_doc->SnapElement = sav3;
 						}
 					}
@@ -1592,10 +1619,10 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 						/* Don't use Grid or Guide Snapping when dragging Items or Groups with the keyboard */
 						/* as the user might be trying to fine tune a position */
 							bool sav1 = m_doc->SnapGuides;
-							bool sav2 = m_doc->useRaster;
+							bool sav2 = m_doc->SnapGrid;
 							bool sav3 = m_doc->SnapElement;
 							m_doc->SnapGuides = false;
-							m_doc->useRaster = false;
+							m_doc->SnapGrid = false;
 							m_doc->SnapElement = false;
 							if (m_doc->m_Selection->count() > 1)
 								m_view->startGroupTransaction(Um::Move, "", Um::IMove);
@@ -1603,7 +1630,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 							if (m_doc->m_Selection->count() > 1)
 								m_view->endGroupTransaction();
 							m_doc->SnapGuides = sav1;
-							m_doc->useRaster = sav2;
+							m_doc->SnapGrid = sav2;
 							m_doc->SnapElement = sav3;
 						}
 					}

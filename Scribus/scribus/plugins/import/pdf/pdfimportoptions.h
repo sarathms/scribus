@@ -21,14 +21,16 @@ class PdfImportOptions : public QDialog
 public:
 	explicit PdfImportOptions(QWidget *parent = 0);
 	~PdfImportOptions();
-	void setUpOptions(QString fileName, int actPage, int numPages, bool interact, PdfPlug* plug);
+	void setUpOptions(QString fileName, int actPage, int numPages, bool interact, bool cropPossible, PdfPlug* plug);
 	QString getPagesString();
+	int getCropBox();
 	void paintEvent(QPaintEvent *e);
 
 protected:
 	void resizeEvent(QResizeEvent *e);
 
 public slots:
+	void updateFromCrop();
 	void updateFromSpinBox(int pg);
 	void updatePreview(int pg);
 	void createPageNumberRange();

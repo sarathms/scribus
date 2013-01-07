@@ -199,10 +199,10 @@ void PageItem_LatexFrame::updateImage(int exitCode, QProcess::ExitStatus exitSta
 	{
 		xres = yres = realDpi();
 	}
-	double scaleX = LocalScX * xres;
-	double scaleY = LocalScY * yres;
-	double offX   = LocalX   / xres;
-	double offY   = LocalY   / yres;
+	double scaleX = m_imageXScale * xres;
+	double scaleY = m_imageYScale * yres;
+	double offX   = m_imageXOffset / xres;
+	double offY   = m_imageYOffset / yres;
 	PageItem_ImageFrame::loadImage(imageFile, true, realDpi());
 	if (PrefsManager::instance()->latexForceDpi()) 
 	{
@@ -210,10 +210,10 @@ void PageItem_LatexFrame::updateImage(int exitCode, QProcess::ExitStatus exitSta
 	}
 	
 	//Restore parameters, account for dpi changes
-	LocalScX = scaleX / pixm.imgInfo.xres;
-	LocalScY = scaleY / pixm.imgInfo.yres;
-	LocalX   = offX   * pixm.imgInfo.xres;
-	LocalY   = offY   * pixm.imgInfo.yres;
+	m_imageXScale = scaleX / pixm.imgInfo.xres;
+	m_imageYScale = scaleY / pixm.imgInfo.yres;
+	m_imageXOffset   = offX   * pixm.imgInfo.xres;
+	m_imageYOffset   = offY   * pixm.imgInfo.yres;
 	//emit imageOffsetScale(LocalScX, LocalScY, LocalX, LocalY);
 	update();
 }
@@ -336,12 +336,12 @@ void PageItem_LatexFrame::writeFileContents(QFile *tempfile)
 	QString tmp(formulaText);
 	double scaleX, scaleY, realW, realH, offsetX, offsetY;
 	double lDpi = realDpi()/72.0;
-	scaleX = LocalScX*lDpi;
-	scaleY = LocalScY*lDpi;
-	offsetX = LocalX*LocalScX;
-	offsetY = LocalY*LocalScY;
-	realW = Width/scaleX - LocalX/lDpi;
-	realH = Height/scaleY - LocalY/lDpi;
+	scaleX = m_imageXScale*lDpi;
+	scaleY = m_imageYScale*lDpi;
+	offsetX = m_imageXOffset*m_imageXScale;
+	offsetY = m_imageYOffset*m_imageYScale;
+	realW = Width/scaleX - m_imageXOffset/lDpi;
+	realH = Height/scaleY - m_imageYOffset/lDpi;
 	if (!tmp.contains("$scribus_noprepost$") && m_usePreamble) {
 		tmp = config->preamble() + tmp + config->postamble();
 	}

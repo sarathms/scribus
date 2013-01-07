@@ -569,7 +569,6 @@ void Scribus12Format::PasteItem(struct CopyPasteBuffer *Buffer, bool drag, bool 
 		currItem->ClipEdited = true;
 		currItem->FrameType = 3;
 		currItem->updatePolyClip();
-		currItem->Frame = true;
 	}
 	if (Buffer->GrType != 0)
 	{
@@ -877,7 +876,7 @@ bool Scribus12Format::loadFile(const QString & fileName, const FileFormat & /* f
 		m_Doc->setHyphAutoCheck(static_cast<bool>(dc.attribute("AUTOCHECK", "0").toInt()));
 		m_Doc->GuideLock = static_cast<bool>(dc.attribute("GUIDELOCK", "0").toInt());
 		m_Doc->SnapGuides = static_cast<bool>(dc.attribute("SnapToGuides", "0").toInt());
-		m_Doc->useRaster = static_cast<bool>(dc.attribute("SnapToGrid", "0").toInt());
+		m_Doc->SnapGrid  = static_cast<bool>(dc.attribute("SnapToGrid", "0").toInt());
 		m_Doc->guidesPrefs().minorGridSpacing = ScCLocale::toDoubleC(dc.attribute("MINGRID"), prefsManager->appPrefs.guidesPrefs.minorGridSpacing);
 		m_Doc->guidesPrefs().majorGridSpacing = ScCLocale::toDoubleC(dc.attribute("MAJGRID"), prefsManager->appPrefs.guidesPrefs.majorGridSpacing);
 		m_Doc->itemToolPrefs().lineStartArrow = 0;
@@ -1514,6 +1513,7 @@ void Scribus12Format::GetItemProps(QDomElement *obj, struct CopyPasteBuffer *OB,
 	OB->m_annotation.setFormat(obj->attribute("ANFORMAT", "0").toInt());
 	OB->m_annotation.setVis(obj->attribute("ANVIS", "0").toInt());
 	OB->m_annotation.setIsChk(static_cast<bool>(obj->attribute("ANCHK", "0").toInt()));
+	OB->m_annotation.setCheckState(OB->m_annotation.IsChk());
 	OB->m_annotation.setAAact(static_cast<bool>(obj->attribute("ANAA", "0").toInt()));
 	OB->m_annotation.setHTML(obj->attribute("ANHTML", "0").toInt());
 	OB->m_annotation.setUseIcons(static_cast<bool>(obj->attribute("ANICON", "0").toInt()));
@@ -2218,7 +2218,7 @@ void Scribus12Format::GetStyle(QDomElement *pg, ParagraphStyle *vg, StyleSet<Par
 	vg->charStyle().setFontSize(qRound(ScCLocale::toDoubleC(pg->attribute("FONTSIZE"), 12.0) * 10.0));
 	vg->setHasDropCap(static_cast<bool>(pg->attribute("DROP", "0").toInt()));
 	vg->setDropCapLines(pg->attribute("DROPLIN", "2").toInt());
-	vg->setDropCapOffset(ScCLocale::toDoubleC(pg->attribute("DROPDIST"), 0.0));
+	vg->setParEffectOffset(ScCLocale::toDoubleC(pg->attribute("DROPDIST"), 0.0));
 	vg->charStyle().setFeatures(static_cast<StyleFlag>((pg->attribute("EFFECT", "0").toInt())).featureList());
 	fColor = pg->attribute("FCOLOR", doc->itemToolPrefs().shapeFillColor);
 	fShade = pg->attribute("FSHADE", "100").toInt();

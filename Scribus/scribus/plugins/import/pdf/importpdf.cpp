@@ -311,10 +311,7 @@ bool PdfPlug::import(QString fNameIn, const TransactionSettings& trSettings, int
 					tmpSele->addItem(Elements.at(dre), true);
 				}
 				tmpSele->setGroupRect();
-				ScriXmlDoc *ss = new ScriXmlDoc();
-				ScElemMimeData* md = new ScElemMimeData();
-				md->setScribusElem(ss->WriteElem(m_Doc, tmpSele));
-				delete ss;
+				ScElemMimeData* md = ScriXmlDoc::WriteToMimeData(m_Doc, tmpSele);
 				m_Doc->itemSelection_DeleteItem(tmpSele);
 				m_Doc->view()->updatesOn(true);
 				m_Doc->m_Selection->delaySignalsOff();
@@ -432,14 +429,30 @@ bool PdfPlug::convert(QString fn)
 				double vDPI = 72.0;
 				int firstPage = 1;
 				int lastPage = pdfDoc->getNumPages();
-				if (((interactive) || (importerFlags & LoadSavePlugin::lfCreateDoc)) && (lastPage > 1))
+				GBool useMediaBox = gTrue;
+				GBool crop = gFalse;
+				GBool printing = gFalse;
+				PDFRectangle *mediaBox = pdfDoc->getPage(1)->getMediaBox();
+				QRectF mediaRect = QRectF(QPointF(mediaBox->x1, mediaBox->y1), QPointF(mediaBox->x2, mediaBox->y2)).normalized();
+				bool boxesAreDifferent = false;
+				if (getCBox(Crop_Box, 1) != mediaRect)
+					boxesAreDifferent = true;
+				else if (getCBox(Trim_Box, 1) != mediaRect)
+					boxesAreDifferent = true;
+				else if (getCBox(Bleed_Box, 1) != mediaRect)
+					boxesAreDifferent = true;
+				else if (getCBox(Art_Box, 1) != mediaRect)
+					boxesAreDifferent = true;
+				bool cropped = false;
+				int contentRect = Media_Box;
+				if (((interactive) || (importerFlags & LoadSavePlugin::lfCreateDoc)) && ((lastPage > 1) || boxesAreDifferent))
 				{
 					if (progressDialog)
 						progressDialog->hide();
 					qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 					PdfImportOptions *optImp = new PdfImportOptions(ScCore->primaryMainWindow());
 					QFileInfo fi = QFileInfo(fn);
-					optImp->setUpOptions(fi.fileName(), firstPage, lastPage, interactive, this);
+					optImp->setUpOptions(fi.fileName(), firstPage, lastPage, interactive, boxesAreDifferent, this);
 					if (!optImp->exec())
 					{
 						if (progressDialog)
@@ -450,6 +463,12 @@ bool PdfPlug::convert(QString fn)
 						return false;
 					}
 					pageString = optImp->getPagesString();
+					int cb = optImp->getCropBox();
+					if (cb > Media_Box)
+					{
+						cropped = true;
+						contentRect = cb;
+					}
 					delete optImp;
 					qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
 					if (progressDialog)
@@ -527,11 +546,13 @@ bool PdfPlug::convert(QString fn)
 							}
 						}
 					}
-					GBool useMediaBox = gTrue;
-					GBool crop = gFalse;
-					GBool printing = gFalse;
+					bool rotated = false;
 					dev->startDoc(pdfDoc, pdfDoc->getXRef(), pdfDoc->getCatalog());
 					int rotate = pdfDoc->getPageRotate(firstPage);
+					if ((rotate == 90) || (rotate == 270))
+						rotated = true;
+					dev->rotate = rotate;
+					rotate = 0;
 					if (importerFlags & LoadSavePlugin::lfCreateDoc)
 					{
 // POPPLER_VERSION appeared in 0.19.0 first
@@ -606,32 +627,34 @@ bool PdfPlug::convert(QString fn)
 							}
 						}
 						info.free();
-						if (crop)
+						if (cropped)
 						{
-							m_Doc->setPageHeight(pdfDoc->getPageCropHeight(pageNs[0]));
-							m_Doc->setPageWidth(pdfDoc->getPageCropWidth(pageNs[0]));
+							QRectF crBox = getCBox(contentRect, pageNs[0]);
+							if (rotated)
+							{
+								m_Doc->setPageWidth(crBox.height());
+								m_Doc->setPageHeight(crBox.width());
+							}
+							else
+							{
+								m_Doc->setPageHeight(crBox.height());
+								m_Doc->setPageWidth(crBox.width());
+							}
 						}
 						else
 						{
-							m_Doc->setPageHeight(pdfDoc->getPageMediaHeight(pageNs[0]));
-							m_Doc->setPageWidth(pdfDoc->getPageMediaWidth(pageNs[0]));
+							if (rotated)
+							{
+								m_Doc->setPageWidth(pdfDoc->getPageMediaHeight(pageNs[0]));
+								m_Doc->setPageHeight(pdfDoc->getPageMediaWidth(pageNs[0]));
+							}
+							else
+							{
+								m_Doc->setPageHeight(pdfDoc->getPageMediaHeight(pageNs[0]));
+								m_Doc->setPageWidth(pdfDoc->getPageMediaWidth(pageNs[0]));
+							}
 						}
 						m_Doc->setPageSize("Custom");
-					/*	PDFRectangle *mediaBox = pdfDoc->getPage(1)->getMediaBox();
-						PDFRectangle *cropBox = pdfDoc->getPage(1)->getCropBox();
-						PDFRectangle *trimBox = pdfDoc->getPage(1)->getTrimBox();
-						PDFRectangle *bleedBox = pdfDoc->getPage(1)->getBleedBox();
-						PDFRectangle *artBox = pdfDoc->getPage(1)->getArtBox();
-						QRectF mediaRect = QRectF(QPointF(mediaBox->x1, mediaBox->y1), QPointF(mediaBox->x2, mediaBox->y2)).normalized();
-						QRectF cropRect = QRectF(QPointF(cropBox->x1, cropBox->y1), QPointF(cropBox->x2, cropBox->y2)).normalized();
-						QRectF trimRect = QRectF(QPointF(trimBox->x1, trimBox->y1), QPointF(trimBox->x2, trimBox->y2)).normalized();
-						QRectF bleedRect = QRectF(QPointF(bleedBox->x1, bleedBox->y1), QPointF(bleedBox->x2, bleedBox->y2)).normalized();
-						QRectF artRect = QRectF(QPointF(artBox->x1, artBox->y1), QPointF(artBox->x2, artBox->y2)).normalized();
-						qDebug() << "Media Box" << mediaRect << "Area" << mediaRect.width() * mediaRect.height();
-						qDebug() << "Crop Box" << cropRect << "Area" << cropRect.width() * cropRect.height();
-						qDebug() << "Trim Box" << trimRect << "Area" << trimRect.width() * trimRect.height();
-						qDebug() << "Bleed Box" << bleedRect << "Area" << bleedRect.width() * bleedRect.height();
-						qDebug() << "Art Box" << artRect << "Area" << artRect.width() * artRect.height(); */
 						m_Doc->pdfOptions().PresentVals.clear();
 						for (uint ap = 0; ap < pageNs.size(); ++ap)
 						{
@@ -641,19 +664,44 @@ bool PdfPlug::convert(QString fn)
 								firstPg = false;
 							else
 								m_Doc->addPage(ap);
-							if (crop)
+							QRectF crBox = getCBox(contentRect, pp);
+							if (cropped)
 							{
-								m_Doc->currentPage()->setInitialHeight(pdfDoc->getPageCropHeight(pp));
-								m_Doc->currentPage()->setInitialWidth(pdfDoc->getPageCropWidth(pp));
-								m_Doc->currentPage()->setHeight(pdfDoc->getPageCropHeight(pp));
-								m_Doc->currentPage()->setWidth(pdfDoc->getPageCropWidth(pp));
+								if (rotated)
+								{
+									m_Doc->currentPage()->setInitialWidth(crBox.height());
+									m_Doc->currentPage()->setInitialHeight(crBox.width());
+									m_Doc->currentPage()->setWidth(crBox.height());
+									m_Doc->currentPage()->setHeight(crBox.width());
+									dev->cropOffsetX = crBox.y();
+									dev->cropOffsetY = crBox.x();
+								}
+								else
+								{
+									m_Doc->currentPage()->setInitialHeight(crBox.height());
+									m_Doc->currentPage()->setInitialWidth(crBox.width());
+									m_Doc->currentPage()->setHeight(crBox.height());
+									m_Doc->currentPage()->setWidth(crBox.width());
+									dev->cropOffsetX = crBox.x();
+									dev->cropOffsetY = crBox.y();
+								}
 							}
 							else
 							{
-								m_Doc->currentPage()->setInitialHeight(pdfDoc->getPageMediaHeight(pp));
-								m_Doc->currentPage()->setInitialWidth(pdfDoc->getPageMediaWidth(pp));
-								m_Doc->currentPage()->setHeight(pdfDoc->getPageMediaHeight(pp));
-								m_Doc->currentPage()->setWidth(pdfDoc->getPageMediaWidth(pp));
+								if (rotated)
+								{
+									m_Doc->currentPage()->setInitialWidth(pdfDoc->getPageMediaHeight(pp));
+									m_Doc->currentPage()->setInitialHeight(pdfDoc->getPageMediaWidth(pp));
+									m_Doc->currentPage()->setWidth(pdfDoc->getPageMediaHeight(pp));
+									m_Doc->currentPage()->setHeight(pdfDoc->getPageMediaWidth(pp));
+								}
+								else
+								{
+									m_Doc->currentPage()->setInitialHeight(pdfDoc->getPageMediaHeight(pp));
+									m_Doc->currentPage()->setInitialWidth(pdfDoc->getPageMediaWidth(pp));
+									m_Doc->currentPage()->setHeight(pdfDoc->getPageMediaHeight(pp));
+									m_Doc->currentPage()->setWidth(pdfDoc->getPageMediaWidth(pp));
+								}
 							}
 							m_Doc->currentPage()->MPageNam = CommonStrings::trMasterPageNormal;
 							m_Doc->currentPage()->m_pageSize = "Custom";
@@ -669,10 +717,18 @@ bool PdfPlug::convert(QString fn)
 								//	pdfDoc->displayPage(dev, pp + 1, hDPI, vDPI, rotate, useMediaBox, crop, printing);
 								//	oc->setState(OptionalContentGroup::Off);
 								}
-								pdfDoc->displayPage(dev, pp, hDPI, vDPI, rotate, useMediaBox, crop, printing, NULL, NULL, dev->annotations_callback, dev);
+								if (cropped)
+									pdfDoc->displayPageSlice(dev, pp, hDPI, vDPI, rotate, useMediaBox, crop, printing, crBox.x(), crBox.y(), crBox.width(), crBox.height(), NULL, NULL, dev->annotations_callback, dev);
+								else
+									pdfDoc->displayPage(dev, pp, hDPI, vDPI, rotate, useMediaBox, crop, printing, NULL, NULL, dev->annotations_callback, dev);
 							}
 							else
-								pdfDoc->displayPage(dev, pp, hDPI, vDPI, rotate, useMediaBox, crop, printing, NULL, NULL, dev->annotations_callback, dev);
+							{
+								if (cropped)
+									pdfDoc->displayPageSlice(dev, pp, hDPI, vDPI, rotate, useMediaBox, crop, printing, crBox.x(), crBox.y(), crBox.width(), crBox.height(), NULL, NULL, dev->annotations_callback, dev);
+								else
+									pdfDoc->displayPage(dev, pp, hDPI, vDPI, rotate, useMediaBox, crop, printing, NULL, NULL, dev->annotations_callback, dev);
+							}
 							PDFPresentationData ef;
 							Object trans;
 							Object *transi = pdfDoc->getPage(pp)->getTrans(&trans);
@@ -835,7 +891,7 @@ bool PdfPlug::convert(QString fn)
 	return true;
 }
 
-QImage PdfPlug::readPreview(int pgNum, int width, int height)
+QImage PdfPlug::readPreview(int pgNum, int width, int height, int box)
 {
 	if (!m_pdfDoc)
 		return QImage();
@@ -876,8 +932,37 @@ QImage PdfPlug::readPreview(int pgNum, int width, int height)
 	QImage image = tmpimg.copy();
 	image.setText("XSize", QString("%1").arg(w));
 	image.setText("YSize", QString("%1").arg(h));
+	if (box > Media_Box)
+	{
+		QRectF cRect = getCBox(box, pgNum);
+		QPainter pp;
+		pp.begin(&image);
+		pp.setBrush(Qt::NoBrush);
+		pp.setPen(QPen(Qt::red, 1.0));
+		pp.translate(0, bh);
+		pp.scale(scale, -scale);
+		pp.drawRect(cRect);
+		pp.end();
+	}
 	delete dev;
 	return image;
+}
+
+QRectF PdfPlug::getCBox(int box, int pgNum)
+{
+	PDFRectangle *cBox = NULL;
+	if (box == Media_Box)
+		cBox = m_pdfDoc->getPage(pgNum)->getMediaBox();
+	else if (box == Bleed_Box)
+		cBox = m_pdfDoc->getPage(pgNum)->getBleedBox();
+	else if (box == Trim_Box)
+		cBox = m_pdfDoc->getPage(pgNum)->getTrimBox();
+	else if (box == Crop_Box)
+		cBox = m_pdfDoc->getPage(pgNum)->getCropBox();
+	else if (box == Art_Box)
+		cBox = m_pdfDoc->getPage(pgNum)->getArtBox();
+	QRectF cRect = QRectF(QPointF(cBox->x1, cBox->y1), QPointF(cBox->x2, cBox->y2)).normalized();
+	return cRect;
 }
 
 QString PdfPlug::UnicodeParsedString(GooString *s1)

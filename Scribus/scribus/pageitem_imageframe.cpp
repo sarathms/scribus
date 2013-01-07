@@ -82,7 +82,7 @@ void PageItem_ImageFrame::DrawObj_Item(ScPainter *p, QRectF /*e*/)
 	p->save();
 	if (Pfile.isEmpty())
 	{
-		if ((Frame) && (m_Doc->guidesPrefs().framesShown))
+		if ((drawFrame()) && (m_Doc->guidesPrefs().framesShown))
 		{
 			p->setPen(Qt::black, 1, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
 			p->drawLine(FPoint(0, 0), FPoint(Width, Height));
@@ -94,7 +94,7 @@ void PageItem_ImageFrame::DrawObj_Item(ScPainter *p, QRectF /*e*/)
 		//If we are missing our image, draw a red cross in the frame
 		if ((!PicArt) || (!PictureIsAvailable))
 		{
-			if ((Frame) && (m_Doc->guidesPrefs().framesShown))
+			if ((drawFrame()) && (m_Doc->guidesPrefs().framesShown))
 			{
 				p->setBrush(Qt::white);
 				QString htmlText = "";
@@ -155,11 +155,11 @@ void PageItem_ImageFrame::DrawObj_Item(ScPainter *p, QRectF /*e*/)
 				p->setupPolygon(&imageClip);
 				p->setClipPath();
 			}
-			p->translate(LocalX*LocalScX, LocalY*LocalScY);
-			p->rotate(LocalRot);
-			double mscalex = 1.0 / LocalScX;
-			double mscaley = 1.0 / LocalScY;
-			p->scale(LocalScX, LocalScY);
+			p->translate(m_imageXOffset*m_imageXScale, m_imageYOffset*m_imageYScale);
+			p->rotate(m_imageRotation);
+			double mscalex = 1.0 / m_imageXScale;
+			double mscaley = 1.0 / m_imageYScale;
+			p->scale(m_imageXScale, m_imageYScale);
 			if (pixm.imgInfo.lowResType != 0)
 			{
 				p->scale(pixm.imgInfo.lowResScale, pixm.imgInfo.lowResScale);
@@ -232,12 +232,12 @@ void PageItem_ImageFrame::clearContents()
 	Pfile = "";
 	pixm = ScImage();
 
-	LocalScX = 1;
-	LocalScY = 1;
+	m_imageXScale = 1;
+	m_imageYScale = 1;
 	OrigW = 0;
 	OrigH = 0;
-	LocalX = 0;
-	LocalY = 0;
+	m_imageXOffset = 0;
+	m_imageYOffset = 0;
 	setImageFlippedH(false);
 	setImageFlippedV(false);
 	EmProfile = "";
@@ -316,22 +316,22 @@ void PageItem_ImageFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 		}		
 		if (dX!=0.0)
 		{
-			double newXScale=dX / 100.0 * LocalScX;
+			double newXScale=dX / 100.0 * m_imageXScale;
 			setImageXScale(newXScale);
 			if (!controlDown)
 			{
-				double newYScale=dX / 100.0 * LocalScY;
+				double newYScale=dX / 100.0 * m_imageYScale;
 				setImageYScale(newYScale);
 			}
 		}
 		else
 		if (dY!=0.0)
 		{
-			double newYScale=dY / 100.0 * LocalScY;
+			double newYScale=dY / 100.0 * m_imageYScale;
 			setImageYScale(newYScale);
 			if (!controlDown)
 			{
-				double newXScale=dY / 100.0 * LocalScY;
+				double newXScale=dY / 100.0 * m_imageYScale;
 				setImageXScale(newXScale);
 			}
 		}

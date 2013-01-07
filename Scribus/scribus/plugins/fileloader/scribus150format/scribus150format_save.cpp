@@ -159,8 +159,15 @@ bool Scribus150Format::savePalette(const QString & fileName)
 bool Scribus150Format::saveFile(const QString & fileName, const FileFormat & /* fmt */)
 {
 	QString text, tf, tf2, tc, tc2;
-	QString fileDir = QFileInfo(fileName).absolutePath();
 	m_lastSavedFile = "";
+
+	// #11279: Image links get corrupted when symlinks involved
+	// We have to proceed in tow steps here as QFileInfo::canonicalPath()
+	// may no return correct result if fileName does not exists
+	QString fileDir = QFileInfo(fileName).absolutePath();
+	QString canonicalPath = QFileInfo(fileDir).canonicalFilePath();
+	if (!canonicalPath.isEmpty())
+		fileDir = canonicalPath;
 
 	// Create a random temporary file name
 	srand(time(NULL)); // initialize random sequence each time
@@ -174,13 +181,6 @@ bool Scribus150Format::saveFile(const QString & fileName, const FileFormat & /* 
 	}
 	if (QFile::exists(tmpFileName))
 		return false;
-
-	/*QDomDocument docu("scribus");
-	QString st="<SCRIBUSUTF8NEW></SCRIBUSUTF8NEW>";
-	docu.setContent(st);
-	QDomElement elem=docu.documentElement();
-	elem.setAttribute("Version", QString(VERSION));
-	QDomElement dc=docu.createElement("DOCUMENT");*/
 
 	std::auto_ptr<QIODevice> outputFile;
 	if (fileName.toLower().right(2) == "gz")
@@ -277,7 +277,7 @@ bool Scribus150Format::saveFile(const QString & fileName, const FileFormat & /* 
 	docu.writeAttribute("AUTOCHECK", static_cast<int>(m_Doc->hyphAutoCheck()));
 	docu.writeAttribute("GUIDELOCK", static_cast<int>(m_Doc->GuideLock));
 	docu.writeAttribute("SnapToGuides", static_cast<int>(m_Doc->SnapGuides));
-	docu.writeAttribute("SnapToGrid", static_cast<int>(m_Doc->useRaster));
+	docu.writeAttribute("SnapToGrid", static_cast<int>(m_Doc->SnapGrid));
 	docu.writeAttribute("MINGRID", m_Doc->guidesPrefs().minorGridSpacing);
 	docu.writeAttribute("MAJGRID", m_Doc->guidesPrefs().majorGridSpacing);
 	docu.writeAttribute("SHOWGRID", static_cast<int>(m_Doc->guidesPrefs().gridShown));
@@ -639,14 +639,40 @@ void Scribus150Format::putPStyle(ScXmlStreamWriter & docu, const ParagraphStyle 
 		docu.writeAttribute("VOR", style.gapBefore());
 	if ( ! style.isInhGapAfter())
 		docu.writeAttribute("NACH", style.gapAfter());
+	if ( ! style.isInhPeCharStyleName())
+		docu.writeAttribute("ParagraphEffectCharStyle", style.peCharStyleName());
+	if ( ! style.isInhParEffectOffset())
+		docu.writeAttribute("ParagraphEffectOffset", style.parEffectOffset());
+	if ( ! style.isInhParEffectIndent())
+		docu.writeAttribute("ParagraphEffectIndent", static_cast<int>(style.parEffectIndent()));
 	if ( ! style.isInhHasDropCap())
 		docu.writeAttribute("DROP", static_cast<int>(style.hasDropCap()));
-	if ( ! style.isInhDcCharStyleName())
-		docu.writeAttribute("DROPCHSTYLE", style.dcCharStyleName());
 	if ( ! style.isInhDropCapLines())
 		docu.writeAttribute("DROPLIN", style.dropCapLines());
-	if ( ! style.isInhDropCapOffset())
-		docu.writeAttribute("DROPDIST", style.dropCapOffset());
+	if ( ! style.isInhHasBullet())
+		docu.writeAttribute("Bullet", static_cast<int>(style.hasBullet()));
+	if ( ! style.isInhBulletStr())
+		docu.writeAttribute("BulletStr", style.bulletStr());
+	if ( ! style.isInhHasNum())
+		docu.writeAttribute("Numeration", static_cast<int>(style.hasNum()));
+	if ( ! style.isInhNumFormat())
+		docu.writeAttribute("NumerationFormat", style.numFormat());
+	if ( ! style.isInhNumName())
+		docu.writeAttribute("NumerationName", style.numName());
+	if ( ! style.isInhNumLevel())
+		docu.writeAttribute("NumerationLevel", style.numLevel());
+	if ( ! style.isInhNumPrefix())
+		docu.writeAttribute("NumerationPrefix", style.numPrefix());
+	if ( ! style.isInhNumSuffix())
+		docu.writeAttribute("NumerationSuffix", style.numSuffix());
+	if ( ! style.isInhNumStart())
+		docu.writeAttribute("NumerationStart", style.numStart());
+	if ( ! style.isInhNumRestart())
+		docu.writeAttribute("NumerationRestart", style.numRestart());
+	if ( ! style.isInhNumOther())
+		docu.writeAttribute("NumerationOther", static_cast<int>(style.numOther()));
+	if ( ! style.isInhNumHigher())
+		docu.writeAttribute("NumerationHigher", static_cast<int>(style.numHigher()));
 	if ( ! style.isInhOpticalMargins())
 		docu.writeAttribute("OpticalMargins", style.opticalMargins());
 	if ( ! style.isInhHyphenationMode())
@@ -1566,9 +1592,12 @@ void Scribus150Format::writeITEXTs(ScribusDoc *doc, ScXmlStreamWriter &docu, Pag
 		else if (ch == SpecialChars::OBJECT && item->itemText.item(k)->mark != NULL)
 		{
 			Mark* mark = item->itemText.item(k)->mark;
-			docu.writeEmptyElement("MARK");
-			docu.writeAttribute("label", mark->label);
-			docu.writeAttribute("type", mark->getType());
+			if (!mark->isType(MARKBullNumType))
+			{ //dont save marks for bullets and numbering
+				docu.writeEmptyElement("MARK");
+				docu.writeAttribute("label", mark->label);
+				docu.writeAttribute("type", mark->getType());
+			}
 		}
 		else if (ch == SpecialChars::PARSEP)	// stores also the paragraphstyle for preceding chars
 			putPStyle(docu, item->itemText.paragraphStyle(k), "para");
@@ -2442,7 +2471,7 @@ void Scribus150Format::SetItemProps(ScXmlStreamWriter& docu, PageItem* item, con
 		docu.writeAttribute("ANFACT", item->annotation().F_act());
 		docu.writeAttribute("ANVACT", item->annotation().V_act());
 		docu.writeAttribute("ANCACT", item->annotation().C_act());
-		if (item->annotation().ActionType() == 8)
+		if (item->annotation().ActionType() == Annotation::Action_URI)
 			docu.writeAttribute("ANEXTERN", item->annotation().Extern());
 		else
 			docu.writeAttribute("ANEXTERN", Path2Relative(item->annotation().Extern(), baseDir));
@@ -2467,6 +2496,8 @@ void Scribus150Format::SetItemProps(ScXmlStreamWriter& docu, PageItem* item, con
 		docu.writeAttribute("ANICON", item->annotation().UseIcons());
 		docu.writeAttribute("ANPLACE", item->annotation().IPlace());
 		docu.writeAttribute("ANSCALE", item->annotation().ScaleW());
+		docu.writeAttribute("ANITYP", item->annotation().Icon());
+		docu.writeAttribute("ANOPEN", item->annotation().IsAnOpen());
 	}
 	if (!item->AutoName)
 		docu.writeAttribute("ANNAME", item->itemName());
@@ -2555,6 +2586,40 @@ void Scribus150Format::SetItemProps(ScXmlStreamWriter& docu, PageItem* item, con
 			docu.writeAttribute("ISIZE", dStyle.charStyle().fontSize() / 10.0 );
 		if ( ! dStyle.charStyle().isInhLanguage())
 			docu.writeAttribute("LANGUAGE", dStyle.charStyle().language());
+		if ( ! dStyle.isInhPeCharStyleName())
+			docu.writeAttribute("ParagraphEffectCharStyle", dStyle.peCharStyleName());
+		if ( ! dStyle.isInhParEffectOffset())
+			docu.writeAttribute("ParagraphEffectOffset", dStyle.parEffectOffset());
+		if ( ! dStyle.isInhParEffectIndent())
+			docu.writeAttribute("ParagraphEffectIndent", static_cast<int>(dStyle.parEffectIndent()));
+		if ( ! dStyle.isInhHasDropCap())
+			docu.writeAttribute("DROP", static_cast<int>(dStyle.hasDropCap()));
+		if ( ! dStyle.isInhDropCapLines())
+			docu.writeAttribute("DROPLIN", dStyle.dropCapLines());
+		if ( ! dStyle.isInhHasBullet())
+			docu.writeAttribute("Bullet", static_cast<int>(dStyle.hasBullet()));
+		if ( ! dStyle.isInhBulletStr())
+			docu.writeAttribute("BulletStr", dStyle.bulletStr());
+		if ( ! dStyle.isInhHasNum())
+			docu.writeAttribute("Numeration", static_cast<int>(dStyle.hasNum()));
+		if ( ! dStyle.isInhNumFormat())
+			docu.writeAttribute("NumerationFormat", dStyle.numFormat());
+		if ( ! dStyle.isInhNumName())
+			docu.writeAttribute("NumerationName", dStyle.numName());
+		if ( ! dStyle.isInhNumLevel())
+			docu.writeAttribute("NumerationLevel", dStyle.numLevel());
+		if ( ! dStyle.isInhNumPrefix())
+			docu.writeAttribute("NumerationPrefix", dStyle.numPrefix());
+		if ( ! dStyle.isInhNumSuffix())
+			docu.writeAttribute("NumerationSuffix", dStyle.numSuffix());
+		if ( ! dStyle.isInhNumStart())
+			docu.writeAttribute("NumerationStart", dStyle.numStart());
+		if ( ! dStyle.isInhNumRestart())
+			docu.writeAttribute("NumerationRestart", dStyle.numRestart());
+		if ( ! dStyle.isInhNumOther())
+			docu.writeAttribute("NumerationOther", static_cast<int>(dStyle.numOther()));
+		if ( ! dStyle.isInhNumHigher())
+			docu.writeAttribute("NumerationHigher", static_cast<int>(dStyle.numHigher()));
 	}
 	if (item->asTextFrame() || item->asPathText())
 	{

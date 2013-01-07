@@ -127,6 +127,7 @@ public:
 	virtual void eoFill(GfxState *state);
 	virtual void fill(GfxState *state);
 	virtual void drawString(GfxState *state, GooString *s);
+
 	QString CurrColorText;
 	QString CurrColorFill;
 	QString CurrColorStroke;
@@ -250,6 +251,9 @@ public:
 	//----- links
 	virtual void processLink(AnnotLink * /*link*/) { qDebug() << "Draw Link"; }
 	bool layersSetByOCG;
+	double cropOffsetX;
+	double cropOffsetY;
+	int rotate;
 
 private:
 	void getPenState(GfxState *state);
@@ -320,6 +324,8 @@ private:
 	SplashFontEngine *m_fontEngine;
 	SplashFont *m_font;
 	FormPageWidgets *m_formWidgets;
+	QHash<QString, QList<int> > m_radioMap;
+	QHash<int, PageItem*> m_radioButtons;
 	int m_actPage;
 };
 

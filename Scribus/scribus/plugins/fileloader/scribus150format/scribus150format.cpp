@@ -40,13 +40,14 @@ for which a new license (GPL+exception) is in place.
 #include "pageitem_arc.h"
 #include "pageitem_spiral.h"
 #include "pagestructs.h"
+
+#include <QApplication>
+#include <QByteArray>
 #include <QCursor>
 // #include <QDebug>
 #include <QFileInfo>
 #include <QList>
-#include <QByteArray>
-#include <QApplication>
-
+#include <QScopedPointer>
 
 // See scplugin.h and pluginmanager.{cpp,h} for detail on what these methods
 // do. That documentatation is not duplicated here.
@@ -143,36 +144,31 @@ bool Scribus150Format::fileSupported(QIODevice* /* file */, const QString & file
 	return false;
 }
 
-QString Scribus150Format::readSLA(const QString & fileName)
+QIODevice* Scribus150Format::slaReader(const QString & fileName)
 {
-	QByteArray docBytes("");
+	if (!fileSupported(0, fileName))
+		return NULL;
+
+	QIODevice* ioDevice = 0;
 	if(fileName.right(2) == "gz")
 	{
-		if (!ScGzFile::readFromFile(fileName, docBytes))
+		ioDevice = new ScGzFile(fileName);
+		if (!ioDevice->open(QIODevice::ReadOnly))
 		{
-			// FIXME: Needs better error return
-			return QString::null;
+			delete ioDevice;
+			return NULL;
 		}
 	}
 	else
 	{
-		// Not gzip encoded, just load it
-		loadRawText(fileName, docBytes);
+		ioDevice = new QFile(fileName);
+		if (!ioDevice->open(QIODevice::ReadOnly))
+		{
+			delete ioDevice;
+			return NULL;
+		}
 	}
-	QString docText("");
-	int startElemPos = docBytes.left(512).indexOf("<SCRIBUSUTF8NEW ");
-	if (startElemPos >= 0)
-	{
-		QRegExp regExp150("Version=\"1.5.[0-9]");
-		bool is150 = ( regExp150.indexIn(docBytes.mid(startElemPos, 64)) >= 0 );
-		if (is150)
-			docText = QString::fromUtf8(docBytes);
-		if (docText.endsWith(QChar(10)) || docText.endsWith(QChar(13)))
-			docText.truncate(docText.length()-1);
-	}
-	if (docText.isEmpty())
-		return QString::null;
-	return docText;
+	return ioDevice;
 }
 
 void Scribus150Format::getReplacedFontData(bool & getNewReplacement, QMap<QString,QString> &getReplacedFonts, QList<ScFace> &getDummyScFaces)
@@ -1233,8 +1229,8 @@ bool Scribus150Format::loadFile(const QString & fileName, const FileFormat & /* 
 	notesMasterMarks.clear();
 	notesNSets.clear();
 
-	QString f(readSLA(fileName));
-	if (f.isEmpty())
+	QScopedPointer<QIODevice> ioDevice(slaReader(fileName));
+	if (ioDevice.isNull())
 	{
 		setFileReadError();
 		return false;
@@ -1245,7 +1241,7 @@ bool Scribus150Format::loadFile(const QString & fileName, const FileFormat & /* 
 	
 	if (m_mwProgressBar!=0)
 	{
-		m_mwProgressBar->setMaximum(f.length());
+		m_mwProgressBar->setMaximum(ioDevice->size());
 		m_mwProgressBar->setValue(0);
 	}
 	// Stop autosave timer,it will be restarted only if doc has autosave feature is enabled
@@ -1281,7 +1277,7 @@ bool Scribus150Format::loadFile(const QString & fileName, const FileFormat & /* 
 	bool hasPageSets = false;
 	int  progress = 0;
 
-	ScXmlStreamReader reader(f);
+	ScXmlStreamReader reader(ioDevice.data());
 	ScXmlStreamAttributes attrs;
 	while(!reader.atEnd() && !reader.hasError())
 	{
@@ -1293,7 +1289,7 @@ bool Scribus150Format::loadFile(const QString & fileName, const FileFormat & /* 
 
 		if (m_mwProgressBar != 0)
 		{
-			int newProgress = qRound(reader.characterOffset() / (double) f.length() * 100);
+			int newProgress = qRound(ioDevice->pos() / (double) ioDevice->size() * 100);
 			if (newProgress != progress)
 			{
 				m_mwProgressBar->setValue(reader.characterOffset());
@@ -1890,9 +1886,9 @@ bool Scribus150Format::loadFile(const QString & fileName, const FileFormat & /* 
 	}
 
 	// start auto save timer if needed
-	if (m_Doc->autoSave()  && ScCore->usingGUI())
+	if (m_Doc->autoSave() && ScCore->usingGUI())
 		m_Doc->restartAutoSaveTimer();
-//		m_Doc->autoSaveTimer->start(m_Doc->autoSaveTime());
+//	m_Doc->autoSaveTimer->start(m_Doc->autoSaveTime());
 	
 	if (m_mwProgressBar!=0)
 		m_mwProgressBar->setValue(reader.characterOffset());
@@ -1981,8 +1977,8 @@ namespace {
 			pstyle.resetGapAfter();
 		if (pstyle.dropCapLines() < 0)
 			pstyle.resetDropCapLines();
-		if (pstyle.dropCapOffset() <= -16000)
-			pstyle.resetDropCapOffset();
+		if (pstyle.parEffectOffset() <= -16000)
+			pstyle.resetParEffectOffset();
 		fixLegacyCharStyle(pstyle.charStyle());
 	}
 	
@@ -2043,7 +2039,7 @@ void Scribus150Format::readDocAttributes(ScribusDoc* doc, ScXmlStreamAttributes&
 	m_Doc->rulerYoffset = attrs.valueAsDouble("rulerYoffset", 0.0);
 	m_Doc->SnapGuides   = attrs.valueAsBool("SnapToGuides", false);
 	m_Doc->SnapElement  = attrs.valueAsBool("SnapToElement", false);
-	m_Doc->useRaster    = attrs.valueAsBool("SnapToGrid", false);
+	m_Doc->SnapGrid     = attrs.valueAsBool("SnapToGrid", false);
 	
 	m_Doc->setAutoSave(attrs.valueAsBool("AutoSave", false));
 	m_Doc->setAutoSaveTime(attrs.valueAsInt("AutoSaveTime", 600000));
@@ -2560,13 +2556,25 @@ void Scribus150Format::readParagraphStyle(ScribusDoc *doc, ScXmlStreamReader& re
 	if (attrs.hasAttribute(NACH))
 		newStyle.setGapAfter(attrs.valueAsDouble(NACH));
 
+	static const QString ParagraphEffectCharStyle("ParagraphEffectCharStyle");
+	if (attrs.hasAttribute(ParagraphEffectCharStyle))
+		newStyle.setPeCharStyleName(attrs.valueAsString(ParagraphEffectCharStyle));
+
+	static const QString ParagraphEffectOffset("ParagraphEffectOffset");
+	if (attrs.hasAttribute(ParagraphEffectOffset))
+		newStyle.setParEffectOffset(attrs.valueAsDouble(ParagraphEffectOffset));
+
+	static const QString ParagraphEffectIndent("ParagraphEffectIndent");
+	if (attrs.hasAttribute(ParagraphEffectIndent))
+		newStyle.setParEffectIndent(attrs.valueAsDouble(ParagraphEffectIndent));
+
 	static const QString DROP("DROP");
 	if (attrs.hasAttribute(DROP))
 		newStyle.setHasDropCap(static_cast<bool>(attrs.valueAsInt(DROP)));
 
 	static const QString DROPCHSTYLE("DROPCHSTYLE");
 	if (attrs.hasAttribute(DROPCHSTYLE))
-		newStyle.setDcCharStyleName(attrs.valueAsString(DROPCHSTYLE));
+		newStyle.setPeCharStyleName(attrs.valueAsString(DROPCHSTYLE));
 
 	static const QString DROPLIN("DROPLIN");
 	if (attrs.hasAttribute(DROPLIN))
@@ -2574,7 +2582,55 @@ void Scribus150Format::readParagraphStyle(ScribusDoc *doc, ScXmlStreamReader& re
 
 	static const QString DROPDIST("DROPDIST");
 	if (attrs.hasAttribute(DROPDIST))
-		newStyle.setDropCapOffset(attrs.valueAsDouble(DROPDIST));
+		newStyle.setParEffectOffset(attrs.valueAsDouble(DROPDIST));
+
+	static const QString Bullet("Bullet");
+	if (attrs.hasAttribute(Bullet))
+		newStyle.setHasBullet(static_cast<bool>(attrs.valueAsInt(Bullet)));
+
+	static const QString BulletStr("BulletStr");
+	if (attrs.hasAttribute(BulletStr))
+		newStyle.setBulletStr(attrs.valueAsString(BulletStr));
+
+	static const QString Numeration("Numeration");
+	if (attrs.hasAttribute(Numeration))
+		newStyle.setHasNum(static_cast<bool>(attrs.valueAsInt(Numeration)));
+
+	static const QString NumerationName("NumerationName");
+	if (attrs.hasAttribute(NumerationName))
+		newStyle.setNumName(attrs.valueAsString(NumerationName));
+
+	static const QString NumerationFormat("NumerationFormat");
+	if (attrs.hasAttribute(NumerationFormat))
+		newStyle.setNumFormat(attrs.valueAsInt(NumerationFormat));
+
+	static const QString NumerationLevel("NumerationLevel");
+	if (attrs.hasAttribute(NumerationLevel))
+		newStyle.setNumLevel(attrs.valueAsInt(NumerationLevel));
+
+	static const QString NumerationStart("NumerationStart");
+	if (attrs.hasAttribute(NumerationStart))
+		newStyle.setNumStart(attrs.valueAsInt(NumerationStart));
+
+	static const QString NumearationPrefix("NumerationPrefix");
+	if (attrs.hasAttribute(NumearationPrefix))
+		newStyle.setNumPrefix(attrs.valueAsString(NumearationPrefix));
+
+	static const QString NumerationSuffix("NumerationSuffix");
+	if (attrs.hasAttribute(NumerationSuffix))
+		newStyle.setNumSuffix(attrs.valueAsString(NumerationSuffix));
+
+	static const QString NumerationRestart("NumerationRestart");
+	if (attrs.hasAttribute(NumerationRestart))
+		newStyle.setNumRestart(attrs.valueAsInt(NumerationRestart));
+
+	static const QString NumerationOther("NumeartionOther");
+	if (attrs.hasAttribute(NumerationOther))
+		newStyle.setNumOther(static_cast<bool>(attrs.valueAsInt(NumerationOther)));
+
+	static const QString NumearationHigher("NumerationHigher");
+	if (attrs.hasAttribute(NumearationHigher))
+		newStyle.setNumHigher(static_cast<bool>(attrs.valueAsInt(NumearationHigher)));
 
 	static const QString PSHORTCUT("PSHORTCUT");
 	if (attrs.hasAttribute(PSHORTCUT))
@@ -3903,10 +3959,7 @@ bool Scribus150Format::readObject(ScribusDoc* doc, ScXmlStreamReader& reader, It
 	}
 
 	if (newItem->asPathText())
-	{
 		newItem->updatePolyClip();
-		newItem->Frame = true;
-	}
 #ifdef HAVE_OSG
 	if (newItem->asImageFrame() || newItem->asLatexFrame() || newItem->asOSGFrame())
 #else
@@ -3968,10 +4021,10 @@ bool Scribus150Format::readPattern(ScribusDoc* doc, ScXmlStreamReader& reader, c
 	pat.yoffset = attrs.valueAsDouble("yoffset", 0.0);
 	
 	uint itemCount1 = m_Doc->Items->count();
-	bool savedAlignGrid = m_Doc->useRaster;
+	bool savedAlignGrid = m_Doc->SnapGrid;
 	bool savedAlignGuides = m_Doc->SnapGuides;
 	bool savedAlignElement = m_Doc->SnapElement;
-	m_Doc->useRaster = false;
+	m_Doc->SnapGrid  = false;
 	m_Doc->SnapGuides = false;
 	m_Doc->SnapElement = false;
 
@@ -3990,11 +4043,11 @@ bool Scribus150Format::readPattern(ScribusDoc* doc, ScXmlStreamReader& reader, c
 		ItemInfo itemInfo;
 		m_Doc->setMasterPageMode(false);
 		
-		int ownPage = tAtt.valueAsInt("OwnPage");
+		//int ownPage = tAtt.valueAsInt("OwnPage");
 		success = readObject(doc, reader, itemInfo, baseDir, false);
 		if (!success) break;
 
-		itemInfo.item->OwnPage = ownPage;
+		itemInfo.item->OwnPage = -1 /*ownPage*/;
 		itemInfo.item->OnMasterPage = "";
 		if (isNewFormat)
 		{
@@ -4036,7 +4089,7 @@ bool Scribus150Format::readPattern(ScribusDoc* doc, ScXmlStreamReader& reader, c
 		}
 	}
 
-	doc->useRaster  = savedAlignGrid;
+	doc->SnapGrid   = savedAlignGrid;
 	doc->SnapGuides = savedAlignGuides;
 	doc->SnapElement = savedAlignElement;
 	if (!success)
@@ -4618,6 +4671,42 @@ PageItem* Scribus150Format::pasteItem(ScribusDoc *doc, ScXmlStreamAttributes& at
 		pstyle.setKeepWithNext(attrs.valueAsBool("keepWithNext"));
 	if (attrs.hasAttribute("keepTogether"))
 		pstyle.setKeepTogether(attrs.valueAsBool("keepTogether"));
+	if (attrs.hasAttribute("ParagraphEffectCharStyle"))
+		pstyle.setPeCharStyleName(attrs.valueAsString("ParagraphEffectCharStyle"));
+	if (attrs.hasAttribute("ParagraphEffectOffset"))
+		pstyle.setParEffectOffset(attrs.valueAsDouble("ParagraphEffectOffset"));
+	if (attrs.hasAttribute("ParagraphEffectIndent"))
+		pstyle.setParEffectIndent(attrs.valueAsDouble("ParagraphEffectIndent"));
+	if (attrs.hasAttribute("DROP"))
+		pstyle.setHasDropCap(static_cast<bool>(attrs.valueAsInt("DROP")));
+	if (attrs.hasAttribute("DROPLIN"))
+		pstyle.setDropCapLines(attrs.valueAsInt("DROPLIN"));
+	if (attrs.hasAttribute("DROPDIST"))
+		pstyle.setParEffectOffset(attrs.valueAsDouble("DROPDIST"));
+	if (attrs.hasAttribute("Bullet"))
+		pstyle.setHasBullet(static_cast<bool>(attrs.valueAsInt("Bullet")));
+	if (attrs.hasAttribute("BulletStr"))
+		pstyle.setBulletStr(attrs.valueAsString("BulletStr"));
+	if (attrs.hasAttribute("Numeration"))
+		pstyle.setHasNum(static_cast<bool>(attrs.valueAsInt("Numeration")));
+	if (attrs.hasAttribute("NumerationName"))
+		pstyle.setNumName(attrs.valueAsString("NumerationName"));
+	if (attrs.hasAttribute("NumerationFormat"))
+		pstyle.setNumFormat(attrs.valueAsInt("NumerationFormat"));
+	if (attrs.hasAttribute("NumerationLevel"))
+		pstyle.setNumLevel(attrs.valueAsInt("NumerationLevel"));
+	if (attrs.hasAttribute("NumerationStart"))
+		pstyle.setNumStart(attrs.valueAsInt("NumerationStart"));
+	if (attrs.hasAttribute("NumerationPrefix"))
+		pstyle.setNumPrefix(attrs.valueAsString("NumerationPrefix"));
+	if (attrs.hasAttribute("NumerationSuffix"))
+		pstyle.setNumSuffix(attrs.valueAsString("NumerationSuffix"));
+	if (attrs.hasAttribute("NumerationRestart"))
+		pstyle.setNumRestart(attrs.valueAsInt("NumerationRestart"));
+	if (attrs.hasAttribute("NumeartionOther"))
+		pstyle.setNumOther(static_cast<bool>(attrs.valueAsInt("NumeartionOther")));
+	if (attrs.hasAttribute("NumerationHigher"))
+		pstyle.setNumHigher(static_cast<bool>(attrs.valueAsInt("NumerationHigher")));
 	currItem->itemText.setDefaultStyle(pstyle);
 
 	if (attrs.hasAttribute("PSTYLE"))
@@ -4681,6 +4770,7 @@ PageItem* Scribus150Format::pasteItem(ScribusDoc *doc, ScXmlStreamAttributes& at
 	currItem->annotation().setFormat( attrs.valueAsInt("ANFORMAT", 0));
 	currItem->annotation().setVis( attrs.valueAsInt("ANVIS", 0));
 	currItem->annotation().setIsChk( attrs.valueAsBool("ANCHK", false) );
+	currItem->annotation().setCheckState(currItem->annotation().IsChk());
 	currItem->annotation().setAAact( attrs.valueAsBool("ANAA", false) );
 	currItem->annotation().setHTML ( attrs.valueAsInt("ANHTML", 0));
 	currItem->annotation().setUseIcons( attrs.valueAsBool("ANICON", false));
@@ -4689,6 +4779,8 @@ PageItem* Scribus150Format::pasteItem(ScribusDoc *doc, ScXmlStreamAttributes& at
 	currItem->annotation().setBorderColor( attrs.valueAsString("ANBCOL", CommonStrings::None));
 	currItem->annotation().setIPlace(attrs.valueAsInt("ANPLACE", 1));
 	currItem->annotation().setScaleW(attrs.valueAsInt("ANSCALE", 0));
+	currItem->annotation().setIcon(attrs.valueAsInt("ANITYP", 0));
+	currItem->annotation().setAnOpen(attrs.valueAsBool("ANOPEN", false) );
 
 	if (currItem->asTextFrame() || currItem->asPathText())
 	{
@@ -4919,10 +5011,7 @@ PageItem* Scribus150Format::pasteItem(ScribusDoc *doc, ScXmlStreamAttributes& at
 	}
 
 	if (currItem->asPathText())
-	{
 		currItem->updatePolyClip();
-		currItem->Frame = true;
-	}
 	currItem->GrType = attrs.valueAsInt("GRTYP", 0);
 	QString GrColor;
 	QString GrColor2;
@@ -5503,8 +5592,8 @@ bool Scribus150Format::loadPage(const QString & fileName, int pageNumber, bool M
 	notesMasterMarks.clear();
 	notesNSets.clear();
 
- 	QString f(readSLA(fileName));
-	if (f.isEmpty())
+ 	QScopedPointer<QIODevice> ioDevice(slaReader(fileName));
+	if (ioDevice.isNull())
 	{
 		setFileReadError();
 		return false;
@@ -5516,7 +5605,7 @@ bool Scribus150Format::loadPage(const QString & fileName, int pageNumber, bool M
 	bool success = true;
 	isNewFormat = false;
 	
-	ScXmlStreamReader reader(f);
+	ScXmlStreamReader reader(ioDevice.data());
 	ScXmlStreamAttributes attrs;
 	while(!reader.atEnd() && !reader.hasError())
 	{
@@ -6096,14 +6185,14 @@ void Scribus150Format::getStyle(ParagraphStyle& style, ScXmlStreamReader& reader
 bool Scribus150Format::readStyles(const QString& fileName, ScribusDoc* doc, StyleSet<ParagraphStyle> &docParagraphStyles)
 {
 	ParagraphStyle pstyle;
-	QString f (readSLA(fileName));
-	if (f.isEmpty())
-		return false;
-
 	bool firstElement = true;
 	bool success = true;
 
-	ScXmlStreamReader reader(f);
+	QScopedPointer<QIODevice> ioDevice(slaReader(fileName));
+	if (ioDevice.isNull())
+		return false;
+
+	ScXmlStreamReader reader(ioDevice.data());
 	ScXmlStreamAttributes attrs;
 	while(!reader.atEnd() && !reader.hasError())
 	{
@@ -6133,13 +6222,14 @@ bool Scribus150Format::readStyles(const QString& fileName, ScribusDoc* doc, Styl
 bool Scribus150Format::readCharStyles(const QString& fileName, ScribusDoc* doc, StyleSet<CharStyle> &docCharStyles)
 {
 	CharStyle cstyle;
-	QString f(readSLA(fileName));
-	if (f.isEmpty())
-		return false;
 	bool firstElement = true;
 	bool success = true;
 
-	ScXmlStreamReader reader(f);
+	QScopedPointer<QIODevice> ioDevice(slaReader(fileName));
+	if (ioDevice.isNull())
+		return false;
+
+	ScXmlStreamReader reader(ioDevice.data());
 	ScXmlStreamAttributes attrs;
 	while(!reader.atEnd() && !reader.hasError())
 	{
@@ -6170,13 +6260,14 @@ bool Scribus150Format::readCharStyles(const QString& fileName, ScribusDoc* doc, 
 
 bool Scribus150Format::readLineStyles(const QString& fileName, QHash<QString,multiLine> *styles)
 {
-	QString f(readSLA(fileName));
-	if (f.isEmpty())
-		return false;
 	bool firstElement = true;
 	bool success = true;
 
-	ScXmlStreamReader reader(f);
+	QScopedPointer<QIODevice> ioDevice(slaReader(fileName));
+	if (ioDevice.isNull())
+		return false;
+
+	ScXmlStreamReader reader(ioDevice.data());
 	ScXmlStreamAttributes attrs;
 	while(!reader.atEnd() && !reader.hasError())
 	{
@@ -6219,13 +6310,14 @@ bool Scribus150Format::readLineStyles(const QString& fileName, QHash<QString,mul
 
 bool Scribus150Format::readColors(const QString& fileName, ColorList & colors)
 {
-	QString f(readSLA(fileName));
-	if (f.isEmpty())
-		return false;
 	bool firstElement = true;
 	bool success = true;
 
-	ScXmlStreamReader reader(f);
+	QScopedPointer<QIODevice> ioDevice(slaReader(fileName));
+	if (ioDevice.isNull())
+		return false;
+
+	ScXmlStreamReader reader(ioDevice.data());
 	ScXmlStreamAttributes attrs;
 	while(!reader.atEnd() && !reader.hasError())
 	{
@@ -6260,6 +6352,8 @@ bool Scribus150Format::readPageCount(const QString& fileName, int *num1, int *nu
 	QString pageName;
 	int counter = 0;
 	int counter2 = 0;
+	bool firstElement = true;
+	bool success = true;
 
 	markeredItemsMap.clear();
 	markeredMarksMap.clear();
@@ -6268,13 +6362,11 @@ bool Scribus150Format::readPageCount(const QString& fileName, int *num1, int *nu
 	notesMasterMarks.clear();
 	notesNSets.clear();
 
-	QString f(readSLA(fileName));
-	if (f.isEmpty())
+	QScopedPointer<QIODevice> ioDevice(slaReader(fileName));
+	if (ioDevice.isNull())
 		return false;
-	bool firstElement = true;
-	bool success = true;
 
-	ScXmlStreamReader reader(f);
+	ScXmlStreamReader reader(ioDevice.data());
 	ScXmlStreamAttributes attrs;
 	while(!reader.atEnd() && !reader.hasError())
 	{

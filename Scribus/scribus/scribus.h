@@ -231,8 +231,6 @@ public:
 	ScribusWin* ActWin;
 	QClipboard *ClipB;
 	QString LoadEnc;
-	//QMap<QString, QStringList> InstLang;
-	//QMap<QString,QString> LangTransl;
 
 	QProcess *ExternalApp;
 
@@ -278,7 +276,9 @@ public slots:
 	void windowsMenuActivated(int id);
 	void PutScrap(int scID);
 	void PutToInline(QString buffer);
+	void PutToInline();
 	void PutToPatterns();
+	void ConvertToSymbol();
 	void changeLayer(int);
 	void showLayer();
 	void ManageJava();
@@ -412,9 +412,9 @@ public slots:
 	/** \brief Schaltet M_ViewShowImages ein/aus */
 	void TogglePics();
 	/** \brief Schaltet Raster ein/aus */
-	void ToggleRaster();
+	void ToggleGrid();
 	/** \brief Schaltet Rasterbenutzung ein/aus */
-	void ToggleURaster();
+	void ToggleUGrid();
 	/** \brief Schaltet Rahmenbearbeitung ein/aus */
 	void toggleNodeEdit();
 	void slotSelect();
@@ -448,6 +448,7 @@ public slots:
 	void objectAttributes();
 	void getImageInfo();
 	void generateTableOfContents();
+	void updateDocument();
 
 //	void saveStyles(StilFormate *dia); //still required for style save from SE
 	void setNewAlignment(int a);
@@ -634,6 +635,7 @@ private:
 	void insertMark(MarkType);
 	bool insertMarkDialog(PageItem_TextFrame* item, MarkType mT, ScItemsState* &is);
 	int m_marksCount; //remember marks count from last call
+	bool m_WasAutoSave;
 };
 
 #endif
