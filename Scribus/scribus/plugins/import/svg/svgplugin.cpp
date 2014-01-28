@@ -75,6 +75,7 @@ SVGImportPlugin::SVGImportPlugin() : LoadSavePlugin(),
 	// Set action info in languageChange, so we only have to do
 	// it in one place. This includes registering file format
 	// support.
+	registerFormats();
 	languageChange();
 }
 /*
@@ -88,14 +89,14 @@ void SVGImportPlugin::addToMainWindowMenu(ScribusMainWindow *mw)
 SVGImportPlugin::~SVGImportPlugin()
 {
 	unregisterAll();
-};
+}
 
 void SVGImportPlugin::languageChange()
 {
 	importAction->setText( tr("Import &SVG..."));
-	// (Re)register file format support.
-	unregisterAll();
-	registerFormats();
+	FileFormat* fmt = getFormatByExt("svg");
+	fmt->trName = FormatsManager::instance()->nameOfFormat(FormatsManager::SVG);
+	fmt->filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::SVG);
 }
 
 const QString SVGImportPlugin::fullTrName() const
@@ -124,9 +125,8 @@ void SVGImportPlugin::registerFormats()
 {
 	FileFormat fmt(this);
 	fmt.trName = FormatsManager::instance()->nameOfFormat(FormatsManager::SVG);
-	fmt.formatId = FORMATID_SVGIMPORT;
+	fmt.formatId = 0;
 	fmt.filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::SVG);
- 	fmt.nameMatch = QRegExp("\\."+FormatsManager::instance()->extensionListForFormat(FormatsManager::SVG, 1)+"$", Qt::CaseInsensitive);
 	fmt.fileExtensions = QStringList() << "svg" << "svgz";
 	fmt.load = true;
 	fmt.save = false;
@@ -397,7 +397,7 @@ void SVGPlug::convert(const TransactionSettings& trSettings, int flags)
 	if (!(flags & LoadSavePlugin::lfLoadAsPattern))
 		m_Doc->view()->updatesOn(false);
 	m_Doc->scMW()->setScriptRunning(true);
-	qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+	qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 	gc->FontFamily = m_Doc->itemToolPrefs().textFont;
 	if (!m_Doc->PageColors.contains("Black"))
 		m_Doc->PageColors.insert("Black", ScColor(0, 0, 0, 255));
@@ -506,10 +506,7 @@ void SVGPlug::convert(const TransactionSettings& trSettings, int flags)
 			}
 			tmpSel->setGroupRect();
 			ScElemMimeData* md = ScriXmlDoc::WriteToMimeData(m_Doc, tmpSel);
-/*#ifndef Q_WS_MAC*/
-// see #2526
 			m_Doc->itemSelection_DeleteItem(tmpSel);
-/*#endif*/
 			m_Doc->view()->updatesOn(true);
 			if ((importedColors.count() != 0) && (!((flags & LoadSavePlugin::lfKeepGradients) || (flags & LoadSavePlugin::lfKeepColors) || (flags & LoadSavePlugin::lfKeepPatterns))))
 			{
@@ -557,6 +554,7 @@ void SVGPlug::convert(const TransactionSettings& trSettings, int flags)
 		if (interactive)
 			m_Doc->view()->DrawNew();
 	}
+	qApp->restoreOverrideCursor();
 }
 
 void SVGPlug::addGraphicContext()
@@ -859,7 +857,7 @@ void SVGPlug::finishNode( const QDomNode &e, PageItem* item)
 		if (markers.contains(gc->startMarker))
 		{
 			FPoint End = item->PoLine.point(0);
-			for (uint xx = 1; xx < item->PoLine.size(); xx += 2)
+			for (int xx = 1; xx < item->PoLine.size(); xx += 2)
 			{
 				FPoint Vector = item->PoLine.point(xx);
 				if ((End.x() != Vector.x()) || (End.y() != Vector.y()))
@@ -1529,10 +1527,13 @@ QList<PageItem*> SVGPlug::parseImage(const QDomElement &e)
 			ba.append(fname);
 			if (dataType.contains("base64"))
 				ba = QByteArray::fromBase64(ba);
-			ite->tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_svg_XXXXXX.png");
-			ite->tempImageFile->open();
-			QString fileName = getLongPathName(ite->tempImageFile->fileName());
-			ite->tempImageFile->close();
+			QTemporaryFile *tempFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_svg_XXXXXX.png");
+			tempFile->setAutoRemove(false);
+			tempFile->open();
+			QString fileName = getLongPathName(tempFile->fileName());
+			tempFile->close();
+			delete tempFile;
+			ite->isTempFile = true;
 			ite->isInlineImage = true;
 			QImage img;
 			img.loadFromData(ba);

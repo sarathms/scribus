@@ -60,7 +60,6 @@ for which a new license (GPL+exception) is in place.
 #include "util_formats.h"
 #include "util_math.h"
 
-#include "text/nlsconfig.h"
 using namespace TableUtils;
 
 PSLib::PSLib(PrintOptions &options, bool psart, SCFonts &AllFonts, QMap<QString, QMap<uint, FPointArray> > DocFonts, ColorList DocColors, bool pdf, bool spot)
@@ -169,7 +168,7 @@ PSLib::PSLib(PrintOptions &options, bool psart, SCFonts &AllFonts, QMap<QString,
 				bool nPath = true;
 				if (ig.value().size() > 3)
 				{
-					for (uint poi = 0; poi < ig.value().size()-3; poi += 4)
+					for (int poi = 0; poi < ig.value().size()-3; poi += 4)
 					{
 						if (ig.value().point(poi).x() > 900000)
 						{
@@ -1733,14 +1732,8 @@ bool PSLib::ProcessItem(ScribusDoc* Doc, ScPage* a, PageItem* c, uint PNr, bool 
 				PS_scale(1, -1);
 			}
 			if (c->imageClip.size() != 0)
-			{
-				SetClipPath(&c->imageClip);
-				PS_closepath();
-				PS_clip(true);
-			}
-			SetClipPath(&c->PoLine);
-			PS_closepath();
-			PS_clip(true);
+				SetPathAndClip(c->imageClip, true);
+			SetPathAndClip(c->PoLine, true);
 			if ((c->PictureIsAvailable) && (!c->Pfile.isEmpty()))
 			{
 				bool imageOk = false;
@@ -2078,7 +2071,7 @@ bool PSLib::ProcessItem(ScribusDoc* Doc, ScPage* a, PageItem* c, uint PNr, bool 
 			if (c->startArrowIndex() != 0)
 			{
 				FPoint Start = c->PoLine.point(0);
-				for (uint xx = 1; xx < c->PoLine.size(); xx += 2)
+				for (int xx = 1; xx < c->PoLine.size(); xx += 2)
 				{
 					FPoint Vector = c->PoLine.point(xx);
 					if ((Start.x() != Vector.x()) || (Start.y() != Vector.y()))
@@ -2158,14 +2151,13 @@ bool PSLib::ProcessItem(ScribusDoc* Doc, ScPage* a, PageItem* c, uint PNr, bool 
 					PS_restore();
 				}
 			}
-#ifndef NLS_PROTO
 			savedOwnPage = c->OwnPage;
 			c->OwnPage = PNr-1;
 			c->asPathText()->layout();
 			c->OwnPage = savedOwnPage;
 			for (d = 0; d < c->maxCharsInFrame(); ++d)
 			{
-				hl = c->asPathText()->itemRenderText.item(d);
+                hl = c->asPathText()->itemRenderText.item_p(d);
 				const CharStyle & style(c->asPathText()->itemRenderText.charStyle(d));
 				if ((hl->ch == QChar(13)) || (hl->ch == QChar(30)) || (hl->ch == QChar(9)) || (hl->ch == QChar(28)))
 					continue;
@@ -2544,16 +2536,13 @@ bool PSLib::ProcessItem(ScribusDoc* Doc, ScPage* a, PageItem* c, uint PNr, bool 
 					PS_restore();
 				}
 			}
-#endif
 			break;
 		case PageItem::Symbol:
 			if (m_Doc->docPatterns.contains(c->pattern()))
 			{
 				ScPattern pat = m_Doc->docPatterns[c->pattern()];
 				PS_save();
-				SetClipPath(&c->PoLine);
-				PS_closepath();
-				PS_clip(c->fillRule);
+				SetPathAndClip(c->PoLine, c->fillRule);
 				if (c->imageFlippedH())
 				{
 					PS_translate(c->width(), 0);
@@ -2580,9 +2569,8 @@ bool PSLib::ProcessItem(ScribusDoc* Doc, ScPage* a, PageItem* c, uint PNr, bool 
 			break;
 		case PageItem::Group:
 			PS_save();
-			SetClipPath(&c->PoLine);
-			PS_closepath();
-			PS_clip(c->fillRule);
+			if (c->groupClipping())
+				SetPathAndClip(c->PoLine, c->fillRule);
 			if (c->imageFlippedH())
 			{
 				PS_translate(c->width(), 0);
@@ -3265,14 +3253,13 @@ bool PSLib::ProcessMasterPageLayer(ScribusDoc* Doc, ScPage* page, ScLayer& layer
 						PS_restore();
 					}
 				}
-	#ifndef NLS_PROTO
 				int savedOwnPage = ite->OwnPage;
 				ite->OwnPage = PNr;
 				ite->asPathText()->layout();
 				ite->OwnPage = savedOwnPage;
 				for (d = 0; d < ite->maxCharsInFrame(); ++d)
 				{
-					hl = ite->asPathText()->itemRenderText.item(d);
+                    hl = ite->asPathText()->itemRenderText.item_p(d);
 					const CharStyle & style(ite->asPathText()->itemRenderText.charStyle(d));
 					if ((hl->ch == QChar(13)) || (hl->ch == QChar(30)) || (hl->ch == QChar(9)) || (hl->ch == QChar(28)))
 						continue;
@@ -3651,7 +3638,6 @@ bool PSLib::ProcessMasterPageLayer(ScribusDoc* Doc, ScPage* page, ScLayer& layer
 						PS_restore();
 					}
 				}
-	#endif
 				PS_restore();
 			}
 			if (!success)
@@ -3724,12 +3710,10 @@ void PSLib::HandleBrushPattern(PageItem *c, QPainterPath &path, ScPage* a, uint 
 	{
 		double currPerc = path.percentAtLength(xpos);
 		double currAngle = path.angleAtPercent(currPerc);
-#if QT_VERSION  >= 0x040400
 		if (currAngle <= 180.0)
 			currAngle *= -1.0;
 		else
 			currAngle = 360.0 - currAngle;
-#endif
 		QPointF currPoint = path.pointAtPercent(currPerc);
 		PS_save();
 		PS_translate(currPoint.x(), -currPoint.y());
@@ -4942,6 +4926,18 @@ void PSLib::SetColor(const ScColor& farb, double shade, int *h, int *s, int *v, 
 	}
 }
 
+/**
+ * @brief PSLib::setTextSt
+ * @param Doc   our dicument
+ * @param ite   the Textitem to set
+ * @param gcr   gray color removal option
+ * @param argh  current page number
+ * @param pg    current page
+ * @param sep   separate colors option
+ * @param farb  useColors option (== !grayscale)
+ * @param ic    use ICC profile option
+ * @param master true if setting master page item
+ */
 void PSLib::setTextSt(ScribusDoc* Doc, PageItem* ite, bool gcr, uint argh, ScPage* pg, bool sep, bool farb, bool ic, bool master)
 {
 //	qDebug() << QString("pslib setTextSt: ownPage=%1 pageNr=%2 OnMasterPage=%3;").arg(ite->OwnPage).arg(pg->pageNr()).arg(ite->OnMasterPage);
@@ -4953,7 +4949,6 @@ void PSLib::setTextSt(ScribusDoc* Doc, PageItem* ite, bool gcr, uint argh, ScPag
 	ite->OwnPage = argh;
 	ite->layout();
 	ite->OwnPage = savedOwnPage;
-#ifndef NLS_PROTO
 	if (ite->lineColor() != CommonStrings::None)
 		tabDist += ite->lineWidth() / 2.0;
 
@@ -4964,16 +4959,16 @@ void PSLib::setTextSt(ScribusDoc* Doc, PageItem* ite, bool gcr, uint argh, ScPag
 
 		for (int d = ls.firstItem; d <= ls.lastItem; ++d)
 		{
-			ScText *hl = ite->itemText.item(d);
+            ScText *hl = ite->itemText.item_p(d);
 			const CharStyle & cstyle(ite->itemText.charStyle(d));
 			const ParagraphStyle& pstyle(ite->itemText.paragraphStyle(d));
 			
 //			if ((hl->ch == QChar(13)) || (hl->ch == QChar(10)) || (hl->ch == QChar(28)) || (hl->ch == QChar(27)) || (hl->ch == QChar(26)))
 //				continue;
-			if (hl->effects() & 4096)
+			if (hl->effects() & ScLayout_SuppressSpace)
 				continue;
 			tTabValues = pstyle.tabValues();
-			if (hl->effects() & 16384)
+			if (hl->effects() & ScLayout_StartOfLine)
 				tabCc = 0;
 			if ((hl->ch == SpecialChars::TAB) && (tTabValues.count() != 0))
 			{
@@ -5061,7 +5056,6 @@ void PSLib::setTextSt(ScribusDoc* Doc, PageItem* ite, bool gcr, uint argh, ScPag
 			tabDist = CurX;
 		}
 	}
-#endif
 }
 
 void PSLib::setTextCh(ScribusDoc* Doc, PageItem* ite, double x, double y, bool gcr, uint argh, uint doh, ScText *hl, const ParagraphStyle& pstyle, ScPage* pg, bool sep, bool farb, bool ic, bool master)
@@ -5099,21 +5093,25 @@ void PSLib::setTextCh(ScribusDoc* Doc, PageItem* ite, double x, double y, bool g
 	*/
 	if (hl->hasObject(Doc))
 	{
-		QList<PageItem*> emG = hl->getGroupedItems(Doc);
-		for (int em = 0; em < emG.count(); ++em)
+		PageItem* embedded = hl->getItem(Doc);
+		PS_save();
+		PS_translate(x + hl->glyph.xoffset + embedded->gXpos * (cstyle.scaleH() / 1000.0), (y + hl->glyph.yoffset - (embedded->gHeight * (cstyle.scaleV() / 1000.0)) + embedded->gYpos * (cstyle.scaleV() / 1000.0)) * -1);
+		if (doh == 0 || ite->itemText.text(doh-1) == SpecialChars::PARSEP)
 		{
-			PageItem* embedded = emG.at(em);
-			PS_save();
-			PS_translate(x + hl->glyph.xoffset + embedded->gXpos * (cstyle.scaleH() / 1000.0), (y + hl->glyph.yoffset - (embedded->gHeight * (cstyle.scaleV() / 1000.0)) + embedded->gYpos * (cstyle.scaleV() / 1000.0)) * -1);
+			if ((cstyle.baselineOffset() != 0) && (!pstyle.hasDropCap()))
+				PS_translate(0, embedded->gHeight * (cstyle.baselineOffset() / 1000.0));
+		}
+		else
+		{
 			if (cstyle.baselineOffset() != 0)
 				PS_translate(0, embedded->gHeight * (cstyle.baselineOffset() / 1000.0));
-			if (cstyle.scaleH() != 1000)
-				PS_scale(cstyle.scaleH() / 1000.0, 1);
-			if (cstyle.scaleV() != 1000)
-				PS_scale(1, cstyle.scaleV() / 1000.0);
-			ProcessItem(Doc, pg, embedded, argh, sep, farb, ic, gcr, master, true);
-			PS_restore();
 		}
+		if (cstyle.scaleH() != 1000)
+			PS_scale(cstyle.scaleH() / 1000.0, 1);
+		if (cstyle.scaleV() != 1000)
+			PS_scale(1, cstyle.scaleV() / 1000.0);
+		ProcessItem(Doc, pg, embedded, argh, sep, farb, ic, gcr, master, true);
+		PS_restore();
 		return;
 	}
 
@@ -5440,36 +5438,46 @@ void PSLib::SetClipPath(FPointArray *c, bool poly)
 	FPoint np, np1, np2, np3, np4, firstP;
 	bool nPath = true;
 	bool first = true;
-	if (c->size() > 3)
+	if (c->size() <= 3)
+		return;
+
+	for (int poi=0; poi < c->size()-3; poi += 4)
 	{
-		for (uint poi=0; poi<c->size()-3; poi += 4)
+		if (c->point(poi).x() > 900000)
 		{
-			if (c->point(poi).x() > 900000)
-			{
-				nPath = true;
-				continue;
-			}
-			if (nPath)
-			{
-				np = c->point(poi);
-				if ((!first) && (poly) && (np4 == firstP))
-					PS_closepath();
-				PS_moveto(np.x(), -np.y());
-				nPath = false;
-				first = false;
-				firstP = np;
-				np4 = np;
-			}
-			np = c->point(poi);
-			np1 = c->point(poi+1);
-			np2 = c->point(poi+3);
-			np3 = c->point(poi+2);
-			if ((np == np1) && (np2 == np3))
-				PS_lineto(np3.x(), -np3.y());
-			else
-				PS_curve(np1.x(), -np1.y(), np2.x(), -np2.y(), np3.x(), -np3.y());
-			np4 = np3;
+			nPath = true;
+			continue;
 		}
+		if (nPath)
+		{
+			np = c->point(poi);
+			if ((!first) && (poly) && (np4 == firstP))
+				PS_closepath();
+			PS_moveto(np.x(), -np.y());
+			nPath = false;
+			first = false;
+			firstP = np;
+			np4 = np;
+		}
+		np = c->point(poi);
+		np1 = c->point(poi+1);
+		np2 = c->point(poi+3);
+		np3 = c->point(poi+2);
+		if ((np == np1) && (np2 == np3))
+			PS_lineto(np3.x(), -np3.y());
+		else
+			PS_curve(np1.x(), -np1.y(), np2.x(), -np2.y(), np3.x(), -np3.y());
+		np4 = np3;
+	}
+}
+
+void PSLib::SetPathAndClip(FPointArray &path, bool clipRule)
+{
+	if (path.size() > 3)
+	{
+		SetClipPath(&path);
+		PS_closepath();
+		PS_clip(clipRule);
 	}
 }
 

@@ -112,9 +112,9 @@ About::About( QWidget* parent, AboutMode diaMode ) : QDialog( parent )
 	buildID = new QLabel( tab );
 	buildID->setAlignment(Qt::AlignCenter);
 	buildID->setTextInteractionFlags(Qt::TextSelectableByMouse);
-	QString BUILD_DAY = "05";
+	QString BUILD_DAY = "14";
 	QString BUILD_MONTH = CommonStrings::january;
-	QString BUILD_YEAR = "2013";
+	QString BUILD_YEAR = "2014";
 	QString BUILD_TIME = "";
 	QString BUILD_TZ = "";
 	QString BUILD_NAME = "";
@@ -147,26 +147,14 @@ About::About( QWidget* parent, AboutMode diaMode ) : QDialog( parent )
 	bu += "*";
 #endif
 	bu += "-";
-#ifdef HAVE_PRIVATE_CAIRO
-	bu += "PC";
-	bu += cairo_version_string();
-#else
 	bu += "C";
 	bu += cairo_version_string();
-#endif
 
 // Some more information if we are not on a 32bit little endian Unix machine
 #if defined(Q_OS_WIN)
 	bu += "-Windows";
 #elif defined(Q_OS_MAC)
 	bu += "-Mac/";
-#  if defined(Q_WS_MACX)
-	bu += "Aqua";
-#  elif define(Q_WS_X11)
-	bu += "X11";
-#  else
-	bu += "?";
-#  endif
 #elif defined(Q_OS_DARWIN)
 	// dunno if anyone uses this...
 	bu += "-Darwin";
@@ -249,6 +237,8 @@ About::About( QWidget* parent, AboutMode diaMode ) : QDialog( parent )
 	else
 	{
 		QTextStream inTS(&licenceFile);
+		inTS.setAutoDetectUnicode(true);
+		inTS.setCodec("UTF-8");
 		QString licenceText = inTS.readAll();
 		textViewLicence->setSimpleText(licenceText);
 	} 
@@ -301,6 +291,8 @@ QString About::trAuthorTitle(QString title)
 		result = tr("OS/2&#174;/eComStation&#8482; Port:");
 	else if ( title == "Windows&#174; Port:" )
 		result = tr("Windows&#174; Port:");
+	else if ( title == "Haiku Port:" )
+		result = tr("Haiku Port:");
 	else if ( title == "Contributions from:" )
 		result = tr("Contributions from:");
 	else if ( title == "Official Documentation:" )
@@ -647,9 +639,9 @@ void About::runUpdateCheck()
 	textView5->clear();
 	UpgradeCheckerGUI uc(textView5);
 	disconnect( checkForUpdateButton, SIGNAL( clicked() ), this, SLOT( runUpdateCheck() ) );
-	connect(checkForUpdateButton, SIGNAL( clicked() ), &uc, SLOT( abort() ));
-	checkForUpdateButton->setText( tr("Abort Update Check") );
+	//connect(checkForUpdateButton, SIGNAL( clicked() ), &uc, SLOT( abort() ));
+	//checkForUpdateButton->setText( tr("Abort Update Check") );
 	uc.fetch();
-	checkForUpdateButton->setText( tr("Check for Updates") );
+	//checkForUpdateButton->setText( tr("Check for Updates") );
 	connect( checkForUpdateButton, SIGNAL( clicked() ), this, SLOT( runUpdateCheck() ) );
 }

@@ -72,8 +72,6 @@ void CanvasMode_Magnifier::enterEvent(QEvent *)
 
 void CanvasMode_Magnifier::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -99,7 +97,7 @@ void CanvasMode_Magnifier::activate(bool fromGesture)
 void CanvasMode_Magnifier::deactivate(bool forGesture)
 {
 //	qDebug() << "CanvasMode_Magnifier::deactivate" << forGesture;
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void CanvasMode_Magnifier::mouseDoubleClickEvent(QMouseEvent *m)
@@ -113,8 +111,6 @@ void CanvasMode_Magnifier::mouseDoubleClickEvent(QMouseEvent *m)
 
 void CanvasMode_Magnifier::mouseMoveEvent(QMouseEvent *m)
 {
-// 	const double mouseX = m->globalX();
-// 	const double mouseY = m->globalY();
 	const FPoint mousePointDoc = m_canvas->globalToCanvas(m->globalPos());
 	
 	m_lastPosWasOverGuide = false;
@@ -128,13 +124,9 @@ void CanvasMode_Magnifier::mouseMoveEvent(QMouseEvent *m)
 		newY = qRound(Myp + ((SeRx - Mxp) * m_view->visibleHeight()) / m_view->visibleWidth());
 		SeRx = newX;
 		SeRy = newY;
-		/*
-		m_view->redrawMarker->setGeometry(QRect(Mxp, Myp, m->globalPos().x() - Mxp, m->globalPos().y() - Myp).normalized());
-		*/
 		QPoint startP = m_canvas->canvasToGlobal(m_doc->appMode == modeDrawTable2 ? QPointF(Dxp, Dyp) : QPointF(Mxp, Myp));
-		m_view->redrawMarker->setGeometry(QRect(startP, m->globalPos()).normalized());
-		if (!m_view->redrawMarker->isVisible())
-			m_view->redrawMarker->show();
+		m_view->redrawMarker->setGeometry(QRect(m_view->mapFromGlobal(startP), m_view->mapFromGlobal(m->globalPos())).normalized());
+		m_view->setRedrawMarkerShown(true);
 		m_view->HaveSelRect = true;
 	}
 }
@@ -171,12 +163,12 @@ void CanvasMode_Magnifier::mousePressEvent(QMouseEvent *m)
 	if ((m->modifiers() == Qt::ShiftModifier) || (m->button() == Qt::RightButton))
 	{
 		m_view->Magnify = false;
-		qApp->changeOverrideCursor(QCursor(loadIcon("LupeZm.xpm")));
+		m_view->setCursor(QCursor(loadIcon("LupeZm.xpm")));
 	}
 	else
 	{
 		m_view->Magnify = true;
-		qApp->changeOverrideCursor(QCursor(loadIcon("LupeZ.xpm")));
+		m_view->setCursor(QCursor(loadIcon("LupeZ.xpm")));
 	}
 	Mxp = mousePointDoc.x(); //m->globalPos().x();
 	Myp = mousePointDoc.y(); //m->globalPos().y();
@@ -203,6 +195,7 @@ void CanvasMode_Magnifier::mouseReleaseEvent(QMouseEvent *m)
 		if (m_view->HaveSelRect)
 		{
 			QRect geom = m_view->redrawMarker->geometry().normalized();
+			geom = QRect(m_view->mapToGlobal(geom.topLeft()), m_view->mapToGlobal(geom.bottomRight()));
 			FPoint nx = m_canvas->globalToCanvas(QPoint(geom.x() + geom.width() / 2, geom.y() + geom.height() / 2));
 			double scaleH = m_view->visibleWidth() / static_cast<double>(qMax(geom.width(), 1));
 			double scaleV = m_view->visibleHeight() / static_cast<double>(qMax(geom.height(), 1));
@@ -211,10 +204,10 @@ void CanvasMode_Magnifier::mouseReleaseEvent(QMouseEvent *m)
 			if (sc == m_canvas->scale())
 			{
 				m_view->HaveSelRect = false;
-				m_view->redrawMarker->hide();
+				m_view->setRedrawMarkerShown(false);
 				m_view->requestMode(submodePaintingDone);
 			}
-			m_view->redrawMarker->hide();
+			m_view->setRedrawMarkerShown(false);
 		}
 		else
 		{
@@ -230,9 +223,9 @@ void CanvasMode_Magnifier::mouseReleaseEvent(QMouseEvent *m)
 			else
 			{
 				if (m->modifiers() & Qt::ShiftModifier)
-					qApp->changeOverrideCursor(QCursor(loadIcon("LupeZm.xpm")));
+					m_view->setCursor(QCursor(loadIcon("LupeZm.xpm")));
 				else
-					qApp->changeOverrideCursor(QCursor(loadIcon("LupeZ.xpm")));
+					m_view->setCursor(QCursor(loadIcon("LupeZ.xpm")));
 			}
 		}
 	}

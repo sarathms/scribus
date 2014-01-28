@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
  *   You should have received a copy of the GNU General Public License     *
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
- *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
  ***************************************************************************/
 
 #include <QObject>
@@ -222,7 +222,11 @@ bool HTMLReader::startElement(const QString&, const QString&, const QString &nam
 				if (attrValue.indexOf("data:image") < 0)
 					imgline +=  " src: " + attrValue;
 				else
+				{
+					// TODO: correctly embed the image (just putting the source in the
+					// text frame crashes scribus for big images; ale/20120808)
 					imgline +=  " src: embedded image";
+				}
 			}
 			if (attrs.localName(i) == "alt")
 			{

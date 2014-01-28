@@ -393,8 +393,8 @@ OutlinePalette::OutlinePalette( QWidget* parent) : ScDockPalette( parent, "Tree"
 	reportDisplay->setRootIsDecorated( true );
 	reportDisplay->setColumnCount(1);
 	reportDisplay->setHeaderLabel( tr("Element"));
-	reportDisplay->header()->setClickable( false );
-	reportDisplay->header()->setResizeMode( QHeaderView::ResizeToContents );
+	reportDisplay->header()->setSectionsClickable(false );
+	reportDisplay->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 	reportDisplay->setSortingEnabled(false);
 	reportDisplay->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	reportDisplay->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -536,7 +536,7 @@ void OutlinePalette::slotRightClick(QPoint point)
 			signalMapper4->setMapping(actLock, item->LayerID);
 			connect(actLock, SIGNAL(triggered()), signalMapper4, SLOT(map()));
 			connect(signalMapper4, SIGNAL(mapped(int)), this, SLOT(setLayerLocked(int)));
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+	//		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 			pmenu->exec(QCursor::pos());
 			delete pmenu;
 		}
@@ -554,18 +554,21 @@ void OutlinePalette::setLayerVisible(int layerID)
 	currDoc->setLayerVisible(layerID, !currDoc->layerVisible(layerID));
 	currDoc->scMW()->showLayer();
 	currDoc->scMW()->layerPalette->rebuildList();
+	currDoc->scMW()->layerPalette->markActiveLayer();
 }
 
 void OutlinePalette::setLayerLocked(int layerID)
 {
 	currDoc->setLayerLocked(layerID, !currDoc->layerLocked(layerID));
 	currDoc->scMW()->layerPalette->rebuildList();
+	currDoc->scMW()->layerPalette->markActiveLayer();
 }
 
 void OutlinePalette::setLayerPrintable(int layerID)
 {
 	currDoc->setLayerPrintable(layerID, !currDoc->layerPrintable(layerID));
 	currDoc->scMW()->layerPalette->rebuildList();
+	currDoc->scMW()->layerPalette->markActiveLayer();
 }
 
 void OutlinePalette::slotRenameItem()
@@ -936,6 +939,8 @@ void OutlinePalette::slotSelect(QTreeWidgetItem* ite, int)
 			if (!currDoc->masterPageMode())
 				emit selectMasterPage(item->PageItemObject->OnMasterPage);
 			pgItem = item->PageItemObject;
+			currDoc->setActiveLayer(pgItem->LayerID);
+			m_MainWindow->changeLayer(currDoc->activeLayer());
 			if (item->PageItemObject->isGroup())
 				emit selectElementByItem(pgItem, false);
 			else
@@ -953,6 +958,8 @@ void OutlinePalette::slotSelect(QTreeWidgetItem* ite, int)
 		case 4:
 			pgItem = item->PageItemObject;
 			m_MainWindow->closeActiveWindowMasterPageEditor();
+			currDoc->setActiveLayer(pgItem->LayerID);
+			m_MainWindow->changeLayer(currDoc->activeLayer());
 			if (pgItem->isGroup())
 				emit selectElementByItem(pgItem, false);
 			else
@@ -1393,7 +1400,7 @@ void OutlinePalette::createContextMenu(PageItem * currItem, double mx, double my
 	if (m_MainWindow==NULL || currDoc==NULL)
 		return;
 	ContextMenu* cmen=NULL;
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+//	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 	if(currItem!=NULL)
 		cmen = new ContextMenu(*(currDoc->m_Selection), m_MainWindow, currDoc);
 	else

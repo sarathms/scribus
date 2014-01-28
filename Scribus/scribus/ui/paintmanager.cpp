@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
 *   You should have received a copy of the GNU General Public License     *
 *   along with this program; if not, write to the                         *
 *   Free Software Foundation, Inc.,                                       *
-*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+*   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
 ***************************************************************************/
 #include "paintmanager.h"
 
@@ -315,7 +315,7 @@ void PaintManagerDialog::slotRightClick(QPoint p)
 		if ((it->parent() == colorItems) || (it == colorItems))
 		{
 			QMenu *pmen = new QMenu();
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+//			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 			pmen->addAction( tr("Sort by Name"));
 			pmen->addAction( tr("Sort by Color"));
 			pmen->addAction( tr("Sort by Type"));
@@ -466,8 +466,8 @@ void PaintManagerDialog::createNew()
 			if (dia->exec())
 			{
 				dia->Farbe.setSpotColor(dia->Separations->isChecked());
-				m_colorList.insert(dia->Farbname->text(), dia->Farbe);
-				QTreeWidgetItem *lg = updateColorList(dia->Farbname->text());
+				m_colorList.insert(dia->ColorName->text(), dia->Farbe);
+				QTreeWidgetItem *lg = updateColorList(dia->ColorName->text());
 				if (lg != 0)
 				{
 					dataTree->expandItem(lg->parent());
@@ -551,16 +551,16 @@ void PaintManagerDialog::editColorItem()
 			{
 				dia->Farbe.setSpotColor(dia->Separations->isChecked());
 				dia->Farbe.setRegistrationColor(tmpColor.isRegistrationColor());
-				m_colorList[dia->Farbname->text()] = dia->Farbe;
-				if (it->text(0) != dia->Farbname->text())
+				m_colorList[dia->ColorName->text()] = dia->Farbe;
+				if (it->text(0) != dia->ColorName->text())
 				{
-					replaceColorMap.insert(it->text(0), dia->Farbname->text());
+					replaceColorMap.insert(it->text(0), dia->ColorName->text());
 					m_colorList.remove(it->text(0));
 				}
-				updateGradientColors(dia->Farbname->text(), it->text(0));
+				updateGradientColors(dia->ColorName->text(), it->text(0));
 				updateGradientList();
 				updatePatternList();
-				QTreeWidgetItem *lg = updateColorList(dia->Farbname->text());
+				QTreeWidgetItem *lg = updateColorList(dia->ColorName->text());
 				if (lg != 0)
 				{
 					dataTree->expandItem(lg->parent());
@@ -575,7 +575,7 @@ void PaintManagerDialog::editColorItem()
 		{
 			QString patternName = origNames[it->text(0)];
 			QString newName = "";
-			Query dia(this, "tt", 1, 0, tr("&Name:"), tr("Rename Entry"));
+			Query dia(this, "tt", 1, tr("&Name:"), tr("Rename Entry"));
 			dia.setEditText(it->text(0), true);
 			dia.setTestList(dialogPatterns.keys());
 			if (dia.exec())
@@ -671,16 +671,16 @@ void PaintManagerDialog::duplicateColorItem()
 			{
 				dia->Farbe.setSpotColor(dia->Separations->isChecked());
 				dia->Farbe.setRegistrationColor(tmpColor.isRegistrationColor());
-				m_colorList[dia->Farbname->text()] = dia->Farbe;
-				if (nam != dia->Farbname->text())
+				m_colorList[dia->ColorName->text()] = dia->Farbe;
+				if (nam != dia->ColorName->text())
 				{
-					replaceColorMap.insert(nam, dia->Farbname->text());
+					replaceColorMap.insert(nam, dia->ColorName->text());
 					m_colorList.remove(nam);
 				}
-				updateGradientColors(dia->Farbname->text(), nam);
+				updateGradientColors(dia->ColorName->text(), nam);
 				updateGradientList();
 				updatePatternList();
-				QTreeWidgetItem *lg = updateColorList(dia->Farbname->text());
+				QTreeWidgetItem *lg = updateColorList(dia->ColorName->text());
 				if (lg != 0)
 				{
 					dataTree->expandItem(lg->parent());
@@ -1072,7 +1072,7 @@ void PaintManagerDialog::importColorItems()
 			QString fileName;
 			QStringList formats;
 			QString allFormats = tr("All Supported Formats")+" (";
-			int fmtCode = FORMATID_ODGIMPORT;
+			int fmtCode = FORMATID_FIRSTUSER;
 			const FileFormat *fmt = LoadSavePlugin::getFormatById(fmtCode);
 			while (fmt != 0)
 			{
@@ -1171,7 +1171,7 @@ void PaintManagerDialog::importColorItems()
 				return;
 			if (!fileName.isEmpty())
 			{
-				qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+				qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 				PrefsManager::instance()->prefsFile->getContext("dirs")->set("patterns", fileName.left(fileName.lastIndexOf("/")));
 				QFileInfo fi(fileName);
 				if ((fi.suffix().toLower() == "sce") || (!imgFormats.contains(fi.suffix().toLower())))
@@ -1194,7 +1194,7 @@ void PaintManagerDialog::importColorItems()
 				updateGradientList();
 				updatePatternList();
 				itemSelected(0);
-				qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+				qApp->restoreOverrideCursor();
 			}
 		}
 	}
@@ -1235,7 +1235,7 @@ void PaintManagerDialog::loadPatternDir()
 			mainWin->setStatusBarInfoText( tr("Loading Patterns"));
 			mainWin->mainWindowProgressBar->reset();
 			mainWin->mainWindowProgressBar->setMaximum(d.count() * 2);
-			qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+			qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 			qApp->processEvents(QEventLoop::ExcludeUserInputEvents);
 			for (uint dc = 0; dc < d.count(); ++dc)
 			{
@@ -1271,7 +1271,7 @@ void PaintManagerDialog::loadPatternDir()
 			}
 			d.cdUp();
 			dirs->set("patterndir", d.absolutePath());
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+			qApp->restoreOverrideCursor();
 			mainWin->setStatusBarInfoText("");
 			mainWin->mainWindowProgressBar->reset();
 		}
@@ -1304,7 +1304,7 @@ void PaintManagerDialog::loadVectors(QString data)
 		FileLoader *fileLoader = new FileLoader(data);
 		int testResult = fileLoader->testFile();
 		delete fileLoader;
-		if ((testResult != -1) && (testResult >= FORMATID_ODGIMPORT))
+		if ((testResult != -1) && (testResult >= FORMATID_FIRSTUSER))
 		{
 			const FileFormat * fmt = LoadSavePlugin::getFormatById(testResult);
 			if( fmt )
@@ -1839,7 +1839,7 @@ void PaintManagerDialog::saveDefaults()
 	QTreeWidgetItem* item = LoadColSet->currentItem();
 	QString NameK = item->data(0, Qt::UserRole).toString() + "/" + item->text(0);
 	QString Name = LoadColSet->text();
-	Query* dia = new Query(this, "Name", 1, 0, tr("&Name:"), tr("Choose a Name"));
+	Query* dia = new Query(this, "Name", 1, tr("&Name:"), tr("Choose a Name"));
 	if ((customColSet.contains(NameK)) && (!paletteLocked))
 		dia->setEditText(Name, false);
 	else

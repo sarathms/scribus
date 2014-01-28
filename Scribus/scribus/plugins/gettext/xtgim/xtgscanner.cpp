@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
 *   You should have received a copy of the GNU General Public License     *
 *   along with this program; if not, write to the                         *
 *   Free Software Foundation, Inc.,                                       *
-*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+*   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
 ***************************************************************************/
 
 #include "xtgscanner.h"
@@ -34,7 +34,7 @@ for which a new license (GPL+exception) is in place.
 
 class ScribusDoc;
 
-XtgScanner::XtgScanner ( QString documentName,TextWriter *wr,QString& buffer, bool textOnly, bool prefix)
+XtgScanner::XtgScanner (QString documentName, TextWriter *wr, QString& buffer, bool textOnly, bool prefix)
 {
 	writer = wr;
 	docname = documentName;
@@ -322,15 +322,11 @@ void XtgScanner::setFont()
 		QList<QString> List = ((*(doc->AllFonts)).keys());
 		QStringList filter = static_cast<QStringList>(List).filter(token);
 		if (!filter.empty())
-		List = filter;
+			List = filter;
 		FontSelect *f = new FontSelect(static_cast<QStringList>(List));
 		if (f->exec())
-		{
 			token = f->setFont();
-			delete f;
-		}
-		else
-			delete f;
+		delete f;
 	}
 	curFontUsed = (*(doc->AllFonts)).value(token);
 	/* Now we check whether isBold=true and isItalic=true. If yes, we will set those */
@@ -1253,12 +1249,18 @@ scannerMode XtgScanner::previousState()
 
 QChar XtgScanner::lookAhead()
 {
-	return input_Buffer.at ( top );
+	QChar ch = QChar(0);
+	if (top < input_Buffer.length())
+		ch = input_Buffer.at(top);
+	return ch;
 }
 
 QChar XtgScanner::nextSymbol()
 {
-	return input_Buffer.at ( top++ );
+	QChar ch = QChar(0);
+	if (top < input_Buffer.length())
+		ch = input_Buffer.at(top++);
+	return ch;
 }
 
 void XtgScanner::flushText()
@@ -1365,6 +1367,8 @@ void XtgScanner::xtgParse()
 			}
 			currentCharStyle = writer->getCurrentCharStyle();
 		}
+		if (top == input_Buffer.length())
+			break;
 	}
 	writer->appendText(textToAppend);
 	qDebug()<<"Unsupported : "<<unSupported;

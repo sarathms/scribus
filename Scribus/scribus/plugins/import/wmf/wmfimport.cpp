@@ -276,12 +276,12 @@ FPointArray WMFImport::pointsToPolyline( const FPointArray& points, bool closePa
 	double x = 0.0, y = 0.0;
 	FPointArray polyline;
 	polyline.svgInit();
-	for( uint i = 0; i < points.size(); ++i )
+	for (int i = 0; i < points.size(); ++i )
 	{
 		FPoint point = points.point(i);
 		x = point.x();
 		y = point.y();
-		if( bFirst )
+		if (bFirst)
 		{
 			polyline.svgMoveTo(x, y);
 			bFirst = false;
@@ -538,8 +538,10 @@ bool WMFImport::loadWMF( QBuffer &buffer )
 				m_BBox.setTop ( qMin((int) cmd->params[ 0 ], m_BBox.top()) );
 			}
 			if ( rdFunc == 0x020C && !m_IsPlaceable ) {         // SETWINDOWEXT: dimensions
-				m_BBox.setWidth ( qMax((int) cmd->params[ 1 ], m_BBox.width()) );
-				m_BBox.setHeight( qMax((int) cmd->params[ 0 ], m_BBox.height()));
+				m_BBox.setWidth((int) cmd->params[ 1 ]);
+				m_BBox.setHeight((int) cmd->params[ 0 ]);
+//				m_BBox.setWidth ( qMax((int) cmd->params[ 1 ], m_BBox.width()) );
+//				m_BBox.setHeight( qMax((int) cmd->params[ 0 ], m_BBox.height()));
 			}
 
 			if ( i<rdSize )
@@ -548,6 +550,7 @@ bool WMFImport::loadWMF( QBuffer &buffer )
 				return false;
 			}
 		}
+		m_BBox = m_BBox.normalized();
 		//----- Test records validities
 		m_Valid = (rdFunc == 0) && (m_BBox.width() != 0) && (m_BBox.height() != 0);
 		if ( !m_Valid ) {
@@ -592,11 +595,11 @@ bool WMFImport::importWMF(const TransactionSettings& trSettings, int flags)
 			m_Doc->setPageOrientation(0);
 		m_Doc->setPageSize("Custom");
 	}
-	if (!(flags & LoadSavePlugin::lfLoadAsPattern))
+	if ((!(flags & LoadSavePlugin::lfLoadAsPattern)) && (m_Doc->view() != NULL))
 		m_Doc->view()->Deselect();
 	m_Doc->setLoading(true);
 	m_Doc->DoDrawing = false;
-	if (!(flags & LoadSavePlugin::lfLoadAsPattern))
+	if ((!(flags & LoadSavePlugin::lfLoadAsPattern)) && (m_Doc->view() != NULL))
 		m_Doc->view()->updatesOn(false);
 	m_Doc->scMW()->setScriptRunning(true);
 	qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
@@ -604,6 +607,7 @@ bool WMFImport::importWMF(const TransactionSettings& trSettings, int flags)
 	m_Doc->PageColors.ensureDefaultColors();
 	//m_gc.push( gc );
 	QList<PageItem*> Elements = parseWmfCommands();
+	qApp->restoreOverrideCursor();
 	if (flags & LoadSavePlugin::lfCreateDoc)
 	{
 		m_Doc->documentInfo().setTitle(m_docTitle);
@@ -627,7 +631,6 @@ bool WMFImport::importWMF(const TransactionSettings& trSettings, int flags)
 	m_Doc->scMW()->setScriptRunning(false);
 	if (interactive)
 		m_Doc->setLoading(false);
-	qApp->setOverrideCursor(QCursor(Qt::ArrowCursor));
 	if ((Elements.count() > 0) && (!ret) && (interactive))
 	{
 		if (flags & LoadSavePlugin::lfScripted)
@@ -645,7 +648,8 @@ bool WMFImport::importWMF(const TransactionSettings& trSettings, int flags)
 				}
 				m_Doc->m_Selection->delaySignalsOff();
 				m_Doc->m_Selection->setGroupRect();
-				m_Doc->view()->updatesOn(true);
+				if (m_Doc->view() != NULL)
+					m_Doc->view()->updatesOn(true);
 			}
 			importCanceled = false;
 		}
@@ -682,7 +686,7 @@ bool WMFImport::importWMF(const TransactionSettings& trSettings, int flags)
 		m_Doc->setLoading(false);
 		m_Doc->changed();
 		m_Doc->reformPages();
-		if (!(flags & LoadSavePlugin::lfLoadAsPattern))
+		if ((!(flags & LoadSavePlugin::lfLoadAsPattern)) && (m_Doc->view() != NULL))
 			m_Doc->view()->updatesOn(true);
 		m_Doc->setLoading(loadF);
 	}
@@ -736,7 +740,7 @@ QList<PageItem*> WMFImport::parseWmfCommands(void)
 				str += param;
 				str += " ";
 			}
-			cerr << str.toAscii().data() << endl;
+			cerr << str.toLatin1().data() << endl;
 		}
 	}
 	return elements;

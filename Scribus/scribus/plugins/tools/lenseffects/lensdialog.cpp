@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
 *   You should have received a copy of the GNU General Public License     *
 *   along with this program; if not, write to the                         *
 *   Free Software Foundation, Inc.,                                       *
-*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+*   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
 ***************************************************************************/
 
 #include "lensdialog.h"
@@ -45,12 +45,11 @@ LensItem::LensItem(QRectF geom, LensDialog *parent) : QGraphicsRectItem(geom)
 	radialGrad.setColorAt(0.0, QColor(255, 0, 0, 127));
 	radialGrad.setColorAt(0.1, QColor(255, 0, 0, 127));
 	radialGrad.setColorAt(1.0, QColor(255, 255, 255, 0));
-#if QT_VERSION  >= 0x040301
 	radialGrad.setCoordinateMode(QGradient::ObjectBoundingMode);
-#endif
 	setBrush(radialGrad);
 	setFlags(QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
-	setAcceptsHoverEvents(true);
+	acceptHoverEvents();
+
 }
 
 void LensItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
@@ -61,9 +60,7 @@ void LensItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
 	radialGrad.setColorAt(0.0, QColor(255, 0, 0, 127));
 	radialGrad.setColorAt(0.1, QColor(255, 0, 0, 127));
 	radialGrad.setColorAt(1.0, QColor(255, 255, 255, 0));
-#if QT_VERSION  >= 0x040301
 	radialGrad.setCoordinateMode(QGradient::ObjectBoundingMode);
-#endif
 	painter->setBrush(radialGrad);
 	painter->drawEllipse(rect().toRect());
 	if (option->state & QStyle::State_Selected)
@@ -295,7 +292,7 @@ void LensDialog::addItemsToScene(Selection* itemSelection, ScribusDoc *doc, QGra
 		{
 			scene.addItem(pItem);
 			pItem->setPos(currItem->xPos() - gx, currItem->yPos() - gy);
-			pItem->rotate(currItem->rotation());
+			pItem->setRotation(currItem->rotation());
 		}
 		else
 		{

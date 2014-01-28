@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
 *   You should have received a copy of the GNU General Public License     *
 *   along with this program; if not, write to the                         *
 *   Free Software Foundation, Inc.,                                       *
-*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+*   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
 ***************************************************************************/
 
 #include "replacecolors.h"
@@ -46,13 +46,13 @@ replaceColorsDialog::replaceColorsDialog(QWidget* parent, ColorList &colorList, 
 	rgbIcon = loadIcon("rgb.png", true);
 	spotIcon = loadIcon("spot.png", true);
 	regIcon = loadIcon("register.png", true);
-	replacementTable->horizontalHeader()->setMovable(false);
-	replacementTable->horizontalHeader()->setClickable(false);
-	replacementTable->horizontalHeader()->setResizeMode(QHeaderView::Stretch);
+	replacementTable->horizontalHeader()->setSectionsClickable(false );
+	replacementTable->horizontalHeader()->setSectionsMovable( false );
+	replacementTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 	replacementTable->setHorizontalHeaderItem(0, new QTableWidgetItem( tr("Original")));
 	replacementTable->setHorizontalHeaderItem(1, new QTableWidgetItem( tr("Replacement")));
-	replacementTable->verticalHeader()->setMovable(false);
-	replacementTable->verticalHeader()->setResizeMode(QHeaderView::Fixed);
+	replacementTable->verticalHeader()->setSectionsMovable( false );
+	replacementTable->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
 	replacementTable->verticalHeader()->hide();
 	replacementTable->setIconSize(QSize(60, 15));
 	updateReplacementTable();

@@ -14,7 +14,7 @@ for which a new license (GPL+exception) is in place.
 
 // On Qt/Mac we need CoreFoundation to discover the location
 // of the app bundle.
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
@@ -55,14 +55,15 @@ ScPaths::ScPaths() :
 	m_iconDir(ICONDIR),
 	m_libDir(LIBDIR),
 	m_pluginDir(PLUGINDIR),
+	m_qmlDir(QMLDIR),
 	m_sampleScriptDir(SAMPLESDIR),
 	m_scriptDir(SCRIPTSDIR),
-	m_templateDir(TEMPLATEDIR),
-	m_shareDir(SHAREDIR)
+	m_shareDir(SHAREDIR),
+	m_templateDir(TEMPLATEDIR)
 {
 // On MacOS/X, override the compile-time settings with a location
 // obtained from the system.
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
 	QString pathPtr(bundleDir());
 	qDebug() << QString("scpaths: bundle at %1").arg(pathPtr);
 	m_shareDir = QString("%1/Contents/share/scribus/").arg(pathPtr);
@@ -73,8 +74,9 @@ ScPaths::ScPaths() :
 	m_templateDir = QString("%1/Contents/share/scribus/templates/").arg(pathPtr);
 	m_libDir = QString("%1/Contents/lib/scribus/").arg(pathPtr);
 	m_pluginDir = QString("%1/Contents/lib/scribus/plugins/").arg(pathPtr);
-	QApplication::setLibraryPaths(QStringList(QString("%1/Contents/lib/qtplugins/").arg(pathPtr)));
-
+	m_qmlDir = QString("%1/Contents/share/scribus/qml/").arg(pathPtr);
+	//QApplication::setLibraryPaths(QStringList(QString("%1/Contents/lib/qtplugins/").arg(pathPtr)));
+	QApplication::addLibraryPath(QString("%1/Contents/lib/qtplugins/").arg(pathPtr));
 	// on OSX this goes to the sys console, so user only sees it when they care -- AV
 	qDebug() << QString("scpaths: doc dir=%1").arg(m_docDir);
 	qDebug() << QString("scpaths: icon dir=%1").arg(m_iconDir);
@@ -84,6 +86,7 @@ ScPaths::ScPaths() :
 	qDebug() << QString("scpaths: template dir=%1").arg(m_templateDir);
 	qDebug() << QString("scpaths: lib dir=%1").arg(m_libDir);
 	qDebug() << QString("scpaths: plugin dir=%1").arg(m_pluginDir);
+	qDebug() << QString("scpaths: QML dir=%1").arg(m_qmlDir);
 	qDebug() << QString("scpaths: qtplugins=%1").arg(QApplication::libraryPaths().join(":"));
 
 #elif defined(_WIN32)
@@ -97,7 +100,11 @@ ScPaths::ScPaths() :
 	m_templateDir = QString("%1/share/templates/").arg(appPath);
 	m_libDir = QString("%1/libs/").arg(appPath);
 	m_pluginDir = QString("%1/plugins/").arg(appPath);
-	QApplication::setLibraryPaths( QStringList(QString("%1/qtplugins/").arg(appPath)) );
+	m_qmlDir = QString("%1/share/qml/").arg(appPath);
+
+	QString qtpluginDir = QString("%1/qtplugins/").arg(appPath);
+	if (QDir(qtpluginDir).exists())
+		QApplication::setLibraryPaths( QStringList(qtpluginDir) );
 #endif
 	
 // 	if(!m_shareDir.endsWith("/"))        m_shareDir += "/";
@@ -117,7 +124,7 @@ QString ScPaths::bundleDir(void) const
 {
 	// On MacOS/X, override the compile-time settings with a location
 // obtained from the system.
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
 	// Set up the various app paths to look inside the app bundle
 	CFURLRef pluginRef = CFBundleCopyBundleURL(CFBundleGetMainBundle());
 	CFStringRef macPath = CFURLCopyFileSystemPath(pluginRef, kCFURLPOSIXPathStyle);
@@ -212,6 +219,11 @@ const QString&  ScPaths::shareDir() const
 	return m_shareDir;
 }
 
+const QString&  ScPaths::qmlDir() const
+{
+	return m_qmlDir;
+}
+
 QString ScPaths::translationDir() const
 {
 	return (m_shareDir + "translations/");
@@ -274,7 +286,7 @@ QStringList ScPaths::spellDirs() const
 		foreach (dir, dictDirList)
 			spellDirs.append(progFiles+windowsLOPath + "/" + dir + "/");
 	}
-#elif defined(Q_WS_X11)
+#elif defined(Q_OS_LINUX)
 	d.setPath(linuxHunspellPath);
 	if (d.exists())
 		spellDirs.append(linuxHunspellPath);
@@ -309,7 +321,7 @@ QStringList ScPaths::getSystemProfilesDirs(void)
 	iccProfDirs.append(QDir::homePath()+"/Library/ColorSync/Profiles/");
 	iccProfDirs.append("/System/Library/ColorSync/Profiles/");
 	iccProfDirs.append("/Library/ColorSync/Profiles/");
-#elif defined(Q_WS_X11)
+#elif defined(Q_OS_LINUX)
 	iccProfDirs.append(QDir::homePath()+"/color/icc/");
 	iccProfDirs.append(QDir::homePath()+"/.color/icc/");
 	iccProfDirs.append(QDir::homePath()+"/.local/share/color/icc/");
@@ -372,7 +384,7 @@ QStringList ScPaths::getSystemCreateSwatchesDirs(void)
 #ifdef Q_OS_MAC
 	createDirs.append(QDir::homePath()+"/create/swatches/");
 	createDirs.append(QDir::homePath()+"/.create/swatches/");
-#elif defined(Q_WS_X11)
+#elif defined(Q_OS_LINUX)
 	createDirs.append(QDir::homePath()+"/create/swatches/");
 	createDirs.append(QDir::homePath()+"/.create/swatches/");
 	createDirs.append("/usr/share/create/swatches/");

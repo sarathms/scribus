@@ -76,29 +76,25 @@ OODrawImportPlugin::OODrawImportPlugin() :
 {
 	// Set action info in languageChange, so we only have to do
 	// it in one place. This includes registering file formats.
+	registerFormats();
 	languageChange();
 }
-/*
-void OODrawImportPlugin::addToMainWindowMenu(ScribusMainWindow *mw)
-{
-	// Then hook up the action
-	importAction->setEnabled(true);
-	connect( importAction, SIGNAL(triggered()), SLOT(import()) );
-	mw->scrMenuMgr->addMenuItem(importAction, "FileImport");
-}
-*/
+
 OODrawImportPlugin::~OODrawImportPlugin()
 {
 	unregisterAll();
 	// note: importAction is automatically deleted by Qt
-};
+}
 
 void OODrawImportPlugin::languageChange()
 {
 	importAction->setText( tr("Import &OpenOffice.org Draw..."));
-	// (Re)register file formats
-	unregisterAll();
-	registerFormats();
+	FileFormat* fmt = getFormatByExt("odg");
+	fmt->trName = tr("OpenDocument 1.0 Draw", "Import/export format name");
+	fmt->filter = tr("OpenDocument 1.0 Draw (*.odg *.ODG)");
+	FileFormat* fmt2 = getFormatByExt("sxd");
+	fmt2->trName = tr("OpenOffice.org 1.x Draw", "Import/export format name");
+	fmt2->filter = tr("OpenOffice.org 1.x Draw (*.sxd *.SXD)");
 }
 
 const QString OODrawImportPlugin::fullTrName() const
@@ -128,9 +124,8 @@ void OODrawImportPlugin::registerFormats()
 	QString odtName = tr("OpenDocument 1.0 Draw", "Import/export format name");
 	FileFormat odtformat(this);
 	odtformat.trName = odtName; // Human readable name
-	odtformat.formatId = FORMATID_ODGIMPORT;
+	odtformat.formatId = 0;
 	odtformat.filter = odtName + " (*.odg *.ODG)"; // QFileDialog filter
-	odtformat.nameMatch = QRegExp("\\.odg$", Qt::CaseInsensitive);
 	odtformat.fileExtensions = QStringList() << "odg";
 	odtformat.load = true;
 	odtformat.save = false;
@@ -142,9 +137,8 @@ void OODrawImportPlugin::registerFormats()
 	QString sxdName = tr("OpenOffice.org 1.x Draw", "Import/export format name");
 	FileFormat sxdformat(this);
 	sxdformat.trName = sxdName; // Human readable name
-	sxdformat.formatId = FORMATID_SXDIMPORT;
+	sxdformat.formatId = 0;
 	sxdformat.filter = sxdName + " (*.sxd *.SXD)"; // QFileDialog filter
-	sxdformat.nameMatch = QRegExp("\\.sxd$", Qt::CaseInsensitive);
 	sxdformat.fileExtensions = QStringList() << "sxd";
 	sxdformat.load = true;
 	sxdformat.save = false;
@@ -513,7 +507,7 @@ bool OODPlug::convert(const TransactionSettings& trSettings, int flags)
 	if (!(flags & LoadSavePlugin::lfLoadAsPattern))
 		m_Doc->view()->updatesOn(false);
 	m_Doc->scMW()->setScriptRunning(true);
-	qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+	qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 	if (!m_Doc->PageColors.contains("Black"))
 		m_Doc->PageColors.insert("Black", ScColor(0, 0, 0, 255));
 	for( QDomNode drawPag = drawPagePNode.firstChild(); !drawPag.isNull(); drawPag = drawPag.nextSibling() )
@@ -586,10 +580,7 @@ bool OODPlug::convert(const TransactionSettings& trSettings, int flags)
 			}
 			tmpSel->setGroupRect();
 			ScElemMimeData* md = ScriXmlDoc::WriteToMimeData(m_Doc, tmpSel);
-/*#ifndef Q_WS_MAC*/
-// see #2196, #2526
 			m_Doc->itemSelection_DeleteItem(tmpSel);
-/*#endif*/
 			m_Doc->view()->updatesOn(true);
 			m_Doc->m_Selection->delaySignalsOff();
 			// We must copy the TransationSettings object as it is owned
@@ -611,6 +602,7 @@ bool OODPlug::convert(const TransactionSettings& trSettings, int flags)
 			m_Doc->view()->updatesOn(true);
 		m_Doc->setLoading(loadF);
 	}
+	qApp->restoreOverrideCursor();
 	return true;
 }
 
@@ -1041,13 +1033,13 @@ void OODPlug::parseStyle(OODrawStyle& oostyle, const QDomElement &e)
 				{
 					const ScColor& col1 = m_Doc->PageColors[c];
 					const ScColor& col2 = m_Doc->PageColors[c2];
-					oostyle.gradient.addStop( ScColorEngine::getRGBColor(col2, m_Doc), 0.0, 0.5, 1, c2, shadeE );
-					oostyle.gradient.addStop( ScColorEngine::getRGBColor(col1, m_Doc), 1.0 - border, 0.5, 1, c, shadeS );
+					oostyle.gradient.addStop( ScColorEngine::getShadeColor(col2, m_Doc, shadeE), 0.0, 0.5, 1, c2, shadeE );
+					oostyle.gradient.addStop( ScColorEngine::getShadeColor(col1, m_Doc, shadeS), 1.0 - border, 0.5, 1, c, shadeS );
 				}
 				else
 				{
-					oostyle.gradient.addStop( ScColorEngine::getRGBColor(col1, m_Doc), border, 0.5, 1, c, shadeS );
-					oostyle.gradient.addStop( ScColorEngine::getRGBColor(col2, m_Doc), 1.0, 0.5, 1, c2, shadeE );
+					oostyle.gradient.addStop( ScColorEngine::getShadeColor(col1, m_Doc, shadeS), border, 0.5, 1, c, shadeS );
+					oostyle.gradient.addStop( ScColorEngine::getShadeColor(col2, m_Doc, shadeE), 1.0, 0.5, 1, c2, shadeE );
 				}
 			}
 		}

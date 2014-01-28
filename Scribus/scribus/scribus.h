@@ -165,6 +165,7 @@ public:
 	void recalcColors(QProgressBar *dia = 0);
 	void SwitchWin();
 	void RestoreBookMarks();
+	QStringList  scrapbookNames();
 
 	void emergencySave();
 
@@ -538,6 +539,7 @@ public slots:
 	//connected to signal emited by actions when "Update Marks" menu item is triggered
 	void slotUpdateMarks();
 	bool editMarkDlg(Mark *mrk, PageItem_TextFrame* currItem = NULL);
+	void testQTQuick2_1();
 
 signals:
 	void AppModeChanged(int oldMode, int newMode);
@@ -558,6 +560,7 @@ private:
     /** init methods */
 	void initSplash(bool showSplash);
 	void initMenuBar(); // initMenuBar creates the menu_bar and inserts the menuitems
+	void createMenuBar();
 	void addDefaultWindowMenuItems(); // addDefaultWindowMenuItems adds the basic Windows menu items, excluding the actual list of windows
 	void initStatusBar(); // setup the statusbar
 	void initToolBars(); // setup the toolbars
@@ -636,6 +639,7 @@ private:
 	bool insertMarkDialog(PageItem_TextFrame* item, MarkType mT, ScItemsState* &is);
 	int m_marksCount; //remember marks count from last call
 	bool m_WasAutoSave;
+	bool m_pagePalVisible;
 };
 
 #endif

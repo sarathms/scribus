@@ -98,7 +98,13 @@ BarcodeGenerator::BarcodeGenerator(QWidget* parent, const char* name)
 								 tr("Variable number of hexadecimal characters"),
 								 "[0-9A-F]*",
 								false, true);
+	map["QR Code"] = BarcodeType("qrcode", "http://www.scribus.net",
+								 tr("Variable number of characters, digits and any symbols."),
+								 ".*",
+								false, false);
 	//    "Symbol"] = "symbol"
+
+	initializeQROptions();
 
 	useSamples = true;
 	guiColor = ui.codeEdit->palette().color(QPalette::Window);
@@ -155,6 +161,37 @@ BarcodeGenerator::~BarcodeGenerator()
 	QFile::remove(tmpFile);
 }
 
+void BarcodeGenerator::initializeQROptions()
+{
+	QStringList qrEccKeys, qrEccValues;
+
+	ui.formatCombo->addItem("Standard", "format=full");
+	ui.formatCombo->addItem("Micro", "format=micro");
+
+	ui.eccCombo->addItem("Auto", "");
+	ui.eccCombo->addItem("L", "");
+	ui.eccCombo->addItem("M", "eclevel=M");
+	ui.eccCombo->addItem("Q", "eclevel=Q");
+	ui.eccCombo->addItem("H", "eclevel=H");
+
+    qrOptionsEnabled(false);
+	connect(ui.formatCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(bcComboChanged(int)));
+	connect(ui.eccCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(bcComboChanged(int)));
+}
+
+void BarcodeGenerator::qrOptionsEnabled(bool enabled) 
+{
+	ui.formatLabel->setEnabled(enabled);
+	ui.formatCombo->setEnabled(enabled);
+	ui.eccLabel->setEnabled(enabled);
+	ui.eccCombo->setEnabled(enabled);
+}
+
+void BarcodeGenerator::bcComboChanged(int i)
+{
+	bcComboChanged();
+}
+
 void BarcodeGenerator::bcComboChanged()
 {
 	if (ui.bcCombo->currentIndex() == 0)
@@ -163,8 +200,8 @@ void BarcodeGenerator::bcComboChanged()
 		ui.sampleLabel->setText(tr("Select Type"));
 		return;
 	}
-	else
-		ui.okButton->setEnabled(true);
+	
+ui.okButton->setEnabled(true);
 
 	QString s = ui.bcCombo->currentText();
 	ui.commentEdit->setText(map[s].comment);
@@ -180,6 +217,11 @@ void BarcodeGenerator::bcComboChanged()
 		ui.includeCheckInText->setEnabled(map[s].includeCheckInText ? true : false);
 	else
 		ui.includeCheckInText->setEnabled(false);
+
+	if (QString::compare(s, "QR Code") == 0)
+		qrOptionsEnabled(true);
+	else
+		qrOptionsEnabled(false);
 
 	codeEdit_check(ui.codeEdit->text());
 	paintBarcode();
@@ -256,7 +298,7 @@ void BarcodeGenerator::okButton_pressed()
 	// no need to call paintBarcode(tmpFile, 300); because
 	// it's created by previous run...
 	hide();
-	const FileFormat * fmt = LoadSavePlugin::getFormatById(FORMATID_PSIMPORT);
+	const FileFormat * fmt = LoadSavePlugin::getFormatByExt("ps");
 
 	QSharedPointer<UndoTransaction> tran;
 	if (UndoManager::undoEnabled())
@@ -330,6 +372,18 @@ bool BarcodeGenerator::paintBarcode(QString fileName, int dpi)
 		opts += " includecheckintext";
 	if (ui.includeCheck->isChecked() & ui.includeCheck->isEnabled())
 		opts += " includecheck";
+	if (ui.formatCombo->isEnabled())
+	{
+		int index = ui.formatCombo->currentIndex();
+		QVariant currentData = ui.formatCombo->itemData(index);
+		opts += " " + currentData.toString();
+	}
+	if (ui.eccCombo->isEnabled())
+	{
+		int index = ui.eccCombo->currentIndex();
+		QVariant currentData = ui.eccCombo->itemData(index);
+		opts += " " + currentData.toString();
+	}
 	QString comm("15 10 moveto (%1) (%2) /%3 /uk.co.terryburton.bwipp findresource exec");
 	comm = comm.arg(ui.codeEdit->text()).arg(opts).arg(map[ui.bcCombo->currentText()].command);
 	comm = psCommand + comm;

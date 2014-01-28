@@ -378,21 +378,35 @@ void SVGExPlug::ProcessItemOnPage(double xOffset, double yOffset, PageItem *Item
 					if (Item->fillTransparency() != 0)
 						ob.setAttribute("opacity", FToStr(1.0 - Item->fillTransparency()));
 				}
-				QString tr = trans + QString(" scale(%1, %2)").arg(Item->width() / Item->groupWidth).arg(Item->height() / Item->groupHeight);
+				QString tr = trans;
+				if (Item->imageFlippedH())
+				{
+					tr += QString(" translate(%1, 0.0)").arg(Item->width());
+					tr += QString(" scale(-1.0, 1.0)");
+				}
+				if (Item->imageFlippedV())
+				{
+					tr += QString(" translate(0.0, %1)").arg(Item->height());
+					tr += QString(" scale(1.0, -1.0)");
+				}
+				tr += QString(" scale(%1, %2)").arg(Item->width() / Item->groupWidth).arg(Item->height() / Item->groupHeight);
 				ob.setAttribute("transform", tr);
 				ob.setAttribute("style", "fill:none; stroke:none");
-				QDomElement obc = docu.createElement("clipPath");
-				obc.setAttribute("id", "Clip"+IToStr(ClipCount));
-				QDomElement cl = docu.createElement("path");
-				cl.setAttribute("d", SetClipPath(&Item->PoLine, true));
-				obc.appendChild(cl);
-				globalDefs.appendChild(obc);
-				ob.setAttribute("clip-path", "url(#Clip"+IToStr(ClipCount)+")");
-				if (Item->fillRule)
-					ob.setAttribute("clip-rule", "evenodd");
-				else
-					ob.setAttribute("clip-rule", "nonzero");
-				ClipCount++;
+				if (Item->groupClipping())
+				{
+					FPointArray clipPath = Item->PoLine;
+					QTransform transform;
+					transform.scale(Item->width() / Item->groupWidth, Item->height() / Item->groupHeight);
+					transform = transform.inverted();
+					clipPath.map(transform);
+					QDomElement obc = createClipPathElement(&clipPath);
+					if (!obc.isNull())
+						ob.setAttribute("clip-path", "url(#"+ obc.attribute("id") + ")");
+					if (Item->fillRule)
+						ob.setAttribute("clip-rule", "evenodd");
+					else
+						ob.setAttribute("clip-rule", "nonzero");
+				}
 				for (int em = 0; em < Item->groupItemList.count(); ++em)
 				{
 					PageItem* embed = Item->groupItemList.at(em);
@@ -662,12 +676,10 @@ QDomElement SVGExPlug::processSymbolStroke(PageItem *Item, QString trans)
 	{
 		double currPerc = path.percentAtLength(xpos);
 		double currAngle = path.angleAtPercent(currPerc);
-#if QT_VERSION  >= 0x040400
 		if (currAngle <= 180.0)
 			currAngle *= -1.0;
 		else
 			currAngle = 360.0 - currAngle;
-#endif
 		QPointF currPoint = path.pointAtPercent(currPerc);
 		QTransform trans;
 		trans.translate(currPoint.x(), currPoint.y());
@@ -704,13 +716,13 @@ QDomElement SVGExPlug::processSymbolStroke(PageItem *Item, QString trans)
 QDomElement SVGExPlug::processSymbolItem(PageItem *Item, QString trans)
 {
 	QDomElement ob;
+	ScPattern pat = m_Doc->docPatterns[Item->pattern()];
 	ob = docu.createElement("use");
 	ob.setAttribute("x", "0");
 	ob.setAttribute("y", "0");
-	ob.setAttribute("width", FToStr(Item->width()));
-	ob.setAttribute("height", FToStr(Item->height()));
+	ob.setAttribute("width", FToStr(pat.width));
+	ob.setAttribute("height", FToStr(pat.height));
 	ob.setAttribute("xlink:href", "#S"+Item->pattern());
-	ScPattern pat = m_Doc->docPatterns[Item->pattern()];
 	QString tr = trans + QString(" scale(%1, %2)").arg(Item->width() / pat.width).arg(Item->height() / pat.height);
 	ob.setAttribute("transform", tr);
 	return ob;
@@ -810,31 +822,31 @@ QDomElement SVGExPlug::processImageItem(PageItem *Item, QString trans, QString f
 	}
 	if ((Item->PictureIsAvailable) && (!Item->Pfile.isEmpty()))
 	{
-		QDomElement ob2 = docu.createElement("clipPath");
-		ob2.setAttribute("id", "Clip"+IToStr(ClipCount));
-		ob2.setAttribute("clipPathUnits", "userSpaceOnUse");
-		ob2.setAttribute("clip-rule", "evenodd");
-		QDomElement cl = docu.createElement("path");
+		QDomElement cl, ob2;
 		if (Item->imageClip.size() != 0)
-			cl.setAttribute("d", SetClipPath(&Item->imageClip, true));
+			ob2 = createClipPathElement(&Item->imageClip, &cl);
 		else
-			cl.setAttribute("d", SetClipPath(&Item->PoLine, true));
-		QTransform mpc;
-		if (Item->imageFlippedH())
+			ob2 = createClipPathElement(&Item->PoLine, &cl);
+		if (!ob2.isNull())
 		{
-			mpc.translate(Item->width(), 0);
-			mpc.scale(-1, 1);
+			ob2.setAttribute("clipPathUnits", "userSpaceOnUse");
+			ob2.setAttribute("clip-rule", "evenodd");
+			QTransform mpc;
+			if (Item->imageFlippedH())
+			{
+				mpc.translate(Item->width(), 0);
+				mpc.scale(-1, 1);
+			}
+			if (Item->imageFlippedV())
+			{
+				mpc.translate(0, Item->height());
+				mpc.scale(1, -1);
+			}
+			cl.setAttribute("transform", MatrixToStr(mpc));
 		}
-		if (Item->imageFlippedV())
-		{
-			mpc.translate(0, Item->height());
-			mpc.scale(1, -1);
-		}
-		cl.setAttribute("transform", MatrixToStr(mpc));
-		ob2.appendChild(cl);
-		globalDefs.appendChild(ob2);
 		QDomElement ob6 = docu.createElement("g");
-		ob6.setAttribute("clip-path", "url(#Clip"+IToStr(ClipCount)+")");
+		if (!ob2.isNull())
+			ob6.setAttribute("clip-path", "url(#" + ob2.attribute("id") + ")");
 		QDomElement ob3 = docu.createElement("image");
 		ScImage img;
 		CMSettings cms(m_Doc, Item->IProfile, Item->IRender);
@@ -879,7 +891,6 @@ QDomElement SVGExPlug::processImageItem(PageItem *Item, QString trans, QString f
 		}
 		mpa.rotate(Item->imageRotation());
 		ob3.setAttribute("transform", MatrixToStr(mpa));
-		ClipCount++;
 		ob6.appendChild(ob3);
 		ob.appendChild(ob6);
 	}
@@ -943,7 +954,7 @@ QDomElement SVGExPlug::processTextItem(PageItem *Item, QString trans, QString fi
 		{
 			x = 0.0;
 			y = 0.0;
-			ScText * hl = Item->itemText.item(a);
+			ScText * hl = Item->itemText.item_p(a);
 			const CharStyle& charStyle(Item->itemText.charStyle(a));
 			chstr = Item->itemText.text(a,1);
 			if ((chstr == QChar(13)) || (chstr == QChar(29)))
@@ -992,7 +1003,7 @@ QDomElement SVGExPlug::processTextItem(PageItem *Item, QString trans, QString fi
 				chma3.translate(-wide, 0);
 			}
 			chma4.translate(0, Item->BaseOffs - (charStyle.fontSize() / 10.0) * hl->glyph.scaleV);
-			if (charStyle.effects() & (ScStyle_Subscript | ScStyle_Superscript | ScStyle_DropCap))
+			if (charStyle.effects() & (ScStyle_Subscript | ScStyle_Superscript | ScLayout_DropCap))
 				chma6.translate(0, hl->glyph.yoffset);
 			if (hl->baselineOffset() != 0)
 				chma6.translate(0, (-charStyle.fontSize() / 10.0) * (charStyle.baselineOffset() / 1000.0));
@@ -1033,7 +1044,7 @@ QDomElement SVGExPlug::processTextItem(PageItem *Item, QString trans, QString fi
 					y = ls.y;
 					double Ulen = hl->glyph.xadvance;
 					double Upos, lw, kern;
-					if (charStyle.effects() & ScStyle_StartOfLine)
+					if (charStyle.effects() & ScLayout_StartOfLine)
 						kern = 0;
 					else
 						kern = charStyle.fontSize() * charStyle.tracking() / 10000.0;
@@ -1090,7 +1101,7 @@ QDomElement SVGExPlug::processTextItem(PageItem *Item, QString trans, QString fi
 					y = ls.y;
 					double Ulen = hl->glyph.xadvance;
 					double Upos, lw, kern;
-					if (charStyle.effects() & ScStyle_StartOfLine)
+					if (charStyle.effects() & ScLayout_StartOfLine)
 						kern = 0;
 					else
 						kern = charStyle.fontSize() * charStyle.tracking() / 10000.0;
@@ -1186,7 +1197,7 @@ QDomElement SVGExPlug::processPathTextItem(PageItem *Item, QString trans, QStrin
 	QString chstr;
 	for (int a = 0; a < Item->asPathText()->itemRenderText.length(); ++a)
 	{
-		ScText *hl = Item->asPathText()->itemRenderText.item(a);
+		ScText *hl = Item->asPathText()->itemRenderText.item_p(a);
 		const CharStyle& charStyle(Item->asPathText()->itemRenderText.charStyle(a));
 		chstr = Item->asPathText()->itemRenderText.text(a,1);
 		if ((chstr == QChar(13)) || (chstr == QChar(29)))
@@ -1256,7 +1267,7 @@ QDomElement SVGExPlug::processPathTextItem(PageItem *Item, QString trans, QStrin
 				chma3.translate(-wide, 0);
 			}
 			chma4.translate(0, Item->BaseOffs - (charStyle.fontSize() / 10.0) * hl->glyph.scaleV);
-			if (charStyle.effects() & (ScStyle_Subscript | ScStyle_Superscript | ScStyle_DropCap))
+			if (charStyle.effects() & (ScStyle_Subscript | ScStyle_Superscript | ScLayout_DropCap))
 				chma6.translate(0, hl->glyph.yoffset);
 			if (hl->baselineOffset() != 0)
 				chma6.translate(0, (-charStyle.fontSize() / 10.0) * (charStyle.baselineOffset() / 1000.0));
@@ -1280,7 +1291,7 @@ QDomElement SVGExPlug::processPathTextItem(PageItem *Item, QString trans, QStrin
 				}
 				double Ulen = hl->glyph.xadvance;
 				double Upos, Uwid, kern;
-				if (hl->effects() & ScStyle_StartOfLine)
+				if (hl->effects() & ScLayout_StartOfLine)
 					kern = 0;
 				else
 					kern = charStyle.fontSize() * charStyle.tracking() / 10000.0;
@@ -1356,7 +1367,7 @@ QDomElement SVGExPlug::processPathTextItem(PageItem *Item, QString trans, QStrin
 				}
 				double Ulen = hl->glyph.xadvance;
 				double Upos, Uwid, kern;
-				if (hl->effects() & ScStyle_StartOfLine)
+				if (hl->effects() & ScLayout_StartOfLine)
 					kern = 0;
 				else
 					kern = charStyle.fontSize() * charStyle.tracking() / 10000.0;
@@ -1502,7 +1513,7 @@ QDomElement SVGExPlug::processArrows(PageItem *Item, QDomElement line, QString t
 		else
 		{
 			FPoint Start = Item->PoLine.point(0);
-			for (uint xx = 1; xx < Item->PoLine.size(); xx += 2)
+			for (int xx = 1; xx < Item->PoLine.size(); xx += 2)
 			{
 				FPoint Vector = Item->PoLine.point(xx);
 				if ((Start.x() != Vector.x()) || (Start.y() != Vector.y()))
@@ -1862,7 +1873,7 @@ QString SVGExPlug::handleMask(PageItem *Item, double xOffset, double yOffset)
 		}
 		else if ((Item->GrMask == 1) || (Item->GrMask == 2) || (Item->GrMask == 4) || (Item->GrMask == 5))
 		{
-			if ((Item->GrMask == 6) || (Item->GrMask == 4))
+			if ((Item->GrMask == 1) || (Item->GrMask == 4))
 			{
 				grad = docu.createElement("linearGradient");
 				grad.setAttribute("x1", FToStr(Item->GrMaskStartX));
@@ -2285,42 +2296,60 @@ QString SVGExPlug::getStrokeStyle(PageItem *Item)
 	return stroke;
 }
 
+QDomElement SVGExPlug::createClipPathElement(FPointArray *ite, QDomElement* pathElem)
+{
+	QString clipPathStr = SetClipPath(ite, true);
+	if (clipPathStr.isEmpty())
+		return QDomElement();
+	QDomElement clipPathElem = docu.createElement("clipPath");
+	clipPathElem.setAttribute("id", "Clip"+IToStr(ClipCount));
+	QDomElement cl = docu.createElement("path");
+	if (pathElem)
+		*pathElem = cl;
+	cl.setAttribute("d", clipPathStr);
+	clipPathElem.appendChild(cl);
+	globalDefs.appendChild(clipPathElem);
+	ClipCount++;
+	return clipPathElem;
+}
+
 QString SVGExPlug::SetClipPath(FPointArray *ite, bool closed)
 {
-	QString tmp = "";
+	QString tmp;
 	FPoint np, np1, np2, np3, np4, firstP;
 	bool nPath = true;
 	bool first = true;
-	if (ite->size() > 3)
+
+	if (ite->size() <= 3)
+		return tmp;
+
+	for (int poi=0; poi<ite->size()-3; poi += 4)
 	{
-		for (uint poi=0; poi<ite->size()-3; poi += 4)
+		if (ite->point(poi).x() > 900000)
 		{
-			if (ite->point(poi).x() > 900000)
-			{
-				nPath = true;
-				continue;
-			}
-			if (nPath)
-			{
-				np = ite->point(poi);
-				if ((!first) && (closed) && (np4 == firstP))
-					tmp += "Z ";
-				tmp += QString("M%1 %2 ").arg(np.x()).arg(np.y());
-				nPath = false;
-				first = false;
-				firstP = np;
-				np4 = np;
-			}
-			np = ite->point(poi);
-			np1 = ite->point(poi+1);
-			np2 = ite->point(poi+3);
-			np3 = ite->point(poi+2);
-			if ((np == np1) && (np2 == np3))
-				tmp += QString("L%1 %2 ").arg(np3.x()).arg(np3.y());
-			else
-				tmp += QString("C%1 %2 %3 %4 %5 %6 ").arg(np1.x()).arg(np1.y()).arg(np2.x()).arg(np2.y()).arg(np3.x()).arg(np3.y());
-			np4 = np3;
+			nPath = true;
+			continue;
 		}
+		if (nPath)
+		{
+			np = ite->point(poi);
+			if ((!first) && (closed) && (np4 == firstP))
+				tmp += "Z ";
+			tmp += QString("M%1 %2 ").arg(np.x()).arg(np.y());
+			nPath = false;
+			first = false;
+			firstP = np;
+			np4 = np;
+		}
+		np = ite->point(poi);
+		np1 = ite->point(poi+1);
+		np2 = ite->point(poi+3);
+		np3 = ite->point(poi+2);
+		if ((np == np1) && (np2 == np3))
+			tmp += QString("L%1 %2 ").arg(np3.x()).arg(np3.y());
+		else
+			tmp += QString("C%1 %2 %3 %4 %5 %6 ").arg(np1.x()).arg(np1.y()).arg(np2.x()).arg(np2.y()).arg(np3.x()).arg(np3.y());
+		np4 = np3;
 	}
 	if (closed)
 		tmp += "Z";

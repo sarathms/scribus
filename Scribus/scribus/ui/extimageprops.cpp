@@ -134,8 +134,8 @@ ExtImageProps::ExtImageProps( QWidget* parent, ImageInfoRecord *info, PageItem *
 		layerTable->setHorizontalHeaderItem(2, new QTableWidgetItem( tr("Name")));
 		QHeaderView* headerH = layerTable->horizontalHeader();
 		headerH->setStretchLastSection(true);
-		headerH->setMovable(false);
-		headerH->setClickable(false);
+		headerH->setSectionsClickable(false );
+		headerH->setSectionsMovable( false );
 		if (info->layerInfo.count() == 1)
 		{
 			layerTable->setColumnWidth(1, 40);
@@ -144,8 +144,8 @@ ExtImageProps::ExtImageProps( QWidget* parent, ImageInfoRecord *info, PageItem *
 		layerTable->setSortingEnabled(false);
 		layerTable->setSelectionBehavior( QAbstractItemView::SelectRows );
 		QHeaderView *Header = layerTable->verticalHeader();
-		Header->setMovable(false);
-		Header->setResizeMode(QHeaderView::Fixed);
+		Header->setSectionsMovable( false );
+		Header->setSectionResizeMode(QHeaderView::Fixed);
 		Header->hide();
 		FlagsSicht.clear();
 		int col2Width = 0;
@@ -249,7 +249,8 @@ ExtImageProps::ExtImageProps( QWidget* parent, ImageInfoRecord *info, PageItem *
 			p->setupPolygon(&Path);
 			p->setPen(Qt::black, 1, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
 			p->setBrush(Qt::white);
-			p->setFillMode(0);
+			p->setFillMode(ScPainter::None);
+			p->setStrokeMode(ScPainter::Solid);
 			p->strokePath();
 			p->end();
 			delete p;

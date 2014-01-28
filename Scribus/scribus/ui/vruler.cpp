@@ -41,14 +41,6 @@ for which a new license (GPL+exception) is in place.
 #include "units.h"
 #include "vruler.h"
 
-#if QT_VERSION  > 0x030102
-	#define SPLITVC Qt::SplitHCursor
-#else
-	#define SPLITVC Qt::SplitVCursor
-#endif
-
-
-
 Vruler::Vruler(ScribusView *pa, ScribusDoc *doc) : QWidget(pa)
 {
 	prefsManager=PrefsManager::instance();
@@ -57,24 +49,25 @@ Vruler::Vruler(ScribusView *pa, ScribusDoc *doc) : QWidget(pa)
 	QPalette palette;
 	palette.setBrush(QPalette::Window, QColor(240, 240, 240));
 	setPalette(palette);
-	currDoc = doc;
-	currView = pa;
+	m_doc = doc;
+	m_view = pa;
 	offs = 0;
 	oldMark = 0;
 	Mpressed = false;
 	drawMark = false;
 	setMouseTracking(true);
-	rulerGesture = new RulerGesture(currView, RulerGesture::VERTICAL);
+	rulerGesture = new RulerGesture(m_view, RulerGesture::VERTICAL);
 	unitChange();
 }
 
 void Vruler::mousePressEvent(QMouseEvent *m)
 {
 	Mpressed = true;
-	if (currDoc->guidesPrefs().guidesShown)
+	if (m_doc->guidesPrefs().guidesShown)
 	{
-		qApp->changeOverrideCursor(QCursor(SPLITVC));
-		currView->startGesture(rulerGesture);
+		qApp->setOverrideCursor(QCursor(Qt::SplitHCursor));
+		m_view->startGesture(rulerGesture);
+		m_view->registerMousePress(m->globalPos());
 	}
 }
 
@@ -83,6 +76,7 @@ void Vruler::mouseReleaseEvent(QMouseEvent *m)
 	if (Mpressed)
 	{
 		rulerGesture->mouseReleaseEvent(m);
+		qApp->restoreOverrideCursor();
 		Mpressed = false;
 	}
 }
@@ -90,27 +84,16 @@ void Vruler::mouseReleaseEvent(QMouseEvent *m)
 void Vruler::mouseMoveEvent(QMouseEvent *m)
 {
 	if (Mpressed)
-	{
 		rulerGesture->mouseMoveEvent(m);
-	}
-	else
-	{
-		QCursor* cursor = qApp->overrideCursor();
-		Qt::CursorShape shape = cursor ? cursor->shape() : Qt::ArrowCursor;
-		if ((shape == Qt::SplitHCursor) || (shape == Qt::SplitVCursor))
-		{
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-		}
-	}
 }
 
 void Vruler::paintEvent(QPaintEvent *e)
 {
-	if (currDoc->isLoading())
+	if (m_doc->isLoading())
 		return;
 	QString tx = "";
 	double xl, frac;
-	double sc = currView->scale();
+	double sc = m_view->scale();
 	QFont ff = font();
 	ff.setPointSize(6);
 	setFont(ff);
@@ -135,7 +118,7 @@ void Vruler::paintEvent(QPaintEvent *e)
 	{
 		p.drawLine(8, qRound(firstMark * sc), 16, qRound(firstMark * sc));
 		int textY = qRound(firstMark * sc)+10;
-		switch (currDoc->unitIndex())
+		switch (m_doc->unitIndex())
 		{
 			case SC_MM:
 				tx = QString::number(markC * iter2 / (iter2 / 100) / cor);
@@ -193,7 +176,7 @@ void Vruler::paintEvent(QPaintEvent *e)
 		}
 		// draw pixmap
 		p.save();
-		p.translate(0, -currView->contentsY());
+		p.translate(0, -m_view->contentsY());
 		p.scale(1.0/(SCALE+1), 1.0/SCALE);
 		p.drawPixmap(0, (where-2)*SCALE, pix);
 		p.restore();
@@ -201,7 +184,7 @@ void Vruler::paintEvent(QPaintEvent *e)
 		p.setBrush(Qt::black);
 		p.setPen(Qt::black);
 		p.setFont(font());
-		double sc = currView->getScale();
+		double sc = m_view->getScale();
 		double cc = height() / sc;
 		double firstMark = ceil(offs / iter) * iter - offs;
 		while (firstMark < cc)
@@ -211,7 +194,7 @@ void Vruler::paintEvent(QPaintEvent *e)
 		}
 #else
 		// draw slim marker
-		p.translate(0, -currView->contentsY());
+		p.translate(0, -m_view->contentsY());
 		p.setPen(Qt::red);
 		p.setBrush(Qt::red);
 		cr.setPoints(5,  5, whereToDraw, 16, whereToDraw, 5, whereToDraw, 0, whereToDraw+2, 0, whereToDraw-2);
@@ -239,7 +222,7 @@ double Vruler::ruleSpacing() {
 void Vruler::Draw(int where)
 {
 	// erase old marker
-	int currentCoor = where - currView->contentsY();
+	int currentCoor = where - m_view->contentsY();
 	whereToDraw = where;
 	drawMark = true;
 	repaint(0, oldMark-3, 17, 6);
@@ -249,9 +232,9 @@ void Vruler::Draw(int where)
 
 void Vruler::unitChange()
 {
-	double sc = currView->scale();
+	double sc = m_view->scale();
 	cor=1;
-	int docUnitIndex=currDoc->unitIndex();
+	int docUnitIndex = m_doc->unitIndex();
 	switch (docUnitIndex)
 	{
 		case SC_PT:

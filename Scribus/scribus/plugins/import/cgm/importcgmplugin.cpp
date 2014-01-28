@@ -66,7 +66,7 @@ void ImportCgmPlugin::languageChange()
 ImportCgmPlugin::~ImportCgmPlugin()
 {
 	unregisterAll();
-};
+}
 
 const QString ImportCgmPlugin::fullTrName() const
 {
@@ -97,7 +97,6 @@ void ImportCgmPlugin::registerFormats()
 	fmt.trName = tr("CGM File"); // Human readable name
 	fmt.formatId = 0;
 	fmt.filter = tr("CGM File (*.cgm *.CGM)"); // QFileDialog filter
-	fmt.nameMatch = QRegExp("\\.cgm$", Qt::CaseInsensitive);
 	fmt.fileExtensions = QStringList() << "cgm";
 	fmt.load = true;
 	fmt.save = false;

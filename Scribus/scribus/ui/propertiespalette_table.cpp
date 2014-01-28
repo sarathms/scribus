@@ -69,14 +69,31 @@ void PropertiesPalette_Table::setMainWindow(ScribusMainWindow* mainWindow)
 
 void PropertiesPalette_Table::setDocument(ScribusDoc *doc)
 {
+	if (m_doc)
+	{
+		disconnect(m_doc->m_Selection, SIGNAL(selectionChanged()), this, SLOT(handleSelectionChanged()));
+		disconnect(m_doc             , SIGNAL(docChanged())      , this, SLOT(handleSelectionChanged()));
+	}
+
 	m_doc = doc;
+
 	tableStyleCombo->setDoc(m_doc);
 	cellStyleCombo->setDoc(m_doc);
+
+	connect(m_doc->m_Selection, SIGNAL(selectionChanged()), this, SLOT(handleSelectionChanged()));
+	connect(m_doc             , SIGNAL(docChanged())      , this, SLOT(handleSelectionChanged()));
 }
 
 void PropertiesPalette_Table::unsetDocument()
 {
+	if (m_doc)
+	{
+		disconnect(m_doc->m_Selection, SIGNAL(selectionChanged()), this, SLOT(handleSelectionChanged()));
+		disconnect(m_doc             , SIGNAL(docChanged())      , this, SLOT(handleSelectionChanged()));
+	}
+
 	m_doc = 0;
+
 	tableStyleCombo->setDoc(m_doc);
 	cellStyleCombo->setDoc(m_doc);
 }
@@ -90,8 +107,10 @@ void PropertiesPalette_Table::setItem(PageItem* item)
 
 void PropertiesPalette_Table::unsetItem()
 {
-	if ((m_item) && (m_item->isTable()))
-		disconnect(m_item->asTable(), SIGNAL(selectionChanged()), this, SLOT(handleCellSelectionChanged()));
+	disconnect(this, SLOT(handleCellSelectionChanged()));
+
+//	if ((m_item) && (m_item->isTable()))
+//		disconnect(m_item->asTable(), SIGNAL(selectionChanged()), this, SLOT(handleCellSelectionChanged()));
 	m_item = 0;
 }
 
@@ -326,7 +345,9 @@ void PropertiesPalette_Table::updateFillControls()
 			if (color == CommonStrings::None)
 				color = CommonStrings::tr_NoneColor;
 			setCurrentComboItem(fillColor, color);
+			bool sigBlocked = fillShade->blockSignals(true);
 			fillShade->setValue(table->fillShade());
+			fillShade->blockSignals(sigBlocked);
 		}
 		else
 		{
@@ -335,7 +356,9 @@ void PropertiesPalette_Table::updateFillControls()
 			if (color == CommonStrings::None)
 				color = CommonStrings::tr_NoneColor;
 			setCurrentComboItem(fillColor, color);
+			bool sigBlocked = fillShade->blockSignals(true);
 			fillShade->setValue(cell.fillShade());
+			fillShade->blockSignals(sigBlocked);
 		}
 	}
 	else

@@ -445,7 +445,6 @@ void PrefsManager::initDefaults()
 	appPrefs.pdfPrefs.RotateDeg = 0;
 	appPrefs.pdfPrefs.PresentMode = false;
 	appPrefs.pdfPrefs.fileName = "";
-	appPrefs.pdfPrefs.PresentVals.clear();
 	appPrefs.pdfPrefs.isGrayscale = false;
 	appPrefs.pdfPrefs.UseRGB = true;
 	appPrefs.pdfPrefs.UseProfiles = false;
@@ -940,7 +939,7 @@ void PrefsManager::ReadPrefsXML()
 		if (userprefsContext)
 		{
 			appPrefs.uiPrefs.language = userprefsContext->get("gui_language","");
-			appPrefs.uiPrefs.mainWinState = QByteArray::fromBase64(userprefsContext->get("mainwinstate","").toAscii());
+			appPrefs.uiPrefs.mainWinState = QByteArray::fromBase64(userprefsContext->get("mainwinstate","").toLatin1());
 			//continue here...
 			//Prefs."blah blah" =...
 		}
@@ -994,7 +993,7 @@ void PrefsManager::SavePrefsXML()
 		if (userprefsContext)
 		{
 			userprefsContext->set("gui_language", appPrefs.uiPrefs.language);
-			userprefsContext->set("mainwinstate", QString::fromAscii(appPrefs.uiPrefs.mainWinState.toBase64()));
+			userprefsContext->set("mainwinstate", QString::fromLatin1(appPrefs.uiPrefs.mainWinState.toBase64()));
 			//continue here...
 			//Prefs."blah blah" =...
 		}
@@ -1250,7 +1249,7 @@ void PrefsManager::setKeyEntry(const QString& actName, const QString& cleanMenuT
 			appPrefs.keyShortcutPrefs.KeyActions.insert(actName, ke);
 		}
 		else
-			qDebug("%s", QString("Action Name: %1 does not exist").arg(actName).toAscii().constData());
+			qDebug("%s", QString("Action Name: %1 does not exist").arg(actName).toLatin1().constData());
 	}
 }
 
@@ -1617,9 +1616,11 @@ bool PrefsManager::WritePref(QString ho)
 		dcVerifierProfile.setAttribute("MinimumResolution",ScCLocale::toQStringC(itcp.value().minResolution));
 		dcVerifierProfile.setAttribute("MaximumResolution",ScCLocale::toQStringC(itcp.value().maxResolution));
 		dcVerifierProfile.setAttribute("CheckNotCMYKOrSpot", static_cast<int>(itcp.value().checkNotCMYKOrSpot));
-		dcVerifierProfile.setAttribute("CheckDeviceColorsAndOutputIntend", static_cast<int>(itcp.value().checkDeviceColorsAndOutputIntend));
+		dcVerifierProfile.setAttribute("CheckDeviceColorsAndOutputIntent", static_cast<int>(itcp.value().checkDeviceColorsAndOutputIntent));
 		dcVerifierProfile.setAttribute("CheckFontNotEmbedded", static_cast<int>(itcp.value().checkFontNotEmbedded));
 		dcVerifierProfile.setAttribute("CheckFontIsOpenType", static_cast<int>(itcp.value().checkFontIsOpenType));
+		dcVerifierProfile.setAttribute("CheckAppliedMasterDifferentSide", static_cast<int>(itcp.value().checkAppliedMasterDifferentSide));
+		dcVerifierProfile.setAttribute("CheckEmptyTextFrames", static_cast<int>(itcp.value().checkEmptyTextFrames));
 		elem.appendChild(dcVerifierProfile);
 	}
 	QDomElement dcColorManagement=docu.createElement("ColorManagement");
@@ -2325,9 +2326,11 @@ bool PrefsManager::ReadPref(QString ho)
 			checkerSettings.ignoreOffLayers = static_cast<bool>(dc.attribute("IgnoreOffLayers", "0").toInt());
 			checkerSettings.checkOffConflictLayers = static_cast<bool>(dc.attribute("CheckOffConflictLayers", "0").toInt());
 			checkerSettings.checkNotCMYKOrSpot = static_cast<bool>(dc.attribute("CheckNotCMYKOrSpot", "0").toInt());
-			checkerSettings.checkDeviceColorsAndOutputIntend = static_cast<bool>(dc.attribute("CheckDeviceColorsAndOutputIntend", "0").toInt());
+			checkerSettings.checkDeviceColorsAndOutputIntent = static_cast<bool>(dc.attribute("CheckDeviceColorsAndOutputIntent", "0").toInt());
 			checkerSettings.checkFontNotEmbedded = static_cast<bool>(dc.attribute("CheckFontNotEmbedded", "0").toInt());
 			checkerSettings.checkFontIsOpenType = static_cast<bool>(dc.attribute("CheckFontIsOpenType", "0").toInt());
+			checkerSettings.checkAppliedMasterDifferentSide = static_cast<bool>(dc.attribute("CheckAppliedMasterDifferentSide", "1").toInt());
+			checkerSettings.checkEmptyTextFrames = static_cast<bool>(dc.attribute("CheckEmptyTextFrames", "1").toInt());
 			appPrefs.verifierPrefs.checkerPrefsList[name] = checkerSettings;
 		}
 		if (dc.tagName()=="Printer")
@@ -2640,9 +2643,11 @@ void PrefsManager::initDefaultCheckerPrefs(CheckerPrefsList* cp)
 		checkerSettings.minResolution = 144.0;
 		checkerSettings.maxResolution = 2400.0;
 		checkerSettings.checkNotCMYKOrSpot = false;
-		checkerSettings.checkDeviceColorsAndOutputIntend = false;
+		checkerSettings.checkDeviceColorsAndOutputIntent = false;
 		checkerSettings.checkFontNotEmbedded = false;
 		checkerSettings.checkFontIsOpenType = false;
+		checkerSettings.checkAppliedMasterDifferentSide = true;
+		checkerSettings.checkEmptyTextFrames = true;
 		//TODO Stop translating these into settings!!!!!!!!!
 		cp->insert( CommonStrings::PostScript, checkerSettings);
 		checkerSettings.checkFontNotEmbedded = true;
@@ -2654,13 +2659,13 @@ void PrefsManager::initDefaultCheckerPrefs(CheckerPrefsList* cp)
 		checkerSettings.checkTransparency = true;
 		checkerSettings.checkAnnotations = true;
 		checkerSettings.minResolution = 144.0;
-		checkerSettings.checkDeviceColorsAndOutputIntend = true;
+		checkerSettings.checkDeviceColorsAndOutputIntent = true;
 		cp->insert( CommonStrings::PDF_X3	, checkerSettings);
 		checkerSettings.checkNotCMYKOrSpot = true;
-		checkerSettings.checkDeviceColorsAndOutputIntend = false;
+		checkerSettings.checkDeviceColorsAndOutputIntent = false;
 		cp->insert( CommonStrings::PDF_X1a	, checkerSettings);
 		checkerSettings.checkNotCMYKOrSpot = false;
-		checkerSettings.checkDeviceColorsAndOutputIntend = true;
+		checkerSettings.checkDeviceColorsAndOutputIntent = true;
 		checkerSettings.checkTransparency = false;
 		checkerSettings.checkFontIsOpenType = false;
 		cp->insert( CommonStrings::PDF_X4	, checkerSettings);

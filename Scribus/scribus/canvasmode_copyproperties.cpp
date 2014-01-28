@@ -31,6 +31,7 @@
 #include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
+#include "selectionrubberband.h"
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
@@ -64,8 +65,6 @@ void CanvasMode_CopyProperties::enterEvent(QEvent *)
 
 void CanvasMode_CopyProperties::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -92,7 +91,7 @@ void CanvasMode_CopyProperties::activate(bool fromGesture)
 void CanvasMode_CopyProperties::deactivate(bool forGesture)
 {
 //	qDebug() << "CanvasMode_CopyProperties::deactivate" << forGesture;
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void CanvasMode_CopyProperties::mouseDoubleClickEvent(QMouseEvent *m)
@@ -113,8 +112,7 @@ void CanvasMode_CopyProperties::mouseMoveEvent(QMouseEvent *m)
 	{
 		QPoint startP = m_canvas->canvasToGlobal(QPointF(Mxp, Myp));
 		m_view->redrawMarker->setGeometry(QRect(startP, m->globalPos()).normalized());
-		if (!m_view->redrawMarker->isVisible())
-			m_view->redrawMarker->show();
+		m_view->setRedrawMarkerShown(true);
 		m_view->HaveSelRect = true;
 		return;
 	}
@@ -345,11 +343,11 @@ bool CanvasMode_CopyProperties::SeleItem(QMouseEvent *m)
 		{
 			frameResizeHandle = m_canvas->frameHitTest(QPointF(mousePointDoc.x(),mousePointDoc.y()), currItem);
 			if ((frameResizeHandle == Canvas::INSIDE) && (!currItem->locked()))
-				qApp->changeOverrideCursor(QCursor(Qt::SizeAllCursor));
+				m_view->setCursor(QCursor(Qt::SizeAllCursor));
 		}
 		else
 		{
-			qApp->changeOverrideCursor(QCursor(Qt::SizeAllCursor));
+			m_view->setCursor(QCursor(Qt::SizeAllCursor));
 			m_canvas->m_viewMode.operItemResizing = false;
 		}
 		return true;
@@ -363,7 +361,7 @@ bool CanvasMode_CopyProperties::SeleItem(QMouseEvent *m)
 void CanvasMode_CopyProperties::createContextMenu(PageItem* currItem, double mx, double my)
 {
 	ContextMenu* cmen=NULL;
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+	m_view->setCursor(QCursor(Qt::ArrowCursor));
 	m_view->setObjectUndoMode();
 	Mxp = mx;
 	Myp = my;

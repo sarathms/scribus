@@ -138,6 +138,10 @@ protected:
 	QString isGIFtoolTip;
 	QString WrongFont;
 	QString partFilledImageFrame;
+	QString notCMYKOrSpot;
+	QString fontNotEmbedded;
+	QString appliedMasterDifferentSide;
+	QString emptyTextFrame;
 
 	//! \brief Flag if is ignore button shown. true = hidden, false = shown.
 	bool noButton;

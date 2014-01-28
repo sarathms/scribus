@@ -9,17 +9,17 @@ for which a new license (GPL+exception) is in place.
 #define SMPSTYLEWIDGET_H
 
 class QEvent;
+class CharStyle;
 #include "ui_smpstylewidget.h"
 
+#include "styles/styleset.h"
 #include "ui/charselectenhanced.h"
-// #include "styles/styleset.h"
-
 
 class SMPStyleWidget : public QWidget, Ui::SMPStyleWidget
 {
 	Q_OBJECT
 public:
-	SMPStyleWidget(ScribusDoc *doc);
+	SMPStyleWidget(ScribusDoc *doc, StyleSet<CharStyle> *cstyles);
 	~SMPStyleWidget();
 	
 	virtual void changeEvent(QEvent *e);
@@ -35,11 +35,12 @@ public:
 private:
 	bool hasParent_;
 	//bool parentParEffects_;
-	bool parentDC_, parentBul_, parentNum_;
+	bool m_parentDC, m_parentBul, m_parentNum;
 	CharSelectEnhanced * m_enhanced;
 	ScribusDoc * m_Doc;
 	QString currFontName;
 	ParagraphStyle* currPStyle;
+	StyleSet<CharStyle> *m_cstyles;
 
 	void fillBulletStrEditCombo();
 	void fillNumFormatCombo();
@@ -78,7 +79,7 @@ private slots:
 	void slotDefaultOpticalMargins();
 	void slotParentOpticalMargins();
 //	void slotUpdateOpticalMarginsFromCheckBoxes(int);
-	void on_bulletCharTableButton__toggled(bool checked);
+	void on_bulletCharTableButton_toggled(bool checked);
 	void handleUpdateRequest(int);
 
 signals:

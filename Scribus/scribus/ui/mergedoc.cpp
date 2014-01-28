@@ -75,7 +75,6 @@ MergeDoc::MergeDoc(QWidget* parent, bool importMasterPages, int targetDocPageCou
 		                           "a range of pages or a single page number.") + "</qt>");
 		fromInfoLayout->addWidget( pageNumberData, 1, 1 );
 		fromLabel = new QLabel(this);
-		fromLabel->setText( tr(" from 0"));
 		fromInfoLayout->addWidget( fromLabel, 1, 2 );
 		createPageData = new QCheckBox( this );
 		createPageData->setText( tr("Create Page(s)"));
@@ -144,7 +143,7 @@ void MergeDoc::changeFile()
 		if (!fn.isEmpty())
 		{
 			dirs->set("merge", fn.left(fn.lastIndexOf("/")));
-			qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+			qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 			FileLoader fl(fn);
 			if (fl.testFile() == -1)
 			//TODO put in nice user warning
@@ -155,7 +154,7 @@ void MergeDoc::changeFile()
 				ret = fl.readPageCount(&dummy, &count, masterPageNames);
 			else
 				ret = fl.readPageCount(&count, &dummy, masterPageNames);
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+			qApp->restoreOverrideCursor();
 			if ((ret) && (count != 0))
 			{
 				fromDocData->setText( QDir::toNativeSeparators(fn) );
@@ -169,6 +168,7 @@ void MergeDoc::changeFile()
 				else
 				{
 					pageNumberData->setEnabled(true);
+					pageNumberData->setText("*");
 				}
 				if (!masterPages)
 					fromLabel->setText( tr(" from %1").arg(count));

@@ -21,10 +21,10 @@ ScCLocale::ScCLocale()
 {
 	qLocale.setNumberOptions(QLocale::OmitGroupSeparator);
 
-#if defined(Q_WS_WIN)
+#if defined(Q_OS_WIN)
 	cLocale = _create_locale(LC_ALL, "C");
 #else
-  #if not defined(Q_OS_SOLARIS) and not defined(Q_OS_OPENBSD) and not defined(Q_OS_FREEBSD)
+  #if not defined(Q_OS_SOLARIS) and not defined(Q_OS_OPENBSD) and not defined(Q_OS_FREEBSD) and not defined(Q_OS_HAIKU)
 	cLocale = newlocale(LC_ALL_MASK, "C", NULL);
   #endif
 #endif
@@ -32,10 +32,10 @@ ScCLocale::ScCLocale()
 
 ScCLocale::~ScCLocale()
 {
-#if defined(Q_WS_WIN)
+#if defined(Q_OS_WIN)
 	_free_locale(cLocale);
 #else
-  #if not defined(Q_OS_SOLARIS) and not defined(Q_OS_OPENBSD) and not defined(Q_OS_FREEBSD)
+  #if not defined(Q_OS_SOLARIS) and not defined(Q_OS_OPENBSD) and not defined(Q_OS_FREEBSD) and not defined(Q_OS_HAIKU)
 	freelocale(cLocale);
   #endif
 #endif
@@ -107,10 +107,10 @@ double ScCLocale::strtod ( const char * str, char ** endptr )
 	}
 	else
 	{
-#if defined(Q_WS_WIN)
+#if defined(Q_OS_WIN)
 		return _strtod_l(str, endptr, that()->cLocale);
 #else
-  #if defined(Q_OS_SOLARIS) or defined (Q_OS_OPENBSD) or defined(Q_OS_FREEBSD)
+  #if defined(Q_OS_SOLARIS) or defined (Q_OS_OPENBSD) or defined(Q_OS_FREEBSD) or defined(Q_OS_HAIKU)
 		char *oldlocale=setlocale(LC_NUMERIC, NULL);
 		double result(0.0);
 		setlocale(LC_NUMERIC, "C");

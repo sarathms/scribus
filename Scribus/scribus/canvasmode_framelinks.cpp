@@ -78,8 +78,6 @@ void CanvasMode_FrameLinks::enterEvent(QEvent *)
 
 void CanvasMode_FrameLinks::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -106,7 +104,7 @@ void CanvasMode_FrameLinks::activate(bool fromGesture)
 void CanvasMode_FrameLinks::deactivate(bool forGesture)
 {
 //	qDebug() << "CanvasMode_FrameLinks::deactivate" << forGesture;
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void CanvasMode_FrameLinks::mouseDoubleClickEvent(QMouseEvent *m)
@@ -129,13 +127,9 @@ void CanvasMode_FrameLinks::mouseMoveEvent(QMouseEvent *m)
 	{
 		SeRx = qRound(mousePointDoc.x()); //m_view->translateToDoc(m->x(), m->y()).x());
 		SeRy = qRound(mousePointDoc.y()); //m_view->translateToDoc(m->x(), m->y()).y());
-		/*
-		m_view->redrawMarker->setGeometry(QRect(Mxp, Myp, m->globalPos().x() - Mxp, m->globalPos().y() - Myp).normalized());
-		*/
 		QPoint startP = m_canvas->canvasToGlobal(m_doc->appMode == modeDrawTable2 ? QPointF(Dxp, Dyp) : QPointF(Mxp, Myp));
-		m_view->redrawMarker->setGeometry(QRect(startP, m->globalPos()).normalized());
-		if (!m_view->redrawMarker->isVisible())
-			m_view->redrawMarker->show();
+		m_view->redrawMarker->setGeometry(QRect(m_view->mapFromGlobal(startP), m_view->mapFromGlobal(m->globalPos())).normalized());
+		m_view->setRedrawMarkerShown(true);
 		m_view->HaveSelRect = true;
 		return;
 	}
@@ -143,8 +137,6 @@ void CanvasMode_FrameLinks::mouseMoveEvent(QMouseEvent *m)
 
 void CanvasMode_FrameLinks::mousePressEvent(QMouseEvent *m)
 {
-// 	const double mouseX = m->globalX();
-// 	const double mouseY = m->globalY();
 	const FPoint mousePointDoc = m_canvas->globalToCanvas(m->globalPos());
 
 	double Rxp = 0;
@@ -193,7 +185,6 @@ void CanvasMode_FrameLinks::mousePressEvent(QMouseEvent *m)
 				{
 					if (bb->prevInChain() != NULL)
 					{
-						qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 						QMessageBox msgBox(QMessageBox::Question, tr("Linking Text Frames"),
 										   "<qt>" + ScribusView::tr("Do you want to insert the frame into the selected text chain? If so, where would you like to insert it?") + "<qt>");
 						//QMessageBox msgBox;
@@ -462,11 +453,11 @@ bool CanvasMode_FrameLinks::SeleItem(QMouseEvent *m)
 		{
 			frameResizeHandle = m_canvas->frameHitTest(QPointF(mousePointDoc.x(),mousePointDoc.y()), currItem);
 			if ((frameResizeHandle == Canvas::INSIDE) && (!currItem->locked()))
-				qApp->changeOverrideCursor(QCursor(Qt::SizeAllCursor));
+				m_view->setCursor(QCursor(Qt::SizeAllCursor));
 		}
 		else
 		{
-			qApp->changeOverrideCursor(QCursor(Qt::SizeAllCursor));
+			m_view->setCursor(QCursor(Qt::SizeAllCursor));
 			m_canvas->m_viewMode.operItemResizing = false;
 		}
 		return true;
@@ -480,7 +471,6 @@ bool CanvasMode_FrameLinks::SeleItem(QMouseEvent *m)
 void CanvasMode_FrameLinks::createContextMenu(PageItem* currItem, double mx, double my)
 {
 	ContextMenu* cmen=NULL;
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 	m_view->setObjectUndoMode();
 	Mxp = mx;
 	Myp = my;

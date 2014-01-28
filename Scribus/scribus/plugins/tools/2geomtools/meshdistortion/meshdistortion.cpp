@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
 *   You should have received a copy of the GNU General Public License      *
 *   along with this program; if not, write to the                          *
 *   Free Software Foundation, Inc.,                                        *
-*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.              *
+*   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.              *
 ****************************************************************************/
 
 #include "meshdistortiondialog.h"
@@ -112,18 +112,18 @@ void MeshDistortionPlugin::deleteAboutData(const AboutData* about) const
 
 bool MeshDistortionPlugin::run(ScribusDoc* doc, QString)
 {
-	currDoc = doc;
-	if (currDoc == 0)
-		currDoc = ScCore->primaryMainWindow()->doc;
-	if (currDoc->m_Selection->count() > 0)
+	m_doc = doc;
+	if (m_doc == 0)
+		m_doc = ScCore->primaryMainWindow()->doc;
+	if (m_doc->m_Selection->count() > 0)
 	{
-		patternItem = currDoc->m_Selection->itemAt(0);
-		MeshDistortionDialog *dia = new MeshDistortionDialog(currDoc->scMW(), currDoc);
+		m_patternItem = m_doc->m_Selection->itemAt(0);
+		MeshDistortionDialog *dia = new MeshDistortionDialog(m_doc->scMW(), m_doc);
 		if (dia->exec())
 		{
 			dia->updateAndExit();
-			currDoc->changed();
-			currDoc->view()->DrawNew();
+			m_doc->changed();
+			m_doc->view()->DrawNew();
 		}
 		delete dia;
 	}

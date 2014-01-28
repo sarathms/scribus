@@ -18,6 +18,8 @@ for which a new license (GPL+exception) is in place.
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+
+#include <QDebug>
 #include <QObject>
 #include <QMetaObject>
 #include <QMenu>
@@ -138,12 +140,12 @@ bool ScrPopupMenu::insertMenuItem(ScrAction *newMenuAction)
 {
 	if (newMenuAction)
 	{
-		
-#ifdef Q_WS_MAC
+
+#ifdef Q_OS_MAC
 		bool menuListHasNoIcons = true;
 		// look for ScrAction or ScrPopupMenu from the end of the list
 //		QList< QPointer<QObject> >::Iterator it = menuItemList.end();
-		int s=menuItemList.size()-1; 
+		int s=menuItemList.size()-1;
 		for (int i=s; i>=0; --i) {
 			QObject* menuItem = menuItemList[i];
 			QString menuItemListClassName = menuItemList[i]->metaObject()->className();
@@ -166,7 +168,7 @@ bool ScrPopupMenu::insertMenuItem(ScrAction *newMenuAction)
 		if (newMenuAction->icon().isNull() && ! menuListHasNoIcons)
 			newMenuAction->setIcon(loadIcon("noicon.xpm"));
 #endif
-		
+
 		menuItemList.append(newMenuAction);
 		localPopupMenu->addAction(newMenuAction);
 		return true;
@@ -196,7 +198,7 @@ bool ScrPopupMenu::insertMenuItemAfter(ScrAction *newMenuAction, ScrAction *afte
 	//if (menuItemList.findRef(newMenuAction)!=-1)
 	//	return false;
 	
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
 	if (newMenuAction && afterMenuAction)
 		if (newMenuAction->icon().isNull() && ! (afterMenuAction->icon().isNull()))
 			newMenuAction->setIcon(loadIcon("noicon.xpm"));
@@ -283,7 +285,7 @@ bool ScrPopupMenu::repopulateLocalMenu()
 			menuItemList.removeAll(*menuItemListItToDelete);
 			continue;
 		}
-		
+
 		QString menuItemListClassName=listObj->metaObject()->className();
 		if (menuItemListClassName=="ScrAction")
 		{
@@ -298,6 +300,7 @@ bool ScrPopupMenu::repopulateLocalMenu()
 				ScrPopupMenu * men = dynamic_cast<ScrPopupMenu *>(listObj);
 				if (men!=NULL)
 				{
+					//qDebug()<<men->localPopupMenu->title()<<men->localPopupMenu->;
 // 					localPopupMenu->insertItem(men->getMenuIcon(), men->getMenuText(), men->getLocalPopupMenu());
 					QAction *m=localPopupMenu->addMenu(men->getLocalPopupMenu());
 					if (m)

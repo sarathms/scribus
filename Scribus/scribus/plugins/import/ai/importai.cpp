@@ -182,7 +182,8 @@ QImage AIPlug::readThumbnail(QString fNameIn)
 		tmpSel->setGroupRect();
 		double xs = tmpSel->width();
 		double ys = tmpSel->height();
-		tmpImage = Elements.at(0)->DrawObj_toImage(500);
+		if (Elements.count() > 0)
+			tmpImage = Elements.at(0)->DrawObj_toImage(500);
 		tmpImage.setText("XSize", QString("%1").arg(xs));
 		tmpImage.setText("YSize", QString("%1").arg(ys));
 		m_Doc->m_Selection->delaySignalsOff();
@@ -432,7 +433,7 @@ bool AIPlug::import(QString fNameIn, const TransactionSettings& trSettings, int 
 	if (!(flags & LoadSavePlugin::lfLoadAsPattern))
 		m_Doc->view()->updatesOn(false);
 	m_Doc->scMW()->setScriptRunning(true);
-	qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+	qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 	QString CurDirP = QDir::currentPath();
 	QDir::setCurrent(fi.path());
 	if (convert(fName))
@@ -501,12 +502,7 @@ bool AIPlug::import(QString fNameIn, const TransactionSettings& trSettings, int 
 				}
 				tmpSel->setGroupRect();
 				ScElemMimeData* md = ScriXmlDoc::WriteToMimeData(m_Doc, tmpSel);
-/*#ifndef Q_WS_MAC*/
-// see #2196
 				m_Doc->itemSelection_DeleteItem(tmpSel);
-/*#else
-				qDebug("aiimport: leaving items on page");
-#endif*/
 				m_Doc->view()->updatesOn(true);
 				if ((importedColors.count() != 0) && (!((flags & LoadSavePlugin::lfKeepGradients) || (flags & LoadSavePlugin::lfKeepColors) || (flags & LoadSavePlugin::lfKeepPatterns))))
 				{
@@ -566,6 +562,7 @@ bool AIPlug::import(QString fNameIn, const TransactionSettings& trSettings, int 
 	}
 	if (convertedPDF)
 		QFile::remove(fName);
+	qApp->restoreOverrideCursor();
 	return success;
 }
 
@@ -1434,23 +1431,24 @@ void AIPlug::processData(QString data)
 					ite->setFillEvenOdd(fillRule);
 					ite->setFillTransparency(1.0 - Opacity);
 					ite->setLineTransparency(1.0 - Opacity);
-#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4))
 					ite->setFillBlendmode(blendMode);
 					ite->setLineBlendmode(blendMode);
-#endif
 					ite->setLineEnd(CapStyle);
 					ite->setLineJoin(JoinStyle);
 					wh = getMaxClipF(&ite->PoLine);
 					ite->setWidthHeight(wh.x(),wh.y());
 					ite->setTextFlowMode(PageItem::TextFlowDisabled);
 					m_Doc->AdjustItemSize(ite);
-					ite->tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_ai_XXXXXX.pdf");
-					ite->tempImageFile->open();
-					ite->tempImageFile->write(fData);
-					QString imgName = getLongPathName(ite->tempImageFile->fileName());
-					ite->tempImageFile->close();
+					QTemporaryFile *tempFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_ai_XXXXXX.pdf");
+					tempFile->setAutoRemove(false);
+					tempFile->open();
+					tempFile->write(fData);
+					QString imgName = getLongPathName(tempFile->fileName());
+					tempFile->close();
 					ite->isInlineImage = true;
+					ite->isTempFile = true;
 					m_Doc->loadPict(imgName, ite);
+					delete tempFile;
 					if (ite->PictureIsAvailable)
 						ite->setImageXYScale(ite->width() / ite->pixm.width(), ite->height() / ite->pixm.height());
 					ite->setImageFlippedV(true);
@@ -1539,10 +1537,8 @@ void AIPlug::processData(QString data)
 				b->setTextFlowMode(PageItem::TextFlowDisabled);
 				b->setFillTransparency(1.0 - Opacity);
 				b->setLineTransparency(1.0 - Opacity);
-	#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4))
 				b->setFillBlendmode(blendMode);
 				b->setLineBlendmode(blendMode);
-	#endif
 				b->updateClip();
 				if (patternMode)
 					PatternElements.append(b);
@@ -1632,10 +1628,8 @@ void AIPlug::processData(QString data)
 					ite->setFillEvenOdd(fillRule);
 					ite->setFillTransparency(1.0 - Opacity);
 					ite->setLineTransparency(1.0 - Opacity);
-	#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4))
 					ite->setFillBlendmode(blendMode);
 					ite->setLineBlendmode(blendMode);
-	#endif
 					if (!currentPatternName.isEmpty())
 					{
 						ite->setPattern(currentPatternName);
@@ -2070,10 +2064,8 @@ void AIPlug::processData(QString data)
 					ite->setFillEvenOdd(fillRule);
 					ite->setFillTransparency(1.0 - Opacity);
 					ite->setLineTransparency(1.0 - Opacity);
-	#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4))
 					ite->setFillBlendmode(blendMode);
 					ite->setLineBlendmode(blendMode);
-	#endif
 					ite->setLineEnd(CapStyle);
 					ite->setLineJoin(JoinStyle);
 					if (importerFlags & LoadSavePlugin::lfCreateDoc)
@@ -2686,14 +2678,16 @@ void AIPlug::processGradientData(QString data)
 			else if (colortype == 3)
 			{
 				stopName = parseCustomColor(Cdata, colorShade);
+				int stopShade = qRound(colorShade);
 				const ScColor& gradC = m_Doc->PageColors[stopName];
-				currentGradient.addStop( ScColorEngine::getRGBColor(gradC, m_Doc), stop, 0.5, 1.0, stopName, qRound(colorShade));
+				currentGradient.addStop( ScColorEngine::getShadeColor(gradC, m_Doc, stopShade), stop, 0.5, 1.0, stopName, stopShade);
 			}
 			else if (colortype == 4)
 			{
 				stopName = parseCustomColorX(Cdata, colorShade, "0");
+				int stopShade = qRound(colorShade);
 				const ScColor& gradC = m_Doc->PageColors[stopName];
-				currentGradient.addStop( ScColorEngine::getRGBColor(gradC, m_Doc), stop, 0.5, 1.0, stopName, qRound(colorShade));
+				currentGradient.addStop( ScColorEngine::getShadeColor(gradC, m_Doc, stopShade), stop, 0.5, 1.0, stopName, stopShade);
 			}
 			else if (colortype == 6)
 			{
@@ -3036,20 +3030,21 @@ void AIPlug::processRaster(QDataStream &ts)
 	ite->setFillEvenOdd(fillRule);
 	ite->setFillTransparency(1.0 - Opacity);
 	ite->setLineTransparency(1.0 - Opacity);
-#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4))
 	ite->setFillBlendmode(blendMode);
 	ite->setLineBlendmode(blendMode);
-#endif
 	ite->setLineEnd(CapStyle);
 	ite->setLineJoin(JoinStyle);
 	uchar *p;
 	uint yCount = 0;
 	quint16 eTag = EXTRASAMPLE_UNASSALPHA;
-	ite->tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_ai_XXXXXX.tif");
-	ite->tempImageFile->open();
-	QString imgName = getLongPathName(ite->tempImageFile->fileName());
-	ite->tempImageFile->close();
+	QTemporaryFile *tempFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_ai_XXXXXX.tif");
+	tempFile->setAutoRemove(false);
+	tempFile->open();
+	QString imgName = getLongPathName(tempFile->fileName());
+	tempFile->close();
 	ite->isInlineImage = true;
+	ite->isTempFile = true;
+	delete tempFile;
 	TIFF* tif = TIFFOpen(imgName.toLocal8Bit().data(), "w");
 	if (tif)
 	{

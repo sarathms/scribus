@@ -154,9 +154,8 @@ PPreview::PPreview( QWidget* parent, ScribusView *vin, ScribusDoc *docu, QString
 		Table->setHorizontalHeaderItem(1, new QTableWidgetItem( tr("Separation Name")));
 		QHeaderView *header = Table->horizontalHeader();
 		header->setStretchLastSection(true);
-		header->setMovable(false);
-//		header->setClickable(false);
-		header->setResizeMode(QHeaderView::Fixed);
+		header->setSectionsMovable(false);
+		header->setSectionResizeMode(QHeaderView::Fixed);
 		Table->setColumnWidth(0, 24);
 		Table->verticalHeader()->hide();
 		Table->setSelectionMode( QAbstractItemView::NoSelection );
@@ -630,7 +629,7 @@ int PPreview::RenderPreview(int Seite, int Res)
 	args.append( "-q" );
 	args.append( "-dNOPAUSE" );
 	args.append( "-dPARANOIDSAFER" );
-	args.append( QString("-r%1").arg(tmp.setNum(qRound(Res))) );
+	args.append( QString("-r%1").arg(tmp.setNum(Res)) );
 	args.append( QString("-g%1x%2").arg(tmp2.setNum(qRound(b))).arg(tmp3.setNum(qRound(h))) );
 	if (EnableCMYK->isChecked())
 	{
@@ -743,7 +742,7 @@ int PPreview::RenderPreviewSep(int Seite, int Res)
 	args1.append( "-q" );
 	args1.append( "-dNOPAUSE" );
 	args1.append( "-dPARANOIDSAFER" );
-	args1.append( QString("-r%1").arg(tmp.setNum(qRound(Res))) );
+	args1.append( QString("-r%1").arg(tmp.setNum(Res)) );
 	args1.append( QString("-g%1x%2").arg(tmp2.setNum(qRound(b))).arg(tmp3.setNum(qRound(h))) ); 
 	if (AntiAlias->isChecked())
 	{
@@ -932,7 +931,7 @@ QPixmap PPreview::CreatePreview(int Seite, int Res)
 	QPixmap Bild;
 	double b = doc->Pages->at(Seite)->width() * Res / 72.0;
 	double h = doc->Pages->at(Seite)->height() * Res / 72.0;
-	qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+	qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 	if ((Seite != APage) || (EnableCMYK->isChecked() != CMode) || (SMode != scaleBox->currentIndex())
 	        || (AntiAlias->isChecked() != GsAl) || (((AliasTr->isChecked() != Trans) || (EnableGCR->isChecked() != GMode))
 			&& (!EnableCMYK->isChecked()))
@@ -1312,7 +1311,7 @@ QPixmap PPreview::CreatePreview(int Seite, int Res)
 	}
 	else
 		Bild = QPixmap::fromImage(image);
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+	qApp->restoreOverrideCursor();
 	getUserSelection(Seite);
 	return Bild;
 }
@@ -1355,7 +1354,7 @@ void PPreview::getUserSelection(int page)
 void PPreview::imageLoadError(QPixmap &Bild, int page)
 {
 	Bild = QPixmap(1,1);
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+	qApp->restoreOverrideCursor();
 	getUserSelection(page);
 }
 

@@ -218,8 +218,6 @@ void CanvasMode_Edit::enterEvent(QEvent *)
 
 void CanvasMode_Edit::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 void CanvasMode_Edit::activate(bool fromGesture)
@@ -260,7 +258,7 @@ void CanvasMode_Edit::activate(bool fromGesture)
 
 void CanvasMode_Edit::deactivate(bool forGesture)
 {
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 	if (!forGesture)
 	{
 		mRulerGuide = -1;
@@ -279,7 +277,7 @@ void CanvasMode_Edit::mouseDoubleClickEvent(QMouseEvent *m)
 		//CB if annotation, open the annotation dialog
 		if (currItem->isAnnotation())
 		{
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+		//	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 			m_view->requestMode(submodeAnnotProps);
 		}
 		//otherwise, select between the whitespace
@@ -315,7 +313,7 @@ void CanvasMode_Edit::mouseDoubleClickEvent(QMouseEvent *m)
 				currItem->itemText.extendSelection(start, stop);
 				currItem->itemText.setCursorPosition(stop);
 			}
-			else if ((currItem->itemText.cursorPosition() < currItem->itemText.length()) && (currItem->itemText.item(currItem->itemText.cursorPosition())->mark != NULL))
+            else if ((currItem->itemText.cursorPosition() < currItem->itemText.length()) && (currItem->itemText.hasMark(currItem->itemText.cursorPosition())))
 			{	//invoke edit marker dialog
 				m_ScMW->slotEditMark();
 				return;
@@ -372,7 +370,7 @@ void CanvasMode_Edit::mouseMoveEvent(QMouseEvent *m)
 			{
 				if (m->modifiers() & Qt::ShiftModifier)
 				{
-					qApp->changeOverrideCursor(QCursor(loadIcon("Rotieren2.png")));
+					m_view->setCursor(QCursor(loadIcon("Rotieren2.png")));
 					QTransform p = currItem->getTransform();
 					p.translate(currItem->imageXOffset()*currItem->imageXScale(), currItem->imageYOffset()*currItem->imageYScale());
 					QPointF rotP = p.map(QPointF(0.0, 0.0));
@@ -382,7 +380,7 @@ void CanvasMode_Edit::mouseMoveEvent(QMouseEvent *m)
 				}
 				else
 				{
-					qApp->changeOverrideCursor(QCursor(loadIcon("HandC.xpm")));
+					m_view->setCursor(QCursor(loadIcon("HandC.xpm")));
 					QTransform ro;
 					ro.rotate(-currItem->rotation());
 					QPointF rota = ro.map(QPointF(newX-Mxp,newY-Myp));
@@ -451,20 +449,20 @@ void CanvasMode_Edit::mouseMoveEvent(QMouseEvent *m)
 					if (hitTest == Canvas::INSIDE)
 					{
 						if (currItem->asTextFrame())
-							qApp->changeOverrideCursor(QCursor(Qt::IBeamCursor));
+							m_view->setCursor(QCursor(Qt::IBeamCursor));
 						if (currItem->asImageFrame())
 						{
 							if (m->modifiers() & Qt::ShiftModifier)
-								qApp->changeOverrideCursor(QCursor(loadIcon("Rotieren2.png")));
+								m_view->setCursor(QCursor(loadIcon("Rotieren2.png")));
 							else
-								qApp->changeOverrideCursor(QCursor(loadIcon("HandC.xpm")));
+								m_view->setCursor(QCursor(loadIcon("HandC.xpm")));
 						}
 					}
 				}
 				else
 				{
 // 					setModeCursor();
-					qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+					m_view->setCursor(QCursor(Qt::ArrowCursor));
 				}
 			}
 		}
@@ -477,13 +475,9 @@ void CanvasMode_Edit::mouseMoveEvent(QMouseEvent *m)
 			newY = qRound(mousePointDoc.y()); //m_view->translateToDoc(m->x(), m->y()).y());
 			SeRx = newX;
 			SeRy = newY;
-			/*
-			m_view->redrawMarker->setGeometry(QRect(Mxp, Myp, m->globalPos().x() - Mxp, m->globalPos().y() - Myp).normalized());
-			*/
 			QPoint startP = m_canvas->canvasToGlobal(QPointF(Mxp, Myp));
-			m_view->redrawMarker->setGeometry(QRect(startP, m->globalPos()).normalized());
-			if (!m_view->redrawMarker->isVisible())
-				m_view->redrawMarker->show();
+			m_view->redrawMarker->setGeometry(QRect(m_view->mapFromGlobal(startP), m_view->mapFromGlobal(m->globalPos())).normalized());
+			m_view->setRedrawMarkerShown(true);
 			m_view->HaveSelRect = true;
 			return;
 		}
@@ -561,7 +555,7 @@ void CanvasMode_Edit::mousePressEvent(QMouseEvent *m)
 					else
 					{
 						m_view->requestMode(submodePaintingDone);
-						qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+						m_view->setCursor(QCursor(Qt::ArrowCursor));
 					}
 					if (currItem->asTextFrame())
 						m_view->slotSetCurs(m->globalPos().x(), m->globalPos().y());
@@ -569,7 +563,7 @@ void CanvasMode_Edit::mousePressEvent(QMouseEvent *m)
 				else
 				{
 					m_view->requestMode(submodePaintingDone);
-					qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+					m_view->setCursor(QCursor(Qt::ArrowCursor));
 				}
 				m_doc->m_Selection->delaySignalsOff();
 				if (wantNormal)
@@ -677,13 +671,13 @@ void CanvasMode_Edit::mousePressEvent(QMouseEvent *m)
 				else
 				{
 					m_view->requestMode(submodePaintingDone);
-					qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+					m_view->setCursor(QCursor(Qt::ArrowCursor));
 				}
 			}
 			else
 			{
 				m_view->requestMode(submodePaintingDone);
-				qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+				m_view->setCursor(QCursor(Qt::ArrowCursor));
 			}
 		}
 	}
@@ -860,7 +854,7 @@ void CanvasMode_Edit::mouseReleaseEvent(QMouseEvent *m)
 			}
 		}
 		m_view->HaveSelRect = false;
-		m_view->redrawMarker->hide();
+		m_view->setRedrawMarkerShown(false);
 		m_view->updateContents();
 	}
 	if (GetItem(&currItem))
@@ -1026,11 +1020,11 @@ bool CanvasMode_Edit::SeleItem(QMouseEvent *m)
 		{
 			frameResizeHandle = m_canvas->frameHitTest(QPointF(mousePointDoc.x(),mousePointDoc.y()), currItem);
 			if ((frameResizeHandle == Canvas::INSIDE) && (!currItem->locked()))
-				qApp->changeOverrideCursor(QCursor(Qt::SizeAllCursor));
+				m_view->setCursor(QCursor(Qt::SizeAllCursor));
 		}
 		else
 		{
-			qApp->changeOverrideCursor(QCursor(Qt::SizeAllCursor));
+			m_view->setCursor(QCursor(Qt::SizeAllCursor));
 			m_canvas->m_viewMode.operItemResizing = false;
 		}
 		return true;
@@ -1044,7 +1038,7 @@ bool CanvasMode_Edit::SeleItem(QMouseEvent *m)
 void CanvasMode_Edit::createContextMenu(PageItem* currItem, double mx, double my)
 {
 	ContextMenu* cmen=NULL;
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+	m_view->setCursor(QCursor(Qt::ArrowCursor));
 	m_view->setObjectUndoMode();
 	Mxp = mx;
 	Myp = my;

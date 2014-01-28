@@ -44,19 +44,20 @@ Scribus12Format::Scribus12Format() :
 {
 	// Set action info in languageChange, so we only have to do
 	// it in one place. This includes registering file formats.
+	registerFormats();
 	languageChange();
 }
 
 Scribus12Format::~Scribus12Format()
 {
 	unregisterAll();
-};
+}
 
 void Scribus12Format::languageChange()
 {
-	//(Re)register file formats.
-	unregisterAll();
-	registerFormats();
+	FileFormat* fmt = getFormatByID(FORMATID_SLA12XIMPORT);
+	fmt->trName = tr("Scribus 1.2.x Document");
+	fmt->filter = fmt->trName + " (*.sla *.SLA *.sla.gz *.SLA.GZ *.scd *.SCD *.scd.gz *.SCD.GZ)";
 }
 
 const QString Scribus12Format::fullTrName() const
@@ -117,7 +118,6 @@ void Scribus12Format::registerFormats()
 	fmt.save = false;
 	fmt.colorReading = true;
 	fmt.filter = fmt.trName + " (*.sla *.SLA *.sla.gz *.SLA.GZ *.scd *.SCD *.scd.gz *.SCD.GZ)";
-	fmt.nameMatch = QRegExp("\\.(sla|scd)(\\.gz)?", Qt::CaseInsensitive);
 	fmt.mimeTypes = QStringList();
 	fmt.mimeTypes.append("application/x-scribus");
 	fmt.fileExtensions = QStringList() << "sla" << "sla.gz" << "scd" << "scd.gz";
@@ -227,7 +227,6 @@ void Scribus12Format::PasteItem(struct CopyPasteBuffer *Buffer, bool drag, bool 
 	//
 	case PageItem::PathText:
 	case PageItem::TextFrame:
-#ifndef NLS_PROTO
 		if (Buffer->PType == PageItem::PathText)
 			z = m_Doc->itemAdd(PageItem::PathText, PageItem::Unspecified, x, y, w, h, pw, CommonStrings::None, Buffer->Pcolor, true);
 		else
@@ -353,7 +352,6 @@ void Scribus12Format::PasteItem(struct CopyPasteBuffer *Buffer, bool drag, bool 
 			currItem->itemText.setDefaultStyle(pstyle);
 		}
 //		undoManager->setUndoEnabled(true);
-#endif
 		break;
 	case PageItem::Line:
 		z = m_Doc->itemAdd(PageItem::Line, PageItem::Unspecified, x, y, w ,0, pw, CommonStrings::None, Buffer->Pcolor2, true);
@@ -1232,7 +1230,7 @@ bool Scribus12Format::loadFile(const QString & fileName, const FileFormat & /* f
     					ef.Dm = pdfF.attribute("Dm").toInt();
     					ef.M = pdfF.attribute("M").toInt();
 		    			ef.Di = pdfF.attribute("Di").toInt();
-						m_Doc->pdfOptions().PresentVals.append(ef);
+						EffVal.append(ef);
 					}
 					PFO = PFO.nextSibling();
 				}
@@ -1246,6 +1244,14 @@ bool Scribus12Format::loadFile(const QString & fileName, const FileFormat & /* f
 	//m_Doc->Items = m_Doc->DocItems;
 	m_Doc->setMasterPageMode(false);
 	m_View->reformPages();
+	if (!EffVal.isEmpty())
+	{
+		for (int pdoE = 0; pdoE < EffVal.count(); ++pdoE)
+		{
+			if (pdoE < m_Doc->Pages->count())
+				m_Doc->Pages->at(pdoE)->PresentVals = EffVal[pdoE];
+		}
+	}
 
 	handleOldLayerBehavior(m_Doc);
 	if (m_Doc->layerCount() == 0)
@@ -1438,6 +1444,10 @@ void Scribus12Format::GetItemProps(QDomElement *obj, struct CopyPasteBuffer *OB,
 			OB->GrStartY = ScCLocale::toDoubleC(obj->attribute("GRSTARTY"), 0.0);
 			OB->GrEndX = ScCLocale::toDoubleC(obj->attribute("GRENDX"), 0.0);
 			OB->GrEndY = ScCLocale::toDoubleC(obj->attribute("GRENDY"), 0.0);
+			OB->GrFocalX = OB->GrStartX;
+			OB->GrFocalY = OB->GrStartY;
+			OB->GrScale  = 1.0;
+			OB->GrSkew  = 0.0;
 			OB->GrColor = obj->attribute("GRCOLOR","");
 			if (OB->GrColor.isEmpty())
 				OB->GrColor = "Black";

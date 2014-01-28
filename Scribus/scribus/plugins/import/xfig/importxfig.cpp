@@ -354,7 +354,7 @@ bool XfigPlug::import(QString fNameIn, const TransactionSettings& trSettings, in
 	if (!(flags & LoadSavePlugin::lfLoadAsPattern))
 		m_Doc->view()->updatesOn(false);
 	m_Doc->scMW()->setScriptRunning(true);
-	qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+	qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 	QString CurDirP = QDir::currentPath();
 	QDir::setCurrent(fi.path());
 	if (convert(fName))
@@ -399,12 +399,7 @@ bool XfigPlug::import(QString fNameIn, const TransactionSettings& trSettings, in
 				}
 				tmpSel->setGroupRect();
 				ScElemMimeData* md = ScriXmlDoc::WriteToMimeData(m_Doc, tmpSel);
-/*#ifndef Q_WS_MAC*/
-// see #2196
 				m_Doc->itemSelection_DeleteItem(tmpSel);
-/*#else
-				qDebug("xfigimport: leaving items on page");
-#endif*/
 				m_Doc->view()->updatesOn(true);
 				m_Doc->m_Selection->delaySignalsOff();
 				// We must copy the TransationSettings object as it is owned
@@ -441,6 +436,7 @@ bool XfigPlug::import(QString fNameIn, const TransactionSettings& trSettings, in
 		if ((showProgress) && (!interactive))
 			m_Doc->view()->DrawNew();
 	}
+	qApp->restoreOverrideCursor();
 	return success;
 }
 
@@ -718,7 +714,7 @@ void XfigPlug::processArrows(int forward_arrow, QString fArrowData, int backward
 		arrow_thicknessAB = arrow_thicknessAB / 80.0 * 72.0;
 		FPointArray arrow;
 		FPoint Start = ite->PoLine.point(0);
-		for (uint xx = 1; xx < ite->PoLine.size(); xx += 2)
+		for (int xx = 1; xx < ite->PoLine.size(); xx += 2)
 		{
 			FPoint Vector = ite->PoLine.point(xx);
 			if ((Start.x() != Vector.x()) || (Start.y() != Vector.y()))

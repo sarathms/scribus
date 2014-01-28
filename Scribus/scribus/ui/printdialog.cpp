@@ -189,7 +189,7 @@ void PrintDialog::SetOptions()
 	if(!done)
 		return;
 	// Merge stored settings, prompt user and return user settings
-	DocumentPropertiesW( winId(), handle, (LPWSTR) printerS.utf16(), (DEVMODEW*) DevMode.data(), (DEVMODEW*) DevMode.data(), 
+	DocumentPropertiesW((HWND) winId(), handle, (LPWSTR) printerS.utf16(), (DEVMODEW*) DevMode.data(), (DEVMODEW*) DevMode.data(), 
 						DM_IN_BUFFER | DM_IN_PROMPT | DM_OUT_BUFFER);
 	// Free the printer handle
 	ClosePrinter( handle );
@@ -310,7 +310,7 @@ void PrintDialog::SelPrinter(const QString& prn)
 	if (!toFile)
 	{
 		if( !PrinterUtil::getDefaultSettings(PrintDest->currentText(), DevMode) )
-			qWarning( tr("Failed to retrieve printer settings").toAscii().data() );
+			qWarning( tr("Failed to retrieve printer settings").toLatin1().data() );
 	}
 #endif
 	if (toFile && LineEdit1->text().isEmpty())

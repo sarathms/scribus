@@ -1,5 +1,10 @@
-<body>
-<head><TITLE>Render Frames</TITLE></head>
+<html>
+<head>	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+
+<title>Render Frames</title></head>
+<style>
+@import "manual.css";
+</style>
 <body>
 <h2>Introduction</h2>
 <p>Since version 1.3.5 Scribus offers a powerful new feature called Render Frames. Originally planned as a means to insert formulas into
@@ -8,10 +13,8 @@ Scribus documents, the inventor, Hermann Kraus, has enabled the creation of almo
 <h2>Creating a Render Frame</h2>
 <p>To create a Render Frame, click on the Render Frame icon in the menu bar, use <i>Insert&nbsp;&gt; Render Frame</i>, or press D on the keyboard:</p>
 <table width="100%"><tr><td align="center"><img src="images/rf2.png"/></td></tr></table>
-<p>The cursor will then turn into a frame symbol with an L inside:</p>
-<table width="100%"><tr><td align="center"><img src="images/DrawLatexFrame.png"/></td></tr></table>
-<p><br><br>
-</p>
+<table width="70%"><tr><td align="right"><p>The cursor will then turn into a frame symbol with an L inside:</p></td><td align="left"><img src="images/DrawLatexFrame.png" /></td></tr></table>
+
 <p>The next step is to click-drag the frame and let up, just like you would do with a text frame. By default, Scribus will display a welcome message, which indicates that at least the configuration for LaTeX is correct. What you see below is the output from LaTeX, rendered in Scribus. The welcome message will be displayed in the language of the user interface as set in the <a href="settings1.html#1">Preferences</a>. If no translation of the message is available, you will see the English version:</p>
 <table width="100%"><tr><td align="center"><img src="images/rf3.png"/></td></tr></table>
 <p>The screenshot above has been made with the default resolution of 72 dpi, which, obviously, isn&rsquo;t enough for printing. You can easily change the resolution as you&rsquo;ll learn below.</p>
@@ -113,7 +116,7 @@ and copying the resulting archive to another machine, Render Frames require the 
 <p><code>&lt;highlighter&gt; &lt;/highlighter&gt;</code> This part is mainly interesting for programmers, as it allows for the creation of indvidual syntax highlighting schemes by using Regular Expressions. For further information see: <a href="http://docs.kde.org/kde3/en/kdeutils/KRegExpEditor/index.html">http://docs.kde.org/kde3/en/kdeutils/KRegExpEditor/index.html</a> and <a href="http://doc.trolltech.com/4.4/qregexp.html">http://doc.trolltech.com/4.4/qregexp.html</a>.</p>
 <p><code>&lt;empty-frame-text&gt;</code> Here you can enter sample text in the markup language of the program you want to use, for instance:</p>
 <p><code>plot sin(x), (cos(x))**2</code></p>
-</p><code>&lt;preamble&gt;</code> If the markup language you want to use requires a preamble, you can enter it here. It will not be displayed in the editor.</p>
+<p><code>&lt;preamble&gt;</code> If the markup language you want to use requires a preamble, you can enter it here. It will not be displayed in the editor.</p>
 <p><code>&lt;postamble&gt;</code> If the markup language you want to use requires a postamble, you can enter it here. It will not be displayed in the editor.</p>
 <p><code>&lt;tab type="settings"&gt;</code> Here&rsquo;s where translations to existing GUI strings as well as new tabs or other UI elements can be added via simple XML entries, for example:</p>
 <p><code>&lt;title&gt;&lt;i18n&gt;</code>
@@ -128,10 +131,10 @@ and copying the resulting archive to another machine, Render Frames require the 
 
 <p>To add a new configuration file, click on the &ldquo;Add&nbsp;&hellip;&rdquo; button, which will bring up a file dialog. Select your file and click &ldquo;Open.&rdquo; The file will then be added to your Render Frame configuration.</p>
 <p>By moving entries of XML configuration files in the list up or down, you can change the order of entries in the editor&rsquo;s drop down list. If you want to use a different XML configuration file for a particular markup language (for example, if you need another default preamble for LaTeX frames in a project), you can change the path to the alternative file by clicking on &ldquo;Change&nbsp;&hellip;&rdquo; or simply add a new configuration file with an appropriate name, like &ldquo;MyLateX.&rdquo;</p>
-<br>If you prefer another editor for your markup, for example if you can&rsquo;t live without Emacs or vi, or if the editor window is simply too small for you, you can override the built-in Scribus Render Frame Editor by using another editor like vi or Kate. Just insert the path to the executable file in the text field &ldquo;External Editor.&rdquo; The external editor won&rsquo;t override the Render Frame editor: As soon as you save your markup from the external editor, Scribus &ldquo;intercepts&rdquo; the data and renders the output into the frame or will display error messages in the &ldquo;Program Messages&rdquo; field. The interception also means that any change to the markup text won&rsquo;t be saved anywhere but in your Scribus file. If you haven&rsquo;t specified an external editor in <i>Preferences &lt; Tools</i>, Scribus will display an error message:</p>
-<br></br>
+<p>If you prefer another editor for your markup, for example if you can&rsquo;t live without Emacs or vi, or if the editor window is simply too small for you, you can override the built-in Scribus Render Frame Editor by using another editor like vi or Kate. Just insert the path to the executable file in the text field &ldquo;External Editor.&rdquo; The external editor won&rsquo;t override the Render Frame editor: As soon as you save your markup from the external editor, Scribus &ldquo;intercepts&rdquo; the data and renders the output into the frame or will display error messages in the &ldquo;Program Messages&rdquo; field. The interception also means that any change to the markup text won&rsquo;t be saved anywhere but in your Scribus file. If you haven&rsquo;t specified an external editor in <i>Preferences &lt; Tools</i>, Scribus will display an error message:</p>
+<br />
 <table width="100%"><tr><td align="center"><img src="images/rf-error3.png"/></td></tr></table>
-<br></br>
+<br />
 <p>In addition, you have the option to start with an empty frame. By checking &ldquo;Force DPI,&rdquo; Scribus will render the output of every Render Frame with the resolution set in the spinbox to the right. It's set to 72 dpi by default for performance reasons. If you want to produce a document for professional printing, you will want to choose a higher resolution.</p>
 </body>
 </html>

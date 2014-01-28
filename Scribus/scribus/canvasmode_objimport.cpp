@@ -23,6 +23,7 @@
 #include <QMouseEvent>
 #include <QPoint>
 #include <QRect>
+#include <QMimeData>
 #include <QDebug>
 
 #include "canvas.h"
@@ -36,6 +37,7 @@
 #include "scribus.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
+#include "selection.h"
 #include "undomanager.h"
 #include "util.h"
 #include "util_icon.h"
@@ -83,12 +85,10 @@ void CanvasMode_ObjImport::enterEvent(QEvent *)
 		setModeCursor();
 		return;
 	}
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 void CanvasMode_ObjImport::leaveEvent(QEvent *e)
 {
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -115,7 +115,7 @@ void CanvasMode_ObjImport::deactivate(bool forGesture)
 //	qDebug() << "CanvasMode_ObjImport::deactivate" << forGesture;
 	setMimeData(NULL);
 	setTransactionSettings(NULL);
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void CanvasMode_ObjImport::mouseDoubleClickEvent(QMouseEvent *m)
@@ -163,6 +163,13 @@ void CanvasMode_ObjImport::mousePressEvent(QMouseEvent *m)
 			m_view->DrawNew();
 		return;
 	}
+}
+
+void CanvasMode_ObjImport::mouseReleaseEvent(QMouseEvent *m)
+{
+	m_canvas->m_viewMode.m_MouseButtonPressed = false;
+	m_canvas->resetRenderMode();
+	m->accept();
 	if ((m->button() == Qt::LeftButton) && m_mimeData)
 	{
 		UndoTransaction* undoTransaction = NULL;
@@ -172,8 +179,15 @@ void CanvasMode_ObjImport::mousePressEvent(QMouseEvent *m)
 		}
 		// Creating QDragEnterEvent outside of Qt is not recommended per docs :S
 		QPoint dropPos = m_view->widget()->mapFromGlobal(m->globalPos());
+		const FPoint mousePointDoc = m_canvas->globalToCanvas(m->globalPos());
 		QDropEvent dropEvent(dropPos, Qt::CopyAction|Qt::MoveAction, m_mimeData, m->buttons(), m->modifiers());
 		m_view->contentsDropEvent(&dropEvent);
+		if (m_doc->m_Selection->count() > 0)
+		{
+			double gx, gy, gh, gw;
+			m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+			m_doc->moveGroup(mousePointDoc.x() - gx, mousePointDoc.y() -gy, false);
+		}
 		// Commit undo transaction if necessary
 		if (undoTransaction)
 		{
@@ -184,13 +198,6 @@ void CanvasMode_ObjImport::mousePressEvent(QMouseEvent *m)
 		// Return to normal mode
 		m_view->requestMode(modeNormal);
 	}
-}
-
-void CanvasMode_ObjImport::mouseReleaseEvent(QMouseEvent *m)
-{
-	m_canvas->m_viewMode.m_MouseButtonPressed = false;
-	m_canvas->resetRenderMode();
-	m->accept();
 //	m_view->stopDragTimer();
 	
 	m_canvas->setRenderModeUseBuffer(false);

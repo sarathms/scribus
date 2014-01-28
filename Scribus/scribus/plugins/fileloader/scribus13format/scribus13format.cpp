@@ -47,19 +47,20 @@ Scribus13Format::Scribus13Format() :
 {
 	// Set action info in languageChange, so we only have to do
 	// it in one place. This includes registering file formats.
+	registerFormats();
 	languageChange();
 }
 
 Scribus13Format::~Scribus13Format()
 {
 	unregisterAll();
-};
+}
 
 void Scribus13Format::languageChange()
 {
-	//(Re)register file formats.
-	unregisterAll();
-	registerFormats();
+	FileFormat* fmt = getFormatByID(FORMATID_SLA13XIMPORT);
+	fmt->trName = tr("Scribus 1.3.0->1.3.3.7 Document");
+	fmt->filter = fmt->trName + " (*.sla *.SLA *.sla.gz *.SLA.GZ *.scd *.SCD *.scd.gz *.SCD.GZ)";
 }
 
 const QString Scribus13Format::fullTrName() const
@@ -98,7 +99,6 @@ void Scribus13Format::registerFormats()
 	fmt.save = false; //Only support 134format saving in 134cvs
 	fmt.colorReading = true;
 	fmt.filter = fmt.trName + " (*.sla *.SLA *.sla.gz *.SLA.GZ *.scd *.SCD *.scd.gz *.SCD.GZ)";
-	fmt.nameMatch = QRegExp("\\.(sla|scd)(\\.gz)?", Qt::CaseInsensitive);
 	fmt.mimeTypes = QStringList();
 	fmt.mimeTypes.append("application/x-scribus");
 	fmt.fileExtensions = QStringList() << "sla" << "sla.gz" << "scd" << "scd.gz";
@@ -696,7 +696,7 @@ bool Scribus13Format::loadFile(const QString & fileName, const FileFormat & /* f
 						ef.Dm = pdfF.attribute("Dm").toInt();
 						ef.M = pdfF.attribute("M").toInt();
 						ef.Di = pdfF.attribute("Di").toInt();
-						m_Doc->pdfOptions().PresentVals.append(ef);
+						EffVal.append(ef);
 					}
 					PFO = PFO.nextSibling();
 				}
@@ -938,6 +938,7 @@ bool Scribus13Format::loadFile(const QString & fileName, const FileFormat & /* f
 				if (pg.tagName()=="FRAMEOBJECT")
 				{
 					FrameItems.append(m_Doc->Items->takeAt(m_Doc->Items->indexOf(Neu)));
+					Neu->LayerID = m_Doc->firstLayerID();
 				}
 				if (Neu->isTableItem)
 				{
@@ -1070,6 +1071,14 @@ bool Scribus13Format::loadFile(const QString & fileName, const FileFormat & /* f
 		layerToSetActive = nl->ID;
 	}
 	m_Doc->setActiveLayer(layerToSetActive);
+	if (!EffVal.isEmpty())
+	{
+		for (int pdoE = 0; pdoE < EffVal.count(); ++pdoE)
+		{
+			if (pdoE < m_Doc->Pages->count())
+				m_Doc->Pages->at(pdoE)->PresentVals = EffVal[pdoE];
+		}
+	}
 	
 	// reestablish textframe links
 	if (itemNext.count() != 0)
@@ -1933,6 +1942,10 @@ PageItem* Scribus13Format::PasteItem(QDomElement *obj, ScribusDoc *doc, const QS
 		currItem->GrStartY = ScCLocale::toDoubleC(obj->attribute("GRSTARTY"), 0.0);
 		currItem->GrEndX = ScCLocale::toDoubleC(obj->attribute("GRENDX"), currItem->width());
 		currItem->GrEndY = ScCLocale::toDoubleC(obj->attribute("GRENDY"), 0.0);
+		currItem->GrFocalX = currItem->GrStartX;
+		currItem->GrFocalY = currItem->GrStartY;
+		currItem->GrScale  = 1.0;
+		currItem->GrSkew  = 0.0;
 		GrColor = obj->attribute("GRCOLOR","");
 		if (!GrColor.isEmpty())
 		{
@@ -2323,6 +2336,7 @@ bool Scribus13Format::loadPage(const QString & fileName, int pageNumber, bool Mp
 					if (pg.tagName()=="FRAMEOBJECT")
 					{
 						FrameItems.append(m_Doc->Items->takeAt(m_Doc->Items->indexOf(Neu)));
+						Neu->LayerID = m_Doc->firstLayerID();
 					}
 				}
 				counter++;
@@ -2553,12 +2567,12 @@ QString Scribus13Format::AskForFont(QString fStr, ScribusDoc *doc)
 	{
 		if ((!prefsManager->appPrefs.fontPrefs.GFontSub.contains(tmpf)) || (!(*m_AvailableFonts)[prefsManager->appPrefs.fontPrefs.GFontSub[tmpf]].usable()))
 		{
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+			qApp->setOverrideCursor(QCursor(Qt::ArrowCursor));
 			MissingFont *dia = new MissingFont(0, tmpf, doc);
 			dia->exec();
 			tmpf = dia->getReplacementFont();
 			delete dia;
-			qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+			qApp->restoreOverrideCursor();
 			prefsManager->appPrefs.fontPrefs.GFontSub[fStr] = tmpf;
 		}
 		else

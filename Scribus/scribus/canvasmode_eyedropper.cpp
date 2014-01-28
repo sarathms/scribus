@@ -24,6 +24,7 @@
 #include <QMouseEvent>
 #include <QPoint>
 #include <QRect>
+#include <QScreen>
 #include <QDebug>
 
 #include "canvas.h"
@@ -74,8 +75,6 @@ void CanvasMode_EyeDropper::enterEvent(QEvent *)
 
 void CanvasMode_EyeDropper::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -100,7 +99,7 @@ void CanvasMode_EyeDropper::activate(bool fromGesture)
 void CanvasMode_EyeDropper::deactivate(bool forGesture)
 {
 //	qDebug() << "CanvasMode_EyeDropper::deactivate" << forGesture;
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 	releaseMouse();
 }
 
@@ -118,6 +117,7 @@ void CanvasMode_EyeDropper::mouseMoveEvent(QMouseEvent *m)
 	/*m->accept();
 	if (commonMouseMove(m))
 		return;*/
+	m->accept();
 }
 
 void CanvasMode_EyeDropper::mousePressEvent(QMouseEvent *m)
@@ -140,9 +140,11 @@ void CanvasMode_EyeDropper::mouseReleaseEvent(QMouseEvent *m)
 
 	releaseMouse();
 
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-
-	QPixmap pm = QPixmap::grabWindow( QApplication::desktop()->winId(), m->globalPos().x(), m->globalPos().y(), 1, 1);
+	m_view->setCursor(QCursor(Qt::ArrowCursor));
+	QPixmap pm;
+	QScreen *screen = QGuiApplication::primaryScreen();
+	if (screen)
+		pm = screen->grabWindow( QApplication::desktop()->winId(), m->globalPos().x(), m->globalPos().y(), 1, 1);
 	QImage i = pm.toImage();
 	QColor selectedColor=i.pixel(0, 0);
 

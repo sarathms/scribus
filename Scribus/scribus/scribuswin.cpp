@@ -73,7 +73,6 @@ void ScribusWin::setView(ScribusView* newView)
 	m_View->previewToolbarButton->setParent(statusFrame);
 	m_View->visualMenu->setParent(statusFrame);
 	statusFrameLayout->addWidget(m_View->unitSwitcher);
-	statusFrameLayout->addWidget(m_View->previewQualitySwitcher);
 	statusFrameLayout->addWidget(m_View->zoomSpinBox);
 	statusFrameLayout->addWidget(m_View->zoomOutToolbarButton);
 	statusFrameLayout->addWidget(m_View->zoomDefaultToolbarButton);
@@ -85,6 +84,7 @@ void ScribusWin::setView(ScribusView* newView)
 	statusFrameLayout->addWidget(m_View->cmsToolbarButton);
 	statusFrameLayout->addWidget(m_View->editOnPreviewToolbarButton);
 	statusFrameLayout->addWidget(m_View->previewToolbarButton);
+	statusFrameLayout->addWidget(m_View->previewQualitySwitcher);
 	statusFrameLayout->addWidget(m_View->visualMenu);
 	statusBar()->addPermanentWidget(statusFrame, 4);
 	currentDir = QDir::currentPath();
@@ -112,6 +112,8 @@ void ScribusWin::slotAutoSave()
 
 void ScribusWin::closeEvent(QCloseEvent *ce)
 {
+	activateWindow();
+	m_MainWindow->newActWin(getSubWin());
 	if (m_Doc->symbolEditMode())
 	{
 		m_MainWindow->editSymbolEnd();
@@ -134,7 +136,6 @@ void ScribusWin::closeEvent(QCloseEvent *ce)
 	{
 		if (m_Doc->isModified() && (m_Doc->viewCount == 1))
 		{
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 			int exit = QMessageBox::information(m_MainWindow, CommonStrings::trWarning, tr("Document:")+" "+
 												QDir::toNativeSeparators(m_Doc->DocName)+"\n"+
 												tr("has been changed since the last save."),
@@ -149,7 +150,7 @@ void ScribusWin::closeEvent(QCloseEvent *ce)
 			{
 				if (m_MainWindow->slotFileSave())
 				{
-					if (m_Doc==m_MainWindow->storyEditor->currentDocument())
+					if (m_Doc == m_MainWindow->storyEditor->currentDocument())
 						m_MainWindow->storyEditor->close();
 				}
 				else
@@ -169,11 +170,3 @@ void ScribusWin::resizeEvent(QResizeEvent *re)
 	statusBar()->setSizeGripEnabled(!isMaximized());
 }
 
-void ScribusWin::windowActivationChange ( bool oldActive )
-{
-	if( isActiveWindow() )
-		QDir::setCurrent( currentDir );
-	else
-		currentDir = QDir::currentPath();
-	QMainWindow::windowActivationChange( oldActive );
-}

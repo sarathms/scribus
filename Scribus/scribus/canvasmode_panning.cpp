@@ -53,8 +53,6 @@ void CanvasMode_Panning::enterEvent(QEvent *)
 
 void CanvasMode_Panning::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -76,7 +74,7 @@ void CanvasMode_Panning::activate(bool fromGesture)
 
 void CanvasMode_Panning::deactivate(bool forGesture)
 {
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void CanvasMode_Panning::mouseDoubleClickEvent(QMouseEvent *m)

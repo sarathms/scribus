@@ -54,6 +54,12 @@ ScPage::ScPage(const double x, const double y, const double b, const double h) :
 {
 	guides.setPage(this);
 	marginPreset = 0;
+	PresentVals.pageEffectDuration = 1;
+	PresentVals.pageViewDuration = 1;
+	PresentVals.effectType = 0;
+	PresentVals.Dm = 0;
+	PresentVals.M = 0;
+	PresentVals.Di = 0;
 }
 
 ScPage::~ScPage()
@@ -323,7 +329,7 @@ void ScPage::restorePageItemCreation(ScItemState<PageItem*> *state, bool isUndo)
 	{
 		if (m_Doc->m_Selection->findItem(ite)!=-1)
 		{
-			if (m_Doc->appMode == modeEdit)
+			if (m_Doc->appMode == modeEdit || m_Doc->appMode == modeEditTable)
 				m_Doc->view()->requestMode(modeNormal);
 			m_Doc->m_Selection->removeItem(ite);
 		}
@@ -379,7 +385,7 @@ void ScPage::restorePageItemDeletion(ScItemState< QList<PageItem*> > *state, boo
 		PageItem* ite = itemList.at(id2);
 		if (m_Doc->m_Selection->findItem(ite)!=-1)
 		{
-			if (m_Doc->appMode == modeEdit)
+			if (m_Doc->appMode == modeEdit || m_Doc->appMode == modeEditTable)
 				m_Doc->view()->requestMode(modeNormal);
 			m_Doc->m_Selection->removeItem(ite);
 		}

@@ -32,6 +32,8 @@ for which a new license (GPL+exception) is in place.
 #include <QToolTip>
 #include <QPainter>
 #include <QProgressDialog>
+#include <QDrag>
+#include <QMimeData>
 
 #include "commonstrings.h"
 #include "cmsettings.h"
@@ -79,7 +81,7 @@ BibView::BibView(QWidget* parent) : QListWidget(parent)
 
  void BibView::startDrag(Qt::DropActions supportedActions)
  {
-	QStringList vectorFiles = LoadSavePlugin::getExtensionsForPreview(FORMATID_ODGIMPORT);
+	QStringList vectorFiles = LoadSavePlugin::getExtensionsForPreview(FORMATID_FIRSTUSER);
 	QString formatD(FormatsManager::instance()->extensionListForFormat(FormatsManager::RASTORIMAGES, 1));
 	QStringList rasterFiles = formatD.split("|");
 	QString dt = objectMap[currentItem()->text()].Data;
@@ -141,7 +143,7 @@ void BibView::dropEvent(QDropEvent *e)
 	}
 	else if ( e->mimeData()->hasFormat("text/uri-list"))
 	{
-		QStringList vectorFiles = LoadSavePlugin::getExtensionsForPreview(FORMATID_ODGIMPORT);
+		QStringList vectorFiles = LoadSavePlugin::getExtensionsForPreview(FORMATID_FIRSTUSER);
 		QString formatD(FormatsManager::instance()->extensionListForFormat(FormatsManager::RASTORIMAGES, 1));
 		QStringList rasterFiles = formatD.split("|");
 		QList<QUrl> fileUrls = e->mimeData()->urls();
@@ -155,7 +157,7 @@ void BibView::dropEvent(QDropEvent *e)
 				FileLoader *fileLoader = new FileLoader(url.path());
 				int testResult = fileLoader->testFile();
 				delete fileLoader;
-				if ((testResult != -1) && (testResult >= FORMATID_ODGIMPORT) && (fi.exists()))
+				if ((testResult != -1) && (testResult >= FORMATID_FIRSTUSER) && (fi.exists()))
 					emit fileDropped(url.path(), testResult);
 			}
 			else if (rasterFiles.contains(fi.suffix().toLower()))
@@ -177,13 +179,49 @@ void BibView::AddObj(QString name, QString daten, QPixmap Bild, bool isDir, bool
 	objectMap.insert(name, DrElem);
 }
 
+void BibView::checkForImg(QDomElement elem, bool &hasImage)
+{
+	QDomNode DOC = elem.firstChild();
+	while(!DOC.isNull())
+	{
+		QDomElement pg = DOC.toElement();
+		if(pg.tagName() == "PAGEOBJECT")
+		{
+			PageItem::ItemType PType = static_cast<PageItem::ItemType>(pg.attribute("PTYPE").toInt());
+			if ((PType == PageItem::ImageFrame) || (PType == PageItem::TextFrame))
+			{
+				QString Pfile = pg.attribute("PFILE");
+				QString Pfile2 = pg.attribute("PFILE2","");
+				QString Pfile3 = pg.attribute("PFILE3","");
+				if (!Pfile.isEmpty())
+					hasImage = true;
+				if (!Pfile2.isEmpty())
+					hasImage = true;
+				if (!Pfile3.isEmpty())
+					hasImage = true;
+			}
+			else if (PType == PageItem::OSGFrame)
+			{
+				QString Pfile = pg.attribute("modelFile");
+				if (!Pfile.isEmpty())
+					hasImage = true;
+			}
+			else if (PType == PageItem::Group)
+				checkForImg(pg, hasImage);
+			if (hasImage)
+				break;
+		}
+		DOC = DOC.nextSibling();
+	}
+}
+
 void BibView::checkAndChange(QString &text, QString nam, QString dir)
 {
+	bool hasImage = false;
 	QDomDocument docu("scridoc");
 	docu.setContent(text);
 	QDomElement elem = docu.documentElement();
 	QDomNode DOC = elem.firstChild();
-	bool hasImage = false;
 	while(!DOC.isNull())
 	{
 		QDomElement pg = DOC.toElement();
@@ -202,6 +240,16 @@ void BibView::checkAndChange(QString &text, QString nam, QString dir)
 				if (!Pfile3.isEmpty())
 					hasImage = true;
 			}
+			else if (PType == PageItem::OSGFrame)
+			{
+				QString Pfile = pg.attribute("modelFile");
+				if (!Pfile.isEmpty())
+					hasImage = true;
+			}
+			else if (PType == PageItem::Group)
+				checkForImg(pg, hasImage);
+			if (hasImage)
+				break;
 		}
 		DOC = DOC.nextSibling();
 	}
@@ -212,7 +260,7 @@ void BibView::checkAndChange(QString &text, QString nam, QString dir)
 		dd.mkdir(QDir::cleanPath(QDir::toNativeSeparators(dir + "/" + fid.baseName())));
 	}
 	QString source = "";
-	QString target = "";
+	QString fileDir = QDir::homePath();
 	bool first = true;
 	DOC = elem.firstChild();
 	while(!DOC.isNull())
@@ -234,7 +282,7 @@ void BibView::checkAndChange(QString &text, QString nam, QString dir)
 						source = QDir::cleanPath(QDir::toNativeSeparators(Pfile));
 					else
 					{
-						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(dir+"/"+Pfile)));
+						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(fileDir+"/"+Pfile)));
 						source = pfi2.absoluteFilePath();
 					}
 					QString target = QDir::cleanPath(QDir::toNativeSeparators(dir + "/" + fid.baseName() + "/" + fi.fileName()));
@@ -249,7 +297,7 @@ void BibView::checkAndChange(QString &text, QString nam, QString dir)
 						source = QDir::cleanPath(QDir::toNativeSeparators(Pfile2));
 					else
 					{
-						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(dir+"/"+Pfile2)));
+						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(fileDir+"/"+Pfile2)));
 						source = pfi2.absoluteFilePath();
 					}
 					QString target = QDir::cleanPath(QDir::toNativeSeparators(dir + "/" + fid.baseName() + "/" + fi.fileName()));
@@ -264,7 +312,7 @@ void BibView::checkAndChange(QString &text, QString nam, QString dir)
 						source = QDir::cleanPath(QDir::toNativeSeparators(Pfile3));
 					else
 					{
-						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(dir+"/"+Pfile3)));
+						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(fileDir+"/"+Pfile3)));
 						source = pfi2.absoluteFilePath();
 					}
 					QString target = QDir::cleanPath(QDir::toNativeSeparators(dir + "/" + fid.baseName() + "/" + fi.fileName()));
@@ -272,6 +320,28 @@ void BibView::checkAndChange(QString &text, QString nam, QString dir)
 					pg.setAttribute("PFILE3", fid.baseName() + "/" + fi.fileName());
 				}
 				pg.setAttribute("relativePaths", 1);
+			}
+			else if (PType == PageItem::OSGFrame)
+			{
+				QString Pfile = pg.attribute("modelFile");
+				if (!Pfile.isEmpty())
+				{
+					QFileInfo fi(Pfile);
+					if (fi.isAbsolute())
+						source = QDir::cleanPath(QDir::toNativeSeparators(Pfile));
+					else
+					{
+						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(fileDir+"/"+Pfile)));
+						source = pfi2.absoluteFilePath();
+					}
+					QString target = QDir::cleanPath(QDir::toNativeSeparators(dir + "/" + fid.baseName() + "/" + fi.fileName()));
+					copyFile(source, target);
+					pg.setAttribute("modelFile", fid.baseName() + "/" + fi.fileName());
+				}
+			}
+			else if (PType == PageItem::Group)
+			{
+				checkAndChangeGroups(pg, dir, fid);
 			}
 		}
 		DOC = DOC.nextSibling();
@@ -284,6 +354,93 @@ void BibView::checkAndChange(QString &text, QString nam, QString dir)
 	s.setDevice(&f);
 	s.writeRawData(cs.data(), cs.length());
 	f.close();
+}
+
+void BibView::checkAndChangeGroups(QDomElement elem, QString dir, QFileInfo fid)
+{
+	QString source = "";
+	QString fileDir = QDir::homePath();
+	QDomNode DOC = elem.firstChild();
+	while(!DOC.isNull())
+	{
+		QDomElement pg = DOC.toElement();
+		if(pg.tagName() == "PAGEOBJECT")
+		{
+			PageItem::ItemType PType = static_cast<PageItem::ItemType>(pg.attribute("PTYPE").toInt());
+			if ((PType == PageItem::ImageFrame) || (PType == PageItem::TextFrame))
+			{
+				QString Pfile = pg.attribute("PFILE");
+				if (!Pfile.isEmpty())
+				{
+					QFileInfo fi(Pfile);
+					if (fi.isAbsolute())
+						source = QDir::cleanPath(QDir::toNativeSeparators(Pfile));
+					else
+					{
+						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(fileDir+"/"+Pfile)));
+						source = pfi2.absoluteFilePath();
+					}
+					QString target = QDir::cleanPath(QDir::toNativeSeparators(dir + "/" + fid.baseName() + "/" + fi.fileName()));
+					copyFile(source, target);
+					pg.setAttribute("PFILE", fid.baseName() + "/" + fi.fileName());
+				}
+				QString Pfile2 = pg.attribute("PFILE2","");
+				if (!Pfile2.isEmpty())
+				{
+					QFileInfo fi(Pfile2);
+					if (fi.isAbsolute())
+						source = QDir::cleanPath(QDir::toNativeSeparators(Pfile2));
+					else
+					{
+						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(fileDir+"/"+Pfile2)));
+						source = pfi2.absoluteFilePath();
+					}
+					QString target = QDir::cleanPath(QDir::toNativeSeparators(dir + "/" + fid.baseName() + "/" + fi.fileName()));
+					copyFile(source, target);
+					pg.setAttribute("PFILE2", fid.baseName() + "/" + fi.fileName());
+				}
+				QString Pfile3 = pg.attribute("PFILE3","");
+				if (!Pfile3.isEmpty())
+				{
+					QFileInfo fi(Pfile3);
+					if (fi.isAbsolute())
+						source = QDir::cleanPath(QDir::toNativeSeparators(Pfile3));
+					else
+					{
+						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(fileDir+"/"+Pfile3)));
+						source = pfi2.absoluteFilePath();
+					}
+					QString target = QDir::cleanPath(QDir::toNativeSeparators(dir + "/" + fid.baseName() + "/" + fi.fileName()));
+					copyFile(source, target);
+					pg.setAttribute("PFILE3", fid.baseName() + "/" + fi.fileName());
+				}
+				pg.setAttribute("relativePaths", 1);
+			}
+			else if (PType == PageItem::OSGFrame)
+			{
+				QString Pfile = pg.attribute("modelFile");
+				if (!Pfile.isEmpty())
+				{
+					QFileInfo fi(Pfile);
+					if (fi.isAbsolute())
+						source = QDir::cleanPath(QDir::toNativeSeparators(Pfile));
+					else
+					{
+						QFileInfo pfi2(QDir::cleanPath(QDir::toNativeSeparators(fileDir+"/"+Pfile)));
+						source = pfi2.absoluteFilePath();
+					}
+					QString target = QDir::cleanPath(QDir::toNativeSeparators(dir + "/" + fid.baseName() + "/" + fi.fileName()));
+					copyFile(source, target);
+					pg.setAttribute("modelFile", fid.baseName() + "/" + fi.fileName());
+				}
+			}
+			else if (PType == PageItem::Group)
+			{
+				checkAndChangeGroups(pg, dir, fid);
+			}
+		}
+		DOC = DOC.nextSibling();
+	}
 }
 
 void BibView::ReadOldContents(QString name, QString newName)
@@ -345,7 +502,7 @@ void BibView::ReadContents(QString name)
 	fileCount += dd.count();
 	QDir d(name, "*.sce", QDir::Name, QDir::Files | QDir::Readable | QDir::NoSymLinks);
 	fileCount += d.count();
-	QStringList vectorFiles = LoadSavePlugin::getExtensionsForPreview(FORMATID_ODGIMPORT);
+	QStringList vectorFiles = LoadSavePlugin::getExtensionsForPreview(FORMATID_FIRSTUSER);
 	for (int v = 0; v < vectorFiles.count(); v++)
 	{
 		QString ext = "*." + vectorFiles[v];
@@ -377,6 +534,8 @@ void BibView::ReadContents(QString name)
 				pgDia->setValue(readCount);
 				readCount++;
 			}
+			if (dd[dc].compare(".ScribusThumbs", Qt::CaseInsensitive) == 0)
+				continue;
 			QPixmap pm = loadIcon("folder.png");
 			AddObj(dd[dc], "", pm, true);
 		}
@@ -444,7 +603,7 @@ void BibView::ReadContents(QString name)
 					FileLoader *fileLoader = new FileLoader(QDir::cleanPath(QDir::toNativeSeparators(name + "/" + d4[dc])));
 					int testResult = fileLoader->testFile();
 					delete fileLoader;
-					if ((testResult != -1) && (testResult >= FORMATID_ODGIMPORT))
+					if ((testResult != -1) && (testResult >= FORMATID_FIRSTUSER))
 					{
 						const FileFormat * fmt = LoadSavePlugin::getFormatById(testResult);
 						if( fmt )
@@ -899,7 +1058,8 @@ void Biblio::reloadLib(QString fileName)
 			bv->ReadContents(fileName);
 			bv->ScFilename = fileName;
 			QDir d(fileName);
-			bv->visibleName = d.dirName();
+			if (a > 1)
+				bv->visibleName = d.dirName();
 			bv->scrollToTop();
 		}
 	}
@@ -1023,7 +1183,6 @@ void Biblio::HandleMouse(QPoint p)
 		pmenu->addMenu(pmenu2);
 		if (activeBView->canWrite)
 			pmenu->addMenu(pmenu3);
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 		pmenu->exec(QCursor::pos());
 		delete pmenu;
 		delete pmenu2;
@@ -1037,22 +1196,13 @@ void Biblio::HandleMouse(QPoint p)
 	else
 	{
 		QMenu *pmenu = new QMenu();
-		QAction* delAct;
-		QAction* saveAct;
-		QAction* closeAct;
-		if (activeBView->objectMap.count() != 0)
-		{
-			saveAct = pmenu->addAction( tr("Save as..."));
-			connect(saveAct, SIGNAL(triggered()), this, SLOT(SaveAs()));
-		}
-		closeAct = pmenu->addAction( tr("Close"));
+		QAction* closeAct = pmenu->addAction( tr("Close"));
 		if ((activeBView->canWrite) && (activeBView->objectMap.count() != 0))
 		{
-			delAct = pmenu->addAction( tr("Delete Contents"));
+			QAction* delAct = pmenu->addAction( tr("Delete Contents"));
 			connect(delAct, SIGNAL(triggered()), this, SLOT(deleteAllObj()));
 		}
 		connect(closeAct, SIGNAL(triggered()), this, SLOT(closeLib()));
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 		pmenu->exec(QCursor::pos());
 		delete pmenu;
 	}
@@ -1067,7 +1217,7 @@ bool Biblio::copyObj(int id)
 	BibView* bv = (BibView*)Frame3->widget(id);
 	if (bv->objectMap.contains(nam))
 	{
-		Query dia(this, "tt", 1, 0, tr("&Name:"), tr("New Entry"));
+		Query dia(this, "tt", 1, tr("&Name:"), tr("New Entry"));
 		dia.setValidator(QRegExp("[\\w()]+"));
 		dia.setEditText(nam, true);
 		dia.setTestList(activeBView->objectMap.keys());
@@ -1256,7 +1406,7 @@ void Biblio::renameObj()
 	QPixmap ObjPreview;
 	QListWidgetItem *ite = actItem;
 	QString OldName = ite->text();
-	Query dia(this, "tt", 1, 0, tr("&Name:"), tr("New Name"));
+	Query dia(this, "tt", 1, tr("&Name:"), tr("New Name"));
 	dia.setValidator(QRegExp("[\\w()]+"));
 	dia.setEditText(ite->text(), true);
 	dia.setTestList(activeBView->objectMap.keys());
@@ -1328,6 +1478,19 @@ void Biblio::adjustReferences(QString nam)
 					}
 					pg.setAttribute("relativePaths", 1);
 				}
+				else if (PType == PageItem::OSGFrame)
+				{
+					QString Pfile = pg.attribute("modelFile");
+					if (!Pfile.isEmpty())
+					{
+						QFileInfo fi(Pfile);
+						pg.setAttribute("modelFile", fid.baseName() + "/" + fi.fileName());
+					}
+				}
+				else if (PType == PageItem::Group)
+				{
+					adjustReferencesGroups(pg, fid);
+				}
 			}
 			DOC = DOC.nextSibling();
 		}
@@ -1339,6 +1502,55 @@ void Biblio::adjustReferences(QString nam)
 		s.setDevice(&fl);
 		s.writeRawData(cs.data(), cs.length());
 		fl.close();
+	}
+}
+
+void Biblio::adjustReferencesGroups(QDomElement elem, QFileInfo fid)
+{
+	QDomNode DOC = elem.firstChild();
+	while(!DOC.isNull())
+	{
+		QDomElement pg = DOC.toElement();
+		if(pg.tagName() == "PAGEOBJECT")
+		{
+			PageItem::ItemType PType = static_cast<PageItem::ItemType>(pg.attribute("PTYPE").toInt());
+			if ((PType == PageItem::ImageFrame) || (PType == PageItem::TextFrame))
+			{
+				QString Pfile = pg.attribute("PFILE");
+				if (!Pfile.isEmpty())
+				{
+					QFileInfo fi(Pfile);
+					pg.setAttribute("PFILE", fid.baseName() + "/" + fi.fileName());
+				}
+				QString Pfile2 = pg.attribute("PFILE2","");
+				if (!Pfile2.isEmpty())
+				{
+					QFileInfo fi(Pfile2);
+					pg.setAttribute("PFILE2", fid.baseName() + "/" + fi.fileName());
+				}
+				QString Pfile3 = pg.attribute("PFILE3","");
+				if (!Pfile3.isEmpty())
+				{
+					QFileInfo fi(Pfile3);
+					pg.setAttribute("PFILE3", fid.baseName() + "/" + fi.fileName());
+				}
+				pg.setAttribute("relativePaths", 1);
+			}
+			else if (PType == PageItem::OSGFrame)
+			{
+				QString Pfile = pg.attribute("modelFile");
+				if (!Pfile.isEmpty())
+				{
+					QFileInfo fi(Pfile);
+					pg.setAttribute("modelFile", fid.baseName() + "/" + fi.fileName());
+				}
+			}
+			else if (PType == PageItem::Group)
+			{
+				adjustReferencesGroups(pg, fid);
+			}
+		}
+		DOC = DOC.nextSibling();
 	}
 }
 
@@ -1385,8 +1597,7 @@ void Biblio::ObjFromFile(QString path, int testResult)
 			if (activeBView->objectMap.contains(nam))
 				nam += "("+ tmp.setNum(tempCount) + ")";
 		}
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-		Query dia(this, "tt", 1, 0, tr("&Name:"), tr("New Entry"));
+		Query dia(this, "tt", 1, tr("&Name:"), tr("New Entry"));
 		dia.setValidator(QRegExp("[\\w()]+"));
 		dia.setEditText(nam, true);
 		dia.setTestList(activeBView->objectMap.keys());
@@ -1488,6 +1699,7 @@ void Biblio::ObjFromFile(QString path, int testResult)
 			}
 			emit updateRecentMenue();
 		}
+		reloadLib(activeBView->ScFilename);
 	}
 }
 
@@ -1513,8 +1725,7 @@ void Biblio::ObjFromMenu(QString text)
 		if (activeBView->objectMap.contains(nam))
 			nam += "("+ tmp.setNum(tempCount) + ")";
 	}
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-	Query dia(this, "tt", 1, 0, tr("&Name:"), tr("New Entry"));
+	Query dia(this, "tt", 1, tr("&Name:"), tr("New Entry"));
 	dia.setValidator(QRegExp("[\\w()]+"));
 	dia.setEditText(nam, true);
 	dia.setTestList(activeBView->objectMap.keys());
@@ -1585,6 +1796,7 @@ void Biblio::ObjFromMenu(QString text)
 			}
 		}
 		emit updateRecentMenue();
+		reloadLib(activeBView->ScFilename);
 	}
 }
 
@@ -1658,6 +1870,7 @@ void Biblio::ObjFromCopyAction(QString text, QString name)
 			delete tempBView->takeItem(tempBView->row(ite));
 		}
 	}
+	reloadLib(tempBView->ScFilename);
 }
 
 void Biblio::ObjFromMainMenu(QString text, int scrapID)
@@ -1675,8 +1888,7 @@ void Biblio::ObjFromMainMenu(QString text, int scrapID)
 		nam = tr("Object") + tmp.setNum(actBView->objectMap.count());
 	if (actBView->objectMap.contains(nam))
 		nam += "("+ tmp.setNum(tempCount) + ")";
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-	Query dia(this, "tt", 1, 0, tr("&Name:"), tr("New Entry"));
+	Query dia(this, "tt", 1, tr("&Name:"), tr("New Entry"));
 	dia.setValidator(QRegExp("[\\w()]+"));
 	dia.setEditText(nam, true);
 	dia.setTestList(activeBView->objectMap.keys());
@@ -1709,6 +1921,7 @@ void Biblio::ObjFromMainMenu(QString text, int scrapID)
 	QListWidgetItem *item = new QListWidgetItem(QIcon(pm2), nam, actBView);
 	actBView->objectMap[nam].widgetItem = item;
 	delete pre;
+	reloadLib(actBView->ScFilename);
 }
 
 void Biblio::CleanUpTemp()

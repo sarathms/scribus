@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
  *   You should have received a copy of the GNU General Public License     *
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
- *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
  ***************************************************************************/
 
 #include "undomanager.h"
@@ -50,6 +50,18 @@ for which a new license (GPL+exception) is in place.
 */
 struct TransactionData : public Transaction::TransactionStateBase
 {
+	TransactionData() {
+		transactionObject = 0;
+		transactionState = 0;
+	}
+
+	~TransactionData() {
+		if (transactionObject)
+			delete transactionObject;
+		if (transactionState)
+			delete transactionState;
+	}
+
 	int stackLevel;
 	UndoManager* UM;
 	UndoObject* transactionObject;  // will be DummyUndoObject

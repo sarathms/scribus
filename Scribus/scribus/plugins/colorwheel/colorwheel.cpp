@@ -48,6 +48,7 @@ void ColorWheelPlugin::languageChange()
 	m_actionInfo.text = tr("&Color Wheel...");
 	// Menu
 	m_actionInfo.menu = "Extras";
+	m_actionInfo.menuAfterName = "extrasManageImages";
 	m_actionInfo.enabledOnStartup = false;
 	m_actionInfo.needsNumObjects = -1;
 }
@@ -86,7 +87,7 @@ bool ColorWheelPlugin::run(ScribusDoc* doc, QString target)
 		currDoc=ScCore->primaryMainWindow()->doc;
 	if (currDoc==0)
 		return false;
-	CWDialog *dlg = new CWDialog(currDoc->scMW(), currDoc, "dlg", true, 0);
+	CWDialog *dlg = new CWDialog(currDoc->scMW(), currDoc, "dlg", true);
 	if (dlg)
 	{
 		dlg->exec();

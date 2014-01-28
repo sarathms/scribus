@@ -23,12 +23,15 @@ for which a new license (GPL+exception) is in place.
 #include "inlinepalette.h"
 #include <QPainter>
 #include <QByteArray>
+#include <QDrag>
+#include <QMimeData>
 #include "pageitem.h"
 #include "pageitem_table.h"
 #include "pageitem_textframe.h"
 #include "scribusdoc.h"
 #include "scribus.h"
 #include "selection.h"
+#include "util_icon.h"
 
 InlineView::InlineView(QWidget* parent) : QListWidget(parent)
 {
@@ -107,6 +110,7 @@ InlinePalette::InlinePalette( QWidget* parent) : ScDockPalette( parent, "Inline"
 
 	unsetDoc();
 	m_scMW  = NULL;
+	currentEditedItem = -1;
 	languageChange();
 	connect(InlineViewWidget, SIGNAL(itemDoubleClicked(QListWidgetItem *)), this, SLOT(handleDoubleClick(QListWidgetItem *)));
 	connect(InlineViewWidget, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(handleContextMenue(QPoint)));
@@ -115,14 +119,16 @@ InlinePalette::InlinePalette( QWidget* parent) : ScDockPalette( parent, "Inline"
 
 void InlinePalette::handleContextMenue(QPoint p)
 {
+	if (currentEditedItem > 0)
+		return;
 	QListWidgetItem *item = InlineViewWidget->itemAt(p);
 	if (item)
 	{
 		actItem = item->data(Qt::UserRole).toInt();
 		bool txFrame = false;
-		if (!currDoc->m_Selection->isEmpty())
+		if (!m_doc->m_Selection->isEmpty())
 		{
-			PageItem* selItem = currDoc->m_Selection->itemAt(0);
+			PageItem* selItem = m_doc->m_Selection->itemAt(0);
 			if ((selItem->isTextFrame() || selItem->isTable()))
 				txFrame = true;
 		}
@@ -132,7 +138,7 @@ void InlinePalette::handleContextMenue(QPoint p)
 			QAction* pasteAct = pmenu->addAction( tr("Paste to Item"));
 			connect(pasteAct, SIGNAL(triggered()), this, SLOT(handlePasteToItem()));
 		}
-		if ((currDoc->appMode != modeEdit) && (currDoc->appMode != modeEditTable))
+		if ((m_doc->appMode != modeEdit) && (m_doc->appMode != modeEditTable))
 		{
 			QAction* editAct = pmenu->addAction( tr("Edit Item"));
 			connect(editAct, SIGNAL(triggered()), this, SLOT(handleEditItem()));
@@ -147,7 +153,7 @@ void InlinePalette::handleContextMenue(QPoint p)
 
 void InlinePalette::handlePasteToItem()
 {
-	PageItem* selItem = currDoc->m_Selection->itemAt(0);
+	PageItem* selItem = m_doc->m_Selection->itemAt(0);
 	PageItem_TextFrame *currItem;
 	if (selItem->isTable())
 		currItem = selItem->asTable()->activeCell().textFrame();
@@ -175,14 +181,15 @@ void InlinePalette::handleDoubleClick(QListWidgetItem *item)
 
 void InlinePalette::handleDeleteItem()
 {
-	currDoc->removeInlineFrame(actItem);
+	m_doc->removeInlineFrame(actItem);
 	QListWidgetItem* item = InlineViewWidget->takeItem(InlineViewWidget->currentRow());
 	delete item;
 	InlineViewWidget->update();
 }
 
-void InlinePalette::editingStart()
+void InlinePalette::editingStart(int itemID)
 {
+	currentEditedItem = itemID;
 	for (int a = 0; a < InlineViewWidget->count(); a++)
 	{
 		QListWidgetItem* item = InlineViewWidget->item(a);
@@ -194,6 +201,7 @@ void InlinePalette::editingStart()
 void InlinePalette::editingFinished()
 {
 	updateItemList();
+	currentEditedItem = -1;
 }
 
 void InlinePalette::setMainWindow(ScribusMainWindow *mw)
@@ -211,24 +219,24 @@ void InlinePalette::setMainWindow(ScribusMainWindow *mw)
 void InlinePalette::setDoc(ScribusDoc *newDoc)
 {
 	if (m_scMW == NULL)
-		currDoc = NULL;
+		m_doc = NULL;
 	else
-		currDoc = newDoc;
-	if (currDoc == NULL)
+		m_doc = newDoc;
+	if (m_doc == NULL)
 	{
 		InlineViewWidget->clear();
 		setEnabled(true);
 	}
 	else
 	{
-		setEnabled(!currDoc->drawAsPreview);
+		setEnabled(!m_doc->drawAsPreview);
 		updateItemList();
 	}
 }
 
 void InlinePalette::unsetDoc()
 {
-	currDoc = NULL;
+	m_doc = NULL;
 	InlineViewWidget->clear();
 	setEnabled(true);
 }
@@ -243,7 +251,9 @@ void InlinePalette::updateItemList()
 {
 	InlineViewWidget->clear();
 	InlineViewWidget->setWordWrap(true);
-	for (QHash<int, PageItem*>::iterator it = currDoc->FrameItems.begin(); it != currDoc->FrameItems.end(); ++it)
+	if (!m_doc)
+		return;
+	for (QHash<int, PageItem*>::iterator it = m_doc->FrameItems.begin(); it != m_doc->FrameItems.end(); ++it)
 	{
 		PageItem *currItem = it.value();
 		QPixmap pm = QPixmap::fromImage(currItem->DrawObj_toImage(48));
@@ -251,6 +261,9 @@ void InlinePalette::updateItemList()
 		pm2.fill(palette().color(QPalette::Base));
 		QPainter p;
 		p.begin(&pm2);
+		QBrush b(QColor(205,205,205), loadIcon("testfill.png"));
+		p.setBrush(b);
+		p.drawRect(0, 0, 50, 50);
 		p.drawPixmap(25 - pm.width() / 2, 25 - pm.height() / 2, pm);
 		p.end();
 		QListWidgetItem *item = new QListWidgetItem(pm2, currItem->itemName(), InlineViewWidget);

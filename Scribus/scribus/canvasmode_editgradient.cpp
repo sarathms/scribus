@@ -238,8 +238,6 @@ void CanvasMode_EditGradient::enterEvent(QEvent *)
 
 void CanvasMode_EditGradient::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -264,7 +262,7 @@ void CanvasMode_EditGradient::activate(bool fromGesture)
 void CanvasMode_EditGradient::deactivate(bool forGesture)
 {
 //	qDebug() << "CanvasMode_EditGradient::deactivate" << forGesture;
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void CanvasMode_EditGradient::mouseDoubleClickEvent(QMouseEvent *m)
@@ -920,7 +918,7 @@ void CanvasMode_EditGradient::mousePressEvent(QMouseEvent *m)
 		OldGrMaskScale = currItem->GrMaskScale;
 		OldGrMaskSkew = currItem->GrMaskSkew;
 	}
-	qApp->changeOverrideCursor(QCursor(Qt::CrossCursor));
+	m_view->setCursor(QCursor(Qt::CrossCursor));
 }
 
 void CanvasMode_EditGradient::mouseReleaseEvent(QMouseEvent *m)

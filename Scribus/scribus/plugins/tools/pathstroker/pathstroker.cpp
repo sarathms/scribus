@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
 *   You should have received a copy of the GNU General Public License      *
 *   along with this program; if not, write to the                          *
 *   Free Software Foundation, Inc.,                                        *
-*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.              *
+*   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.              *
 ****************************************************************************/
 
 #if defined(_MSC_VER) && !defined(_USE_MATH_DEFINES)
@@ -149,7 +149,7 @@ bool PathStrokerPlugin::run(ScribusDoc* doc, QString)
 			if (currItem->startArrowIndex() != 0)
 			{
 				FPoint Start = currItem->PoLine.point(0);
-				for (uint xx = 1; xx < currItem->PoLine.size(); xx += 2)
+				for (int xx = 1; xx < currItem->PoLine.size(); xx += 2)
 				{
 					FPoint Vector = currItem->PoLine.point(xx);
 					if ((Start.x() != Vector.x()) || (Start.y() != Vector.y()))
@@ -266,7 +266,7 @@ bool PathStrokerPlugin::run(ScribusDoc* doc, QString)
 			if (currItem->startArrowIndex() != 0)
 			{
 				FPoint Start = currItem->PoLine.point(0);
-				for (uint xx = 1; xx < currItem->PoLine.size(); xx += 2)
+				for (int xx = 1; xx < currItem->PoLine.size(); xx += 2)
 				{
 					FPoint Vector = currItem->PoLine.point(xx);
 					if ((Start.x() != Vector.x()) || (Start.y() != Vector.y()))

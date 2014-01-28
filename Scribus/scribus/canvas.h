@@ -180,7 +180,7 @@ public:
 	 (this flag is ignored in masterpage mode, since all items are masterpage items then).
 	 */
 	PageItem* itemUnderCursor(QPoint globalPos, PageItem* itemAbove=NULL, bool allowInGroup=false, bool allowMasterItems=false) const;
-	PageItem* itemInGroup(PageItem* group, QTransform itemPos, QRectF mouseArea) const;
+	PageItem* itemInGroup(PageItem* group, QRectF mouseArea) const;
 	PageItem* itemUnderItem(PageItem* item, int& index) const;
 	
 	const QPolygon& redrawPolygon() const { return m_viewMode.redrawPolygon; }
@@ -189,6 +189,7 @@ public:
 		m_viewMode.redrawPolygon.clear();
 		return m_viewMode.redrawPolygon;
 	}
+	void setForcedRedraw(bool on) { m_viewMode.forceRedraw = on; }
 	void setPreviewMode(bool on) { m_viewMode.previewMode = on; }
 	bool isPreviewMode() const { return m_viewMode.previewMode || m_viewMode.viewAsPreview; }
 	bool usePreviewVisual() const { return m_viewMode.viewAsPreview && m_viewMode.previewVisual != 0; }

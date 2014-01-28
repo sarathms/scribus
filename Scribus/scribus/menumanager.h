@@ -25,12 +25,16 @@ for which a new license (GPL+exception) is in place.
 #include <QObject>
 #include <QPoint>
 #include <QMenu>
+#include <QList>
+#include <QMap>
+#include <QPointer>
+#include <QString>
 
 class QMenuBar;
 
 #include "scribusapi.h"
+#include "actionmanager.h"
 class ScrAction;
-class ScrPopupMenu;
 class ScribusMainWindow;
 
 /**
@@ -45,37 +49,46 @@ class SCRIBUS_API MenuManager : public QObject
 
 		enum MenuType {Normal, DLL};
 
-		bool createMenu(const QString &menuName, const QString &menuText = QString::null, const QString parent = QString::null, bool checkable = false);
-		bool addMenuToMenu(const QString & child, const QString &parent);
-		bool deleteMenu(const QString &menuName, const QString &parent = QString::null);
-		bool clearMenu(const QString &menuName);
-		void setText(const QString &menuName, const QString &menuText);
-		void setMenuIcon(const QString &menuName, const QIcon &menuIcon);
-		QMenu *getLocalPopupMenu(const QString &menuName);
-		void setMenuEnabled(const QString &menuName, const bool enabled);
-		bool addMenuToMenuBar(const QString &menuName);
-		bool addMenuToMenuBarBefore(const QString &, const QString &);
-		bool removeMenuFromMenuBar(const QString &menuName);
 		bool addMenuToWidgetOfAction(const QString &menuName, ScrAction *action);
-
-		bool addMenuItem(ScrAction *menuAction, const QString &parent, bool enabled);
-		bool addMenuItemAfter(ScrAction *menuAction, const QString &parent, bool enabled, ScrAction *afterMenuAction);
-		bool addMenuSeparator(const QString &parent);
-
+		bool createMenu(const QString &menuName, const QString &menuText = QString::null, const QString parent = QString::null, bool checkable = false, bool rememberMenu = false);
 		bool removeMenuItem(ScrAction *menuAction, const QString &parent);
-
-		void runMenuAtPos(const QString &, const QPoint);
-
 		void generateKeyManList(QStringList *actionNames);
+		void runMenuAtPos(const QString &, const QPoint);
+		void setMenuEnabled(const QString &menuName, const bool enabled);
+		void setText(const QString &menuName, const QString &menuText);
+
+
+
+		QMenu *getLocalPopupMenu(const QString &menuName);
+		bool addMenuStringToMenuBar(const QString &menuName, bool rememberMenu=false);
+		bool addMenuStringToMenuBarBefore(const QString &, const QString &beforeMenuName);
+		void clear();
+		bool clearMenu(const QString &menuName);
 		bool empty();
 		bool menuExists(const QString &menuName);
+		void addMenuItemString(const QString& s, const QString &parent);
+		void addMenuItemStringAfter(const QString &s, const QString &after, const QString &parent);
+		void addMenuItemStringstoMenu(const QString &menuName, QMenu *menuToAddTo, const QMap<QString, QPointer<ScrAction> > &menuActions);
+		void addMenuItemStringstoRememberedMenu(const QString &menuName, const QMap<QString, QPointer<ScrAction> > &menuActions);
+		void addMenuItemStringstoMenuBar(const QString &menuName, const QMap<QString, QPointer<ScrAction> > &menuActions);
+		void clearMenuStrings(const QString &menuName);
+		void dumpMenuStrings();
+		QMenu *undoMenu() {return m_undoMenu;}
+		QMenu *redoMenu() {return m_redoMenu;}
 
 	public slots:
-		void languageChange() {};
+		void languageChange();
 
-private:
+protected:
 	QMenuBar *scribusMenuBar;
-	QMap<QString, ScrPopupMenu *> menuList;
+
+	QMap<QString, QList<QString> > menuStrings;
+	QMap<QString, QString> menuStringTexts;
+	QMap<QString, QMenu*> menuBarMenus;
+	QMap<QString, QMenu*> rememberedMenus;
+	//some hacks to keep undo menu functioning for now
+	QMenu *m_undoMenu;
+	QMenu *m_redoMenu;
 };
 
 #endif

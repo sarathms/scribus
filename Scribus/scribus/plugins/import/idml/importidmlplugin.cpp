@@ -60,12 +60,15 @@ void ImportIdmlPlugin::languageChange()
 	FileFormat* fmt = getFormatByExt("idml");
 	fmt->trName = tr("Adobe Indesign IDML");
 	fmt->filter = tr("Adobe Indesign IDML (*.idml *.IDML)");
+	FileFormat* fmt2 = getFormatByExt("idms");
+	fmt2->trName = tr("Adobe Indesign IDMS");
+	fmt2->filter = tr("Adobe Indesign IDMS (*.idms *.IDMS)");
 }
 
 ImportIdmlPlugin::~ImportIdmlPlugin()
 {
 	unregisterAll();
-};
+}
 
 const QString ImportIdmlPlugin::fullTrName() const
 {
@@ -96,7 +99,6 @@ void ImportIdmlPlugin::registerFormats()
 	fmt.trName = tr("Adobe Indesign IDML");
 	fmt.filter = tr("Adobe Indesign IDML (*.idml *.IDML)");
 	fmt.formatId = 0;
-	fmt.nameMatch = QRegExp("\\.idml$", Qt::CaseInsensitive);
 	fmt.fileExtensions = QStringList() << "idml";
 	fmt.load = true;
 	fmt.save = false;
@@ -111,7 +113,6 @@ void ImportIdmlPlugin::registerFormats()
 	fmt2.trName = tr("Adobe Indesign IDMS");
 	fmt2.filter = tr("Adobe Indesign IDMS (*.idms *.IDMS)");
 	fmt2.formatId = 0;
-	fmt2.nameMatch = QRegExp("\\.idms$", Qt::CaseInsensitive);
 	fmt2.fileExtensions = QStringList() << "idms";
 	fmt2.load = true;
 	fmt2.save = false;

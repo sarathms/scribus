@@ -41,7 +41,6 @@ for which a new license (GPL+exception) is in place.
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
-#include "text/nlsconfig.h"
 #include "fontcombo.h"
 #include "colorcombo.h"
 
@@ -265,7 +264,7 @@ void PropertiesPalette_Text::handleSelectionChanged()
 		setCurrentItem(currItem);
 	}
 	updateGeometry();
-	repaint();
+	//repaint();
 }
 
 void PropertiesPalette_Text::handleUpdateRequest(int updateFlags)
@@ -341,6 +340,11 @@ void PropertiesPalette_Text::setCurrentItem(PageItem *i)
 	}
 
 	m_haveItem = true;
+
+	if (!sender())
+	{
+		parEffectWidgets->handleSelectionChanged();
+	}
 
 	if (m_item->asTextFrame() || m_item->asPathText() || m_item->asTable())
 	{

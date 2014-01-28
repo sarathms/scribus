@@ -231,7 +231,7 @@ bool DrwPlug::import(QString fNameIn, const TransactionSettings& trSettings, int
 	if (!(flags & LoadSavePlugin::lfLoadAsPattern))
 		m_Doc->view()->updatesOn(false);
 	m_Doc->scMW()->setScriptRunning(true);
-	qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+	qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 	QString CurDirP = QDir::currentPath();
 	QDir::setCurrent(fi.path());
 	if (convert(fName))
@@ -327,6 +327,7 @@ bool DrwPlug::import(QString fNameIn, const TransactionSettings& trSettings, int
 		if ((showProgress) && (!interactive))
 			m_Doc->view()->DrawNew();
 	}
+	qApp->restoreOverrideCursor();
 	return success;
 }
 
@@ -903,13 +904,16 @@ void DrwPlug::decodeCmd(quint8 cmd, int pos)
 				{
 					if (currentItem != NULL)
 					{
-						currentItem->tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_drw_XXXXXX.png");
-						currentItem->tempImageFile->open();
-						QString fileName = getLongPathName(currentItem->tempImageFile->fileName());
-						currentItem->tempImageFile->close();
+						QTemporaryFile *tempFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_drw_XXXXXX.png");
+						tempFile->setAutoRemove(false);
+						tempFile->open();
+						QString fileName = getLongPathName(tempFile->fileName());
+						tempFile->close();
 						currentItem->isInlineImage = true;
+						currentItem->isTempFile = true;
 						tmpImage.save(fileName, "PNG");
 						m_Doc->loadPict(fileName, currentItem);
+						delete tempFile;
 						currentItem->setImageScalingMode(false, false);
 					}
 					imageValid = false;
@@ -964,7 +968,7 @@ void DrwPlug::decodeCmd(quint8 cmd, int pos)
 			{
 				if (currentItem->asImageFrame())
 				{
-					QString fileName = getLongPathName(currentItem->tempImageFile->fileName());
+					QString fileName = currentItem->Pfile;
 					if (!fileName.isEmpty())
 					{
 						QVector<QRgb> colors;
@@ -1262,10 +1266,8 @@ void DrwPlug::decodeSymbol(QDataStream &ds, bool last)
 	ds >> flags;
 	QPainterPath path;
 	QPointF posEnd, posMid, posStart;
-	QTransform mat;
 	QLineF sLin, eLin;
-	FPoint wh;
-//	QPointF position = getCoordinate(ds);
+	getCoordinate(ds);						// don't remove dummy parameters
 	double boundingBoxX = getValue(ds);
 	double boundingBoxY = getValue(ds);
 	double boundingBoxW = getValue(ds);
@@ -1874,11 +1876,14 @@ void DrwPlug::handleGradient(PageItem* currentItem, quint8 patternIndex, QString
 				ScPattern pat = ScPattern();
 				pat.setDoc(m_Doc);
 				PageItem* newItem = new PageItem_ImageFrame(m_Doc, 0, 0, 1, 1, 0, CommonStrings::None, CommonStrings::None);
-				newItem->tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_drw_XXXXXX.png");
-				newItem->tempImageFile->open();
-				QString fileName = getLongPathName(newItem->tempImageFile->fileName());
-				newItem->tempImageFile->close();
+				QTemporaryFile *tempFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_drw_XXXXXX.png");
+				tempFile->setAutoRemove(false);
+				tempFile->open();
+				QString fileName = getLongPathName(tempFile->fileName());
+				tempFile->close();
+				delete tempFile;
 				newItem->isInlineImage = true;
+				newItem->isTempFile = true;
 				image.setDotsPerMeterY(2834);
 				image.setDotsPerMeterX(2834);
 				image.save(fileName, "PNG");
@@ -2002,6 +2007,9 @@ void DrwPlug::finishItem(PageItem* ite, bool scale)
 			ite->setLineWidth(ite->lineWidth() / qMin(scx, scy));
 		}
 	}
+	FPoint wh = getMaxClipF(&ite->PoLine);
+	ite->setWidthHeight(wh.x(),wh.y());
+	m_Doc->AdjustItemSize(ite);
 	ite->OldB2 = ite->width();
 	ite->OldH2 = ite->height();
 	ite->updateClip();

@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
  *   You should have received a copy of the GNU General Public License     *
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
- *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
  ***************************************************************************/
 
 #include <QGlobalStatic>
@@ -47,9 +47,7 @@ ContentReader::ContentReader(QString documentName, StyleReader *s, gtWriter *w, 
 	defaultStyle = NULL;
 	currentStyle = NULL;
 	inList = false;
-	inNote = false;
 	inAnnotation = false;
-	inNoteBody = false;
 	inSpan = false;
 	append = 0;
 	listIndex = 0;
@@ -116,7 +114,9 @@ bool ContentReader::startElement(const QString&, const QString&, const QString &
 		for (int i = 0; i < attrs.count(); ++i)
 		{
 			if (attrs.localName(i) == "text:style-name")
+			{
 				currentList = attrs.value(i);
+			}
 		}
 		currentStyle = sreader->getStyle(QString(currentList + "_%1").arg(listLevel));
 		currentListStyle = sreader->getList(currentList);
@@ -136,9 +136,9 @@ bool ContentReader::startElement(const QString&, const QString&, const QString &
 	else if (name == "office:annotation")
 		inAnnotation = true;
 	else if (name == "text:note")
-		inNote = true;
+		writer->inNote = true;
 	else if (name == "text:note-body")
-		inNoteBody = true;
+		writer->inNoteBody = true;
 	else if (name == "style:style")
 	{
 		QString sname = "";
@@ -206,7 +206,7 @@ bool ContentReader::endElement(const QString&, const QString&, const QString &na
 // 		qDebug("TPTH");
 		write("\n");
 		--append;
-		if (inList || inAnnotation || inNote || inNoteBody)
+		if (inList || inAnnotation)
 		{
 			if(static_cast<int>(styleNames.size()) > 0)
 				styleNames.pop_back();
@@ -230,12 +230,13 @@ bool ContentReader::endElement(const QString&, const QString&, const QString &na
 	else if (name == "text:note")
 	{
 // 		qDebug("TN");
-		inNote = false;
+		writer->inNote = false;
 	}
 	else if (name == "text:note-body")
 	{
 // 		qDebug("TNB");
-		inNoteBody = false;
+		write(SpecialChars::OBJECT);
+		writer->inNoteBody = false;
 	}
 	else if (name == "text:line-break")
 	{
@@ -280,7 +281,7 @@ bool ContentReader::endElement(const QString&, const QString&, const QString &na
 
 void ContentReader::write(const QString& text)
 {
-	if (!inNote && !inNoteBody && !inAnnotation) // Disable notes import for now
+	if (!inAnnotation)
 	{
 		if (importTextOnly)
 			writer->appendUnstyled(text);

@@ -47,9 +47,9 @@ FontReplaceDialog::FontReplaceDialog( QWidget* parent, QMap<QString, QString> *R
 	replacementTable->setSortingEnabled(false);
 	replacementTable->setSelectionBehavior( QAbstractItemView::SelectRows );
 	QHeaderView *header = replacementTable->horizontalHeader();
-	header->setMovable(false);
-	header->setClickable(false);
-	header->setResizeMode(QHeaderView::Stretch);
+	header->setSectionsClickable(false );
+	header->setSectionsMovable( false );
+	header->setSectionResizeMode(QHeaderView::Stretch);
 	replacementTable->verticalHeader()->hide();
 	replacementTable->setSizePolicy(QSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding));
 	replacementTable->setRowCount(RList->count());
@@ -81,7 +81,7 @@ FontReplaceDialog::FontReplaceDialog( QWidget* parent, QMap<QString, QString> *R
 	resize( QSize(450, 250) );
 
 	cancelButton->setToolTip( "<qt>" + tr( "Cancels these font substitutions and stops loading the document.") + "</qt>" );
-	stickyReplacements->setToolTip( "<qt>" + tr( "Enabling this tells Scribus to use these replacements for missing fonts permanently in all future layouts. This can be reverted or changed in Edit > Preferences > Fonts.") + "</qt>" );
+	stickyReplacements->setToolTip( "<qt>" + tr( "Enabling this tells Scribus to use these replacements for missing fonts permanently in all future layouts. This can be reverted or changed in File > Preferences > Fonts.") + "</qt>" );
 	okButton->setToolTip( "<qt>" + tr( "If you select OK, then save, these substitutions are made permanent in the document.") + "</qt>" );
 	connect(okButton, SIGNAL(clicked()), this, SLOT(leaveOK()));
 	connect(cancelButton, SIGNAL(clicked()), this, SLOT(reject()));

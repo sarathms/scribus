@@ -284,8 +284,6 @@ void CanvasMode_EditMeshPatch::enterEvent(QEvent *)
 
 void CanvasMode_EditMeshPatch::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -312,7 +310,7 @@ void CanvasMode_EditMeshPatch::activate(bool fromGesture)
 
 void CanvasMode_EditMeshPatch::deactivate(bool forGesture)
 {
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 	m_patchPoint = noPointDefined;
 	m_gradientPoint = noControlPointDefined;
 	m_click_count = 0;
@@ -962,7 +960,7 @@ void CanvasMode_EditMeshPatch::mousePressEvent(QMouseEvent *m)
 	}
 	m_canvas->m_viewMode.m_MouseButtonPressed = true;
 	m_ScMW->propertiesPalette->updateColorSpecialGradient();
-	qApp->changeOverrideCursor(QCursor(Qt::CrossCursor));
+	m_view->setCursor(QCursor(Qt::CrossCursor));
 	m_doc->regionsChanged()->update(itemMatrix.mapRect(QRectF(0, 0, currItem->width(), currItem->height())).adjusted(-currItem->width() / 2.0, -currItem->height() / 2.0, currItem->width(), currItem->height()));
 
 }

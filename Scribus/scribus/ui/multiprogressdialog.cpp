@@ -21,20 +21,18 @@ for which a new license (GPL+exception) is in place.
 *   You should have received a copy of the GNU General Public License     *
 *   along with this program; if not, write to the                         *
 *   Free Software Foundation, Inc.,                                       *
-*   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+*   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
 ***************************************************************************/
 
 #include "multiprogressdialog.h"
 
-MultiProgressDialog::MultiProgressDialog(QWidget* parent, Qt::WFlags f)
-: QDialog(parent, f)
+MultiProgressDialog::MultiProgressDialog(QWidget* parent) : QDialog(parent)
 {
 	setupUi(this);
 	connect(buttonCancel, SIGNAL(clicked()), this, SLOT(emitCancel()));
 }
 
-MultiProgressDialog::MultiProgressDialog(const QString& titleText, const QString & cancelButtonText, QWidget* parent, Qt::WFlags f)
-: QDialog(parent, f)
+MultiProgressDialog::MultiProgressDialog(const QString& titleText, const QString & cancelButtonText, QWidget* parent) : QDialog(parent)
 {
 	setupUi(this);
 	setWindowTitle(titleText);

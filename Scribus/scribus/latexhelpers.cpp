@@ -50,7 +50,7 @@ void LatexHighlighter::highlightBlock(const QString &text)
 		int index = text.indexOf(rule->regex);
 		while (index >= 0) {
 			int length;
-			if (rule->regex.numCaptures() == 0)
+			if (rule->regex.captureCount() == 0)
 			{
 				length = rule->regex.matchedLength();
 			}

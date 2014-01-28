@@ -276,7 +276,6 @@ void CanvasMode::drawSelection(QPainter* psx, bool drawHandles)
 	bb.setCosmetic(true);
 	psx->scale(m_canvas->scale(), m_canvas->scale());
 	psx->translate(-m_doc->minCanvasCoordinate.x(), -m_doc->minCanvasCoordinate.y());
-	
 	psx->setClipping(true);
 	psx->setClipRegion(QRegion ( m_canvas->exposedRect() ) );
 	if (m_doc->m_Selection->isMultipleSelection())
@@ -559,6 +558,7 @@ void CanvasMode::drawOutline(QPainter* p, double scalex, double scaley, double d
 						p->rotate(currItem->rotation());
 					}
 					p->scale(scalex, scaley);
+					p->drawRect(QRectF(0.0, 0.0, currItem->visualWidth(), currItem->visualHeight()));
 					PageItem_Group* gItem = currItem->asGroupFrame();
 					uint itemCountG = gItem->groupItemList.count();
 					if (itemCountG < m_canvas->moveWithFullOutlinesThreshold)
@@ -581,6 +581,20 @@ void CanvasMode::drawOutline(QPainter* p, double scalex, double scaley, double d
 				}
 				else
 				{
+					p->save();
+					p->setBrush(m_brush["outline"]);
+					p->setPen(m_pen["outline"]);
+					p->translate(currItem->visualXPos(), currItem->visualYPos());
+					p->translate(deltax, deltay);
+					if (currItem->rotation() != 0)
+					{
+						p->setRenderHint(QPainter::Antialiasing);
+						p->rotate(currItem->rotation());
+					}
+					p->scale(scalex, scaley);
+					p->drawRect(QRectF(0.0, 0.0, currItem->visualWidth(), currItem->visualHeight()));
+					p->restore();
+
 					p->save();
 					p->setBrush(m_brush["outline"]);
 					p->setPen(m_pen["outline"]);
@@ -658,6 +672,19 @@ void CanvasMode::drawOutline(QPainter* p, double scalex, double scaley, double d
 							p->save();
 							p->setBrush(m_brush["outline"]);
 							p->setPen(m_pen["outline"]);
+							p->translate(currItem->visualXPos(), currItem->visualYPos());
+							p->translate(deltax, deltay);
+							if (currItem->rotation() != 0)
+							{
+								p->setRenderHint(QPainter::Antialiasing);
+								p->rotate(currItem->rotation());
+							}
+							p->scale(scalex, scaley);
+							p->drawRect(QRectF(0.0, 0.0, currItem->visualWidth(), currItem->visualHeight()));
+							p->restore();
+							p->save();
+							p->setBrush(m_brush["outline"]);
+							p->setPen(m_pen["outline"]);
 							p->translate(currItem->xPos(), currItem->yPos());
 							p->translate(deltax, deltay);
 							if (currItem->rotation() != 0)
@@ -682,7 +709,7 @@ void CanvasMode::drawOutline(QPainter* p, double scalex, double scaley, double d
 						p->setRenderHint(QPainter::Antialiasing);
 						p->rotate(currItem->rotation());
 					}
-					p->drawRect(QRectF(0.0, 0.0, currItem->width()+1.0, currItem->height()+1.0));
+					p->drawRect(QRectF(0.0, 0.0, currItem->visualWidth(), currItem->visualHeight()));
 				}
 				p->restore();
 			}
@@ -787,50 +814,50 @@ void CanvasMode::setModeCursor()
 		case modeDrawShapes:
 		case modeDrawArc:
 		case modeDrawSpiral:
-			qApp->changeOverrideCursor(QCursor(loadIcon("DrawFrame.xpm")));
+			m_view->setCursor(QCursor(loadIcon("DrawFrame.xpm")));
 			break;
 		case modeDrawImage:
-			qApp->changeOverrideCursor(QCursor(loadIcon("DrawImageFrame.xpm")));
+			m_view->setCursor(QCursor(loadIcon("DrawImageFrame.xpm")));
 			break;
 		case modeDrawLatex:
-			qApp->changeOverrideCursor(QCursor(loadIcon("DrawLatexFrame.xpm")));
+			m_view->setCursor(QCursor(loadIcon("DrawLatexFrame.xpm")));
 			break;
 		case modeDrawText:
-			qApp->changeOverrideCursor(QCursor(loadIcon("DrawTextFrame.xpm")));
+			m_view->setCursor(QCursor(loadIcon("DrawTextFrame.xpm")));
 			break;
 		case modeDrawTable2:
-			qApp->changeOverrideCursor(QCursor(loadIcon("DrawTable.xpm")));
+			m_view->setCursor(QCursor(loadIcon("DrawTable.xpm")));
 			break;
 		case modeDrawRegularPolygon:
-			qApp->changeOverrideCursor(QCursor(loadIcon("DrawPolylineFrame.xpm")));
+			m_view->setCursor(QCursor(loadIcon("DrawPolylineFrame.xpm")));
 			break;
 		case modeDrawLine:
 		case modeDrawBezierLine:
-			qApp->changeOverrideCursor(QCursor(Qt::CrossCursor));
+			m_view->setCursor(QCursor(Qt::CrossCursor));
 			break;
 		case modeDrawFreehandLine:
-			qApp->changeOverrideCursor(QCursor(loadIcon("DrawFreeLine.png"), 0, 31));
+			m_view->setCursor(QCursor(loadIcon("DrawFreeLine.png"), 0, 31));
 			break;
 		case modeDrawCalligraphicLine:
-			qApp->changeOverrideCursor(QCursor(loadIcon("DrawCalligraphy.xpm"), 4, 4));
+			m_view->setCursor(QCursor(loadIcon("DrawCalligraphy.xpm"), 4, 4));
 			break;
 		case modeImportObject:
-			qApp->changeOverrideCursor(QCursor(loadIcon("DragPix.xpm")));
+			m_view->setCursor(QCursor(loadIcon("DragPix.xpm")));
 			break;
 		case modeMagnifier:
 			if (m_view->Magnify)
-				qApp->changeOverrideCursor(QCursor(loadIcon("LupeZ.xpm")));
+				m_view->setCursor(QCursor(loadIcon("LupeZ.xpm")));
 			else
-				qApp->changeOverrideCursor(QCursor(loadIcon("LupeZm.xpm")));
+				m_view->setCursor(QCursor(loadIcon("LupeZm.xpm")));
 			break;
 		case modePanning:
-			qApp->changeOverrideCursor(QCursor(loadIcon("HandC.xpm")));
+			m_view->setCursor(QCursor(loadIcon("HandC.xpm")));
 			break;
 		case modeEyeDropper:
-			qApp->changeOverrideCursor(QCursor(loadIcon("colorpickercursor.png"), 0, 31));
+			m_view->setCursor(QCursor(loadIcon("colorpickercursor.png"), 0, 31));
 			break;
 		case modeLinkFrames:
-			qApp->changeOverrideCursor(QCursor(loadIcon("LinkTextFrame.png"), 0, 31));
+			m_view->setCursor(QCursor(loadIcon("LinkTextFrame.png"), 0, 31));
 			break;
 		case modeMeasurementTool:
 		case modeEditGradientVectors:
@@ -849,10 +876,10 @@ void CanvasMode::setModeCursor()
 		case modeEditArc:
 		case modeEditPolygon:
 		case modeEditSpiral:
-			qApp->changeOverrideCursor(QCursor(Qt::CrossCursor));
+			m_view->setCursor(QCursor(Qt::CrossCursor));
 			break;
 		default:
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+			m_view->setCursor(QCursor(Qt::ArrowCursor));
 			break;
 	}
 }
@@ -906,22 +933,22 @@ void CanvasMode::setResizeCursor(int how, double rot)
 	{
 		case 1:
 		case 2:
-			qApp->changeOverrideCursor(ScResizeCursor(135 + rot));// Qt::SizeFDiagCursor
+			m_view->setCursor(ScResizeCursor(135 + rot));// Qt::SizeFDiagCursor
 			break;
 		case 3:
 		case 4:
-			qApp->changeOverrideCursor(ScResizeCursor(45 + rot));// Qt::SizeBDiagCursor
+			m_view->setCursor(ScResizeCursor(45 + rot));// Qt::SizeBDiagCursor
 			break;
 		case 5:
 		case 8:
-			qApp->changeOverrideCursor(ScResizeCursor(0 + rot));// Qt::SizeVerCursor
+			m_view->setCursor(ScResizeCursor(0 + rot));// Qt::SizeVerCursor
 			break;
 		case 6:
 		case 7:
-			qApp->changeOverrideCursor(ScResizeCursor(90 + rot));// Qt::SizeHorCursor
+			m_view->setCursor(ScResizeCursor(90 + rot));// Qt::SizeHorCursor
 			break;
 		default:
-			qApp->changeOverrideCursor(QCursor(Qt::SizeAllCursor));
+			m_view->setCursor(QCursor(Qt::SizeAllCursor));
 			break;
 	}
 }
@@ -958,7 +985,7 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 	textframe->itemText.normalizeCursorPosition();
 	int textCursorPos ( textframe->itemText.cursorPosition() );
 
-	if ( textframe->lastInFrame() >= signed ( textframe->itemText.nrOfItems() )
+	if ( textframe->lastInFrame() >= textframe->itemText.length()
 		 || textframe->itemText.length() == 0 )
 	{
 		dx = textframe->textToFrameDistLeft();
@@ -1033,7 +1060,7 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 				FRect bbox = textframe->itemText.boundingBox ( textCursorPos );
 				dx = bbox.x();
 				dy = bbox.y();
-				dx += textframe->itemText.item ( textCursorPos )->glyph.wide();
+                dx += textframe->itemText.getGlyphs(textCursorPos)->wide();
 				if ( bbox.height() <= 2 )
 					dy1 = bbox.y() + textframe->itemText.charStyle ( textCursorPos ).fontSize() / 30.0;
 				else
@@ -1045,7 +1072,7 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 			FRect bbox = textframe->itemText.boundingBox ( textCursorPos );
 			dx = bbox.x();
 			dy = bbox.y();
-			dx += textframe->itemText.item ( textCursorPos )->glyph.wide();
+            dx += textframe->itemText.getGlyphs(textCursorPos)->wide();
 			if ( bbox.height() <= 2 )
 				dy1 = bbox.y() + textframe->itemText.charStyle ( textCursorPos ).fontSize() / 30.0;
 			else
@@ -1067,9 +1094,12 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 		cPen.setColor ( ScColorEngine::getRGBColor ( m_doc->PageColors[textframe->itemText.charStyle ( textCursorPos ).fillColor() ], m_doc ) );
 	}
 	//handle Right to Left writing
-	if ( textframe->reversed() )
+	if (textframe->imageFlippedH())
+		dx = textframe->width() - dx;
+	if (textframe->imageFlippedV())
 	{
-		dx=textframe->width()-dx;
+		dy  = textframe->height() - dy;
+		dy1 = textframe->height() - dy1;
 	}
 	p->save();
 	p->setTransform(textframe->getTransform(), true);
@@ -1150,7 +1180,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 		if (currKeySeq.matches(scrActions["viewShowContextMenu"]->shortcut()) == QKeySequence::ExactMatch)
 		{
 			ContextMenu* cmen=NULL;
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+			m_view->setCursor(QCursor(Qt::ArrowCursor));
 			if (m_doc->m_Selection->count() == 0)
 			{
 				//CB We should be able to get this calculated by the canvas.... it is already in m_canvas->globalToCanvas(m->globalPos());
@@ -1388,7 +1418,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 								poly = m.map(poly);
 								QRectF oldR = poly.boundingRect().adjusted(-5, -5, 10, 10);
 								QRectF newR(currItem->getBoundingRect());
-								m_doc->regionsChanged()->update(newR.unite(oldR));
+								m_doc->regionsChanged()->update(newR.united(oldR));
 							}
 							m_doc->nodeEdit.ClRe = storedClRe;
 						}
@@ -1462,7 +1492,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 								poly = m.map(poly);
 								QRectF oldR = poly.boundingRect().adjusted(-5, -5, 10, 10);
 								QRectF newR(currItem->getBoundingRect());
-								m_doc->regionsChanged()->update(newR.unite(oldR));
+								m_doc->regionsChanged()->update(newR.united(oldR));
 							}
 							m_doc->nodeEdit.ClRe = storedClRe;
 						}
@@ -1536,7 +1566,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 								poly = m.map(poly);
 								QRectF oldR = poly.boundingRect().adjusted(-5, -5, 10, 10);
 								QRectF newR(currItem->getBoundingRect());
-								m_doc->regionsChanged()->update(newR.unite(oldR));
+								m_doc->regionsChanged()->update(newR.united(oldR));
 							}
 							m_doc->nodeEdit.ClRe = storedClRe;
 						}
@@ -1610,7 +1640,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 								poly = m.map(poly);
 								QRectF oldR = poly.boundingRect().adjusted(-5, -5, 10, 10);
 								QRectF newR(currItem->getBoundingRect());
-								m_doc->regionsChanged()->update(newR.unite(oldR));
+								m_doc->regionsChanged()->update(newR.united(oldR));
 							}
 							m_doc->nodeEdit.ClRe = storedClRe;
 						}
@@ -1676,7 +1706,7 @@ void CanvasMode::commonkeyReleaseEvent(QKeyEvent *e)
 	if ((m_doc->appMode == modePanning) && (e->key() == Qt::Key_Control) && (QApplication::mouseButtons() & Qt::RightButton))
 		m_view->requestMode(modeNormal);
 	if (m_doc->appMode == modeMagnifier)
-		qApp->changeOverrideCursor(QCursor(loadIcon("LupeZ.xpm")));
+		m_view->setCursor(QCursor(loadIcon("LupeZ.xpm")));
 	if (e->isAutoRepeat() || !m_arrowKeyDown)
 		return;
 	switch(e->key())

@@ -581,12 +581,3 @@ void Tpalette::unitChange(double, double, int unitIndex)
 	currentUnit = unitIndex;
 }
 
-void Tpalette::changeEvent(QEvent *e)
-{
-	if (e->type() == QEvent::LanguageChange)
-	{
-		languageChange();
-	}
-	else
-		QWidget::changeEvent(e);
-}

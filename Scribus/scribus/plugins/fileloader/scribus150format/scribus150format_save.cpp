@@ -81,8 +81,8 @@ QString Scribus150Format::saveElements(double xp, double yp, double wp, double h
 				uint chr = currItem->itemText.text(e).unicode();
 				if (chr == 25)
 				{
-					if ((currItem->itemText.item(e)->hasObject(m_Doc)) && (!emF.contains(currItem->itemText.item(e)->getItem(m_Doc))))
-						emF.append(currItem->itemText.item(e)->getItem(m_Doc));
+                    if ((currItem->itemText.hasObject(e)) && (!emF.contains(currItem->itemText.object(e))))
+                        emF.append(currItem->itemText.object(e));
 				}
 			}
 		}
@@ -422,8 +422,12 @@ bool Scribus150Format::saveFile(const QString & fileName, const FileFormat & /* 
 	}
 	else if (QFile::exists(tmpFileName))
 		QFile::remove(tmpFileName);
-	if (writeSucceed) 
+	if (writeSucceed)
 		QFile::remove(tmpFileName);
+#ifdef Q_OS_UNIX
+	if (writeSucceed)
+		QFile::setPermissions(fileName, m_Doc->filePermissions());
+#endif
 	return writeSucceed;
 }
 
@@ -450,7 +454,12 @@ void Scribus150Format::writeCheckerProfiles(ScXmlStreamWriter & docu)
 		docu.writeAttribute("checkRasterPDF", static_cast<int>(itcp.value().checkRasterPDF));
 		docu.writeAttribute("checkForGIF", static_cast<int>(itcp.value().checkForGIF));
 		docu.writeAttribute("ignoreOffLayers", static_cast<int>(itcp.value().ignoreOffLayers));
-		//docu.writeEndElement();
+		docu.writeAttribute("checkNotCMYKOrSpot", static_cast<int>(itcp.value().checkNotCMYKOrSpot));
+		docu.writeAttribute("checkDeviceColorsAndOutputIntent", static_cast<int>(itcp.value().checkDeviceColorsAndOutputIntent));
+		docu.writeAttribute("checkFontNotEmbedded", static_cast<int>(itcp.value().checkFontNotEmbedded));
+		docu.writeAttribute("checkFontIsOpenType", static_cast<int>(itcp.value().checkFontIsOpenType));
+		docu.writeAttribute("checkAppliedMasterDifferentSide", static_cast<int>(itcp.value().checkAppliedMasterDifferentSide));
+		docu.writeAttribute("checkEmptyTextFrames", static_cast<int>(itcp.value().checkEmptyTextFrames));
 	}
 }
 
@@ -486,7 +495,7 @@ void Scribus150Format::writeLinestyles(ScXmlStreamWriter& docu)
 			QString arp = "";
 			QString tmp, tmpy;
 			double xa, ya;
-			for (uint nxx = 0; nxx < (*itar).points.size(); ++nxx)
+			for (int nxx = 0; nxx < (*itar).points.size(); ++nxx)
 			{
 				(*itar).points.point(nxx, &xa, &ya);
 				arp += tmp.setNum(xa) + " " + tmpy.setNum(ya) + " ";
@@ -1067,6 +1076,7 @@ void Scribus150Format::writePdfOptions(ScXmlStreamWriter & docu)
 	docu.writeAttribute("Compress", static_cast<int>(m_Doc->pdfOptions().Compress));
 	docu.writeAttribute("CMethod", m_Doc->pdfOptions().CompressMethod);
 	docu.writeAttribute("Quality", m_Doc->pdfOptions().Quality);
+	docu.writeAttribute("EmbedPDF", static_cast<int>(m_Doc->pdfOptions().embedPDF));
 	docu.writeAttribute("MirrorH", static_cast<int>(m_Doc->pdfOptions().MirrorH));
 	docu.writeAttribute("MirrorV", static_cast<int>(m_Doc->pdfOptions().MirrorV));
 	docu.writeAttribute("Clip", static_cast<int>(m_Doc->pdfOptions().doClip));
@@ -1129,16 +1139,6 @@ void Scribus150Format::writePdfOptions(ScXmlStreamWriter & docu)
 	{
 		docu.writeEmptyElement("Subset");
 		docu.writeAttribute("Name", m_Doc->pdfOptions().SubsetList[pdoS]);
-	}
-	for (int pdoE = 0; pdoE < m_Doc->pdfOptions().PresentVals.count(); ++pdoE)
-	{
-		docu.writeEmptyElement("Effekte");
-		docu.writeAttribute("pageEffectDuration", m_Doc->pdfOptions().PresentVals[pdoE].pageEffectDuration);
-		docu.writeAttribute("pageViewDuration", m_Doc->pdfOptions().PresentVals[pdoE].pageViewDuration);
-		docu.writeAttribute("effectType", m_Doc->pdfOptions().PresentVals[pdoE].effectType);
-		docu.writeAttribute("Dm", m_Doc->pdfOptions().PresentVals[pdoE].Dm);
-		docu.writeAttribute("M", m_Doc->pdfOptions().PresentVals[pdoE].M);
-		docu.writeAttribute("Di", m_Doc->pdfOptions().PresentVals[pdoE].Di);
 	}
 	QMap<QString,LPIData>::Iterator itlp;
 	for (itlp = m_Doc->pdfOptions().LPISettings.begin(); itlp != m_Doc->pdfOptions().LPISettings.end(); ++itlp)
@@ -1505,6 +1505,12 @@ void Scribus150Format::WritePages(ScribusDoc *doc, ScXmlStreamWriter& docu, QPro
 		docu.writeAttribute("AGhorizontalAutoRefer", page->guides.horizontalAutoRefer());
 		docu.writeAttribute("AGverticalAutoRefer", page->guides.verticalAutoRefer());
 		docu.writeAttribute("AGSelection", GuideManagerIO::writeSelection(page));
+		docu.writeAttribute("pageEffectDuration", page->PresentVals.pageEffectDuration);
+		docu.writeAttribute("pageViewDuration", page->PresentVals.pageViewDuration);
+		docu.writeAttribute("effectType", page->PresentVals.effectType);
+		docu.writeAttribute("Dm", page->PresentVals.Dm);
+		docu.writeAttribute("M", page->PresentVals.M);
+		docu.writeAttribute("Di", page->PresentVals.Di);
 		docu.writeEndElement();
 	}
 }
@@ -1517,7 +1523,7 @@ namespace { // anon
 		int lastPos = from;
 		for (int i = from; i < to; ++i)
 		{
-			if (itemText.charStyle(i).effects() & ScStyle_HyphenationPossible 
+			if (itemText.hasFlag(i, ScLayout_HyphenationPossible)
 				// duplicate SHYPHEN if already present to indicate a user provided SHYPHEN:
 				|| itemText.text(i) == SpecialChars::SHYPHEN)
 			{
@@ -1589,9 +1595,9 @@ void Scribus150Format::writeITEXTs(ScribusDoc *doc, ScXmlStreamWriter &docu, Pag
 			docu.writeAttribute("Unicode", tmpnum);
 			docu.writeAttribute("COBJ", item->itemText.object(k)->inlineCharID);
 		}
-		else if (ch == SpecialChars::OBJECT && item->itemText.item(k)->mark != NULL)
+        else if (ch == SpecialChars::OBJECT && item->itemText.hasMark(k))
 		{
-			Mark* mark = item->itemText.item(k)->mark;
+            Mark* mark = item->itemText.mark(k);
 			if (!mark->isType(MARKBullNumType))
 			{ //dont save marks for bullets and numbering
 				docu.writeEmptyElement("MARK");
@@ -2715,6 +2721,17 @@ void Scribus150Format::SetItemProps(ScXmlStreamWriter& docu, PageItem* item, con
 		docu.writeAttribute("TransBlend", item->fillBlendmode());
 	if (item->lineBlendmode() != 0)
 		docu.writeAttribute("TransBlendS", item->lineBlendmode());
+	if (item->hasSoftShadow())
+	{
+		docu.writeAttribute("HASSOFTSHADOW",item->hasSoftShadow() ? 1 : 0);
+		docu.writeAttribute("SOFTSHADOWXOFFSET",item->softShadowXOffset());
+		docu.writeAttribute("SOFTSHADOWYOFFSET",item->softShadowYOffset());
+		docu.writeAttribute("SOFTSHADOWCOLOR",item->softShadowColor());
+		docu.writeAttribute("SOFTSHADOWBLURRADIUS",item->softShadowBlurRadius());
+		docu.writeAttribute("SOFTSHADOWSHADE",item->softShadowShade());
+		docu.writeAttribute("SOFTSHADOWBLENDMODE",item->softShadowBlendMode());
+		docu.writeAttribute("SOFTSHADOWOPACITY",item->softShadowOpacity());
+	}
 
 	if (item->isTable())
 	{
@@ -2759,6 +2776,7 @@ void Scribus150Format::SetItemProps(ScXmlStreamWriter& docu, PageItem* item, con
 	{
 		docu.writeAttribute("groupWidth", item->groupWidth);
 		docu.writeAttribute("groupHeight", item->groupHeight);
+		docu.writeAttribute("groupClips", item->groupClipping());
 	}
 	if (item->DashValues.count() != 0)
 	{

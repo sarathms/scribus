@@ -36,6 +36,7 @@ for which a new license (GPL+exception) is in place.
 #include <QRectF>
 #include <QStringList>
 #include <QTimer>
+#include <QFile>
 
 #include "gtgettext.h" //CB For the ImportSetup struct and itemadduserframe
 #include "scribusapi.h"
@@ -61,9 +62,6 @@ for which a new license (GPL+exception) is in place.
 #include "undostate.h"
 #include "updatemanager.h"
 #include "usertaskstructs.h"
-
-#include <ft2build.h>
-#include FT_FREETYPE_H
 
 class DocUpdater;
 class FPoint;
@@ -523,6 +521,8 @@ public:
 	 * @param list QStringList to insert the layer names into
 	 */
 	void orderedLayerList(QStringList* list);
+
+	int firstLayerID();
 	//Items
 	bool deleteTaggedItems();
 
@@ -1046,6 +1046,8 @@ public:
 	void itemSelection_SetNamedCharStyle(const QString & name, Selection* customSelection=0);
 	void itemSelection_SetNamedLineStyle(const QString & name, Selection* customSelection=0);
 
+	void itemSelection_SetSoftShadow(bool has, QString color, double dx, double dy, double radius, int shade, double opac, int blend);
+
 	void itemSelection_SetLineWidth(double w);
 	void itemSelection_SetLineArt(Qt::PenStyle w);
 	void itemSelection_SetLineJoin(Qt::PenJoinStyle w);
@@ -1181,12 +1183,15 @@ public:
 	int addToInlineFrames(PageItem *item);
 	void removeInlineFrame(int fIndex);
 	void checkItemForFrames(PageItem *it, int fIndex);
+	bool hasPreflightErrors();
+	QFileDevice::Permissions filePermissions() { return docFilePermissions; }
+	void saveFilePermissions(QFileDevice::Permissions p) { docFilePermissions=p; }
 
 protected:
 	void addSymbols();
 	void applyPrefsPageSizingAndMargins(bool resizePages, bool resizeMasterPages, bool resizePageMargins, bool resizeMasterPageMargins);
-
 	bool m_hasGUI;
+	QFileDevice::Permissions docFilePermissions;
 	ApplicationPrefs& appPrefsData;
 	ApplicationPrefs docPrefsData;
 	UndoManager * const undoManager;
@@ -1349,6 +1354,7 @@ public:
 	};
 	QList<OpenNodesList> OpenNodes;
 	QTimer *CurTimer;
+	QMap<int, errorCodes> pageErrors;
 	QMap<int, errorCodes> docLayerErrors;
 	QMap<PageItem*, errorCodes> docItemErrors;
 	QMap<PageItem*, errorCodes> masterItemErrors;

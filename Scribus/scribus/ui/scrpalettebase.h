@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
  *   You should have received a copy of the GNU General Public License     *
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
- *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
  ***************************************************************************/
 #ifndef SCRPALETTE_BASE_H
 #define SCRPALETTE_BASE_H
@@ -40,7 +40,7 @@ class SCRIBUS_API ScrPaletteBase : public QDialog
 	Q_OBJECT
 
 	public:
-		ScrPaletteBase( QWidget * parent = NULL, const QString& prefsContext = QString::null, bool modal = false, Qt::WFlags f = 0 );
+		ScrPaletteBase( QWidget * parent = NULL, const QString& prefsContext = QString::null, bool modal = false, Qt::WindowFlags f = 0 );
 		~ScrPaletteBase() {};
 		/** @brief Sample way to grab keystrokes, simply calls superclass at this point */
 		//virtual void keyPressEvent(QKeyEvent *keyEvent);
@@ -50,6 +50,7 @@ class SCRIBUS_API ScrPaletteBase : public QDialog
 	public slots:
 		virtual void setPaletteShown(bool);
 		virtual void setFontSize();
+		virtual int exec() { return QDialog::exec();}
 		int exec(QWidget* newParent);
 		
 	signals:

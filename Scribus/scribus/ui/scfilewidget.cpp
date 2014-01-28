@@ -6,14 +6,17 @@ for which a new license (GPL+exception) is in place.
 */
 
 #include <QDesktopServices>
+#include <QListView>
 #include <QPushButton>
 #include <QUrl>
 
+#include "scescapecatcher.h"
 #include "scfilewidget.h"
 
 
 ScFileWidget::ScFileWidget(QWidget * parent) : QFileDialog(parent, Qt::Widget)
 {
+	setOption(QFileDialog::DontUseNativeDialog);
 	setSizeGripEnabled(false);
 	setModal(false);
 	setViewMode(QFileDialog::List);
@@ -31,6 +34,13 @@ ScFileWidget::ScFileWidget(QWidget * parent) : QFileDialog(parent, Qt::Widget)
 	setSidebarUrls(urls);
 #endif
 
+	ScEscapeCatcher* keyCatcher = new ScEscapeCatcher(this);
+	QList<QListView *> lv = findChildren<QListView *>();
+	QListIterator<QListView *> lvi(lv);
+	while (lvi.hasNext())
+		lvi.next()->installEventFilter(keyCatcher);
+	connect(keyCatcher, SIGNAL(escapePressed()), this, SLOT(reject()));
+
 	QList<QPushButton *> b = findChildren<QPushButton *>();
 	QListIterator<QPushButton *> i(b);
 	while (i.hasNext())
@@ -47,11 +57,11 @@ QString ScFileWidget::selectedFile()
 	return l.at(0);
 }
 
-/* Hack to make the previews in our Fildialogs useable again
+/* Hack to make the previews in our file dialogs useable again
    needed e.g on OpenSuse patched Qt versions */
 void ScFileWidget::accept()
 {
-#ifndef Q_WS_X11
+#ifndef Q_OS_LINUX
 	QFileDialog::accept();
 #endif
 }

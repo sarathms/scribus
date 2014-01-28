@@ -57,8 +57,6 @@ class SCRIBUS_API Cpalette : public QWidget, Ui::colorPalette
 public:
 	Cpalette(QWidget* parent);
 	~Cpalette() {};
-	
-	virtual void changeEvent(QEvent *e);
 
 	void setDocument(ScribusDoc* doc);
 
@@ -180,6 +178,9 @@ protected:
 
 	void   setCurrentItem(PageItem* item);
 	void   updateFromItem();
+
+	void   setGradientVectorValues();
+	void   setGradientVectorStrokeValues();
 
 	int    m_blockUpdates;
 	void   blockUpdates(bool block) { if (block) ++m_blockUpdates; else --m_blockUpdates; }

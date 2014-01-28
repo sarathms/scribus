@@ -52,13 +52,14 @@ class SCRIBUS_API LocaleDef
 
 class SCRIBUS_API LocaleManager
 {
-	static LocaleManager* m_instance;
 	LocaleManager() {};
 	~LocaleManager();
+
 	void init();
 	
 public:
 	static LocaleManager* instance();
+	static void deleteInstance();
 
 	const QString getUnitFromLocale(QString);
 	void printSelectedForLocale(const QString &locale);
@@ -66,6 +67,8 @@ public:
 	QString unitForLocale(const QString &locale);
 
 private:
+	static LocaleManager* m_instance;
+
 	QList <LocaleDef> localeTable;
 	QLocale sysLocale;
 	void generateLocaleList();

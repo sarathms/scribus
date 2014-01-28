@@ -45,9 +45,8 @@ public:
 	PDFExportDialog( QWidget* parent, const QString & docFileName,
 					 const QMap<QString, int > & DocFonts,
 					 ScribusView * currView, PDFOptions & pdfOptions,
-					 const QList<PDFPresentationData> & Eff,
 					 const ProfilesL & PDFXProfiles, const SCFonts & AllFonts,
-					 double unitRatio, const ProfilesL & printerProfiles);
+					 const ProfilesL & printerProfiles);
 	~PDFExportDialog() {};
 
 	void updateDocOptions();
@@ -77,13 +76,13 @@ protected:
 	TabPDFOptions* Options;
 
 	// Other members
-	ScribusDoc* doc;
-	QList<PDFPresentationData> EffVal;
-	PDFOptions & Opts;
-	double docUnitRatio;
-	QString cmsDescriptorName;
-	int components;
-	const ProfilesL & appPrinterProfiles;
+	ScribusDoc* m_doc;
+	QList<PDFPresentationData> m_presEffects;
+	PDFOptions & m_opts;
+	double m_unitRatio;
+	QString m_cmsDescriptor;
+	int m_components;
+	const ProfilesL & m_printerProfiles;
 };
 
 #endif // PDF_OPTS_H

@@ -77,7 +77,7 @@ public:
 	void setMainWindow(ScribusMainWindow *mw);
 	void setDoc(ScribusDoc *);
 	void unsetDoc();
-	void editingStart();
+	void editingStart(int itemID);
 	void editingFinished();
 	void updateItemList();
 	
@@ -100,9 +100,10 @@ signals:
 protected:
 	InlineView *InlineViewWidget;
 	QVBoxLayout* PaletteLayout;
-	ScribusDoc *currDoc;
+	ScribusDoc *m_doc;
 	ScribusMainWindow *m_scMW;
 	int actItem;
+	int currentEditedItem;
 };
 
 #endif

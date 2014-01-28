@@ -37,30 +37,31 @@
 #include <QWidgetAction>
 #include <QDebug>
 
-#include "ui/aligndistribute.h"
 #include "canvas.h"
-#include "ui/contextmenu.h"
 #include "fpoint.h"
 #include "fpointarray.h"
 #include "hyphenator.h"
 #include "pageitem_textframe.h"
-#include "ui/pageselector.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
-#include "ui/propertiespalette.h"
 #include "sccolorengine.h"
 #include "sclimits.h"
 #include "scribus.h"
+#include "scribusXml.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
-#include "scribusXml.h"
 #include "selection.h"
+#include "ui/aligndistribute.h"
+#include "ui/contextmenu.h"
+#include "ui/pageselector.h"
+#include "ui/propertiespalette.h"
 #include "undomanager.h"
 #include "units.h"
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
+
 
 CanvasMode_EditWeldPoint::CanvasMode_EditWeldPoint(ScribusView* view) : CanvasMode(view), m_ScMW(view->m_ScMW)
 {
@@ -119,8 +120,6 @@ void CanvasMode_EditWeldPoint::enterEvent(QEvent *)
 
 void CanvasMode_EditWeldPoint::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -154,7 +153,7 @@ void CanvasMode_EditWeldPoint::activate(bool fromGesture)
 
 void CanvasMode_EditWeldPoint::deactivate(bool forGesture)
 {
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 	selectedPoint = -1;
 	weldToList.clear();
 	disconnect(ModeDialog, SIGNAL(paletteShown(bool)), this, SLOT(endEditing(bool)));
@@ -421,7 +420,7 @@ void CanvasMode_EditWeldPoint::mousePressEvent(QMouseEvent *m)
 		}
 	}
 	m_canvas->m_viewMode.m_MouseButtonPressed = true;
-	qApp->changeOverrideCursor(QCursor(Qt::CrossCursor));
+	m_view->setCursor(QCursor(Qt::CrossCursor));
 	m_doc->regionsChanged()->update(getUpdateRect());
 }
 

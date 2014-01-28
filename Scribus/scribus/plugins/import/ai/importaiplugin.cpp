@@ -49,28 +49,22 @@ ImportAIPlugin::ImportAIPlugin() : LoadSavePlugin(),
 {
 	// Set action info in languageChange, so we only have to do it in one
 	// place. This includes registering file format support.
+	registerFormats();
 	languageChange();
 }
-/*
-void ImportAIPlugin::addToMainWindowMenu(ScribusMainWindow *mw)
-{
-	importAction->setEnabled(true);
-	connect( importAction, SIGNAL(triggered()), SLOT(import()) );
-	mw->scrMenuMgr->addMenuItem(importAction, "FileImport");
-}
-*/
+
 void ImportAIPlugin::languageChange()
 {
 	importAction->setText( tr("Import AI..."));
-	// (Re)register file format support
-	unregisterAll();
-	registerFormats();
+	FileFormat* fmt = getFormatByExt("ai");
+	fmt->trName = FormatsManager::instance()->nameOfFormat(FormatsManager::AI); // Human readable name
+	fmt->filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::AI); // QFileDialog filter
 }
 
 ImportAIPlugin::~ImportAIPlugin()
 {
 	unregisterAll();
-};
+}
 
 const QString ImportAIPlugin::fullTrName() const
 {
@@ -99,9 +93,8 @@ void ImportAIPlugin::registerFormats()
 {
 	FileFormat fmt(this);
 	fmt.trName = FormatsManager::instance()->nameOfFormat(FormatsManager::AI); // Human readable name
-	fmt.formatId = FORMATID_AIIMPORT;
+	fmt.formatId = 0;
 	fmt.filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::AI); // QFileDialog filter
-	fmt.nameMatch = QRegExp("\\."+FormatsManager::instance()->extensionListForFormat(FormatsManager::AI, 1)+"$", Qt::CaseInsensitive);
 	fmt.fileExtensions = QStringList() << "ai";
 	fmt.load = true;
 	fmt.save = false;
@@ -180,7 +173,7 @@ bool ImportAIPlugin::import(QString fileName, int flags)
 				if ((QPushButton *)msgBox.clickedButton() == pdfButton)
 				{
 					//Import PDF
-					const FileFormat *fmt = LoadSavePlugin::getFormatById(FORMATID_PDFIMPORT);
+					const FileFormat *fmt = LoadSavePlugin::getFormatByExt("pdf");
 					if (!fmt)
 					{
 						QMessageBox::warning(ScCore->primaryMainWindow(), CommonStrings::trWarning, tr("The PDF Import plugin could not be found"), 1, 0, 0);

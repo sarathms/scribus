@@ -31,6 +31,19 @@ class ScribusDoc;
 class Selection;
 class TransactionSettings;
 
+class ScBitReader
+{
+	public:
+		ScBitReader(QByteArray &data);
+		~ScBitReader();
+		quint32 getUInt(uint size);
+		void alignToWord();
+	private:
+		int actByte;
+		int actBit;
+		QByteArray buffer;
+};
+
 //! \brief Cgm importer plugin
 class CgmPlug : public QObject
 {
@@ -82,8 +95,10 @@ private:
 	void    getBinaryBezierPath(QDataStream &ts, quint16 paramLen);
 	void    getBinaryPath(QDataStream &ts, quint16 paramLen, bool disjoint = false);
 	void    getBinaryColorTable(QDataStream &ts, quint16 paramLen);
-	QString getBinaryIndexedColor(QDataStream &ts);
+	ScColor getBinaryDirectColor(ScBitReader *breader);
 	ScColor getBinaryDirectColor(QDataStream &ts);
+	QString getBinaryIndexedColor(ScBitReader *breader);
+	QString getBinaryIndexedColor(QDataStream &ts);
 	QString getBinaryColor(QDataStream &ts);
 	double  getBinaryDistance(QDataStream &ts);
 	QPointF getBinaryCoords(QDataStream &ts, bool raw = false);
@@ -100,6 +115,9 @@ private:
 	void    handleMetaFileDescription(QString value);
 	QString handleColor(ScColor &color, QString proposedName);
 	double  convertCoords(double input);
+	QPointF convertCoords(QPointF input);
+	void appendPath(QPainterPath &path1, QPainterPath &path2);
+	PageItem* itemAdd(PageItem::ItemType itemType, PageItem::ItemFrameType frameType, double x, double y, double b, double h, double w, QString fill, QString stroke);
 	void    finishItem(PageItem* ite, bool line = true);
 
 /* common variables */
@@ -124,7 +142,7 @@ private:
 	int colorPrecision;
 	int colorIndexPrecision;
 	uint maxColorIndex;
-	int colorModel;
+	int m_colorModel;
 	int colorMode;
 	int namePrecision;
 	int lineWidthMode;
@@ -148,6 +166,12 @@ private:
 	QString edgeColor;
 	QString fillColor;
 	int fillType;
+	int patternIndex;
+	QMap<int, QString> patternTable;
+	double patternScaleX;
+	double patternScaleY;
+	QString backgroundColor;
+	bool backgroundSet;
 	QMap<uint, QString> ColorTableMap;
 	QRectF clipRect;
 	bool useClipRect;
@@ -180,6 +204,20 @@ private:
 	bool firstPage;
 	bool vcdSet;
 	bool wasEndPic;
+	bool recordFigure;
+	QPainterPath figurePath;
+	bool figClose;
+	int figDocIndex;
+	int figElemIndex;
+	int figGstIndex;
+	QString figFillColor;
+	QMap<int, QString> fontID_Map;
+	int m_fontIndex;
+	QString textColor;
+	int textSize;
+	int textAlignH;
+	int textScaleMode;
+	QString pictName;
 
 public slots:
 	void cancelRequested() { cancel = true; }

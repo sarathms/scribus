@@ -77,15 +77,22 @@ void ScripterCore::addToMainWindowMenu(ScribusMainWindow *mw)
 {
 	menuMgr = mw->scrMenuMgr;
 	menuMgr->createMenu("Scripter", QObject::tr("&Script"));
-	menuMgr->addMenuToMenuBarBefore("Scripter","Windows");
 	menuMgr->createMenu("ScribusScripts", QObject::tr("&Scribus Scripts"), "Scripter");
-	menuMgr->addMenuItem(scrScripterActions["scripterExecuteScript"], "Scripter", true);
-	menuMgr->createMenu("RecentScripts", QObject::tr("&Recent Scripts"), "Scripter");
-	menuMgr->addMenuSeparator("Scripter");
-	menuMgr->addMenuItem(scrScripterActions["scripterShowConsole"], "Scripter", true);
-	menuMgr->addMenuItem(scrScripterActions["scripterAboutScript"], "Scripter", true);
+	menuMgr->addMenuItemString("ScribusScripts", "Scripter");
+	menuMgr->addMenuItemString("scripterExecuteScript", "Scripter");
+	menuMgr->createMenu("RecentScripts", QObject::tr("&Recent Scripts"), "Scripter", false, true);
+	menuMgr->addMenuItemString("RecentScripts", "Scripter");
+	menuMgr->addMenuItemString("scripterExecuteScript", "Scripter");
+	menuMgr->addMenuItemString("SEPARATOR", "Scripter");
+	menuMgr->addMenuItemString("scripterShowConsole", "Scripter");
+	menuMgr->addMenuItemString("scripterAboutScript", "Scripter");
+
 	buildScribusScriptsMenu();
-	buildRecentScriptsMenu();
+
+	menuMgr->addMenuStringToMenuBarBefore("Scripter","Windows");
+	menuMgr->addMenuItemStringstoMenuBar("Scripter", scrScripterActions);
+	RecentScripts = SavedRecentScripts;
+	rebuildRecentScriptsMenu();
 }
 
 void ScripterCore::enableMainWindowMenu()
@@ -120,18 +127,14 @@ void ScripterCore::buildScribusScriptsMenu()
 			QString strippedName=fs.baseName();
 			scrScripterActions.insert(strippedName, new ScrAction( ScrAction::RecentScript, strippedName, QKeySequence(), this));
 			connect( scrScripterActions[strippedName], SIGNAL(triggeredData(QString)), this, SLOT(StdScript(QString)) );
-			menuMgr->addMenuItem(scrScripterActions[strippedName], "ScribusScripts", true);
+			menuMgr->addMenuItemString(strippedName, "ScribusScripts");
 		}
 	}
-
-
 }
 
 void ScripterCore::rebuildRecentScriptsMenu()
 {
-	for( QMap<QString, QPointer<ScrAction> >::Iterator it = scrRecentScriptActions.begin(); it!=scrRecentScriptActions.end(); ++it )
-		menuMgr->removeMenuItem((*it), "RecentScripts");
-
+	menuMgr->clearMenuStrings("RecentScripts");
 	scrRecentScriptActions.clear();
 	uint max = qMin(PrefsManager::instance()->appPrefs.uiPrefs.recentDocCount, RecentScripts.count());
 	for (uint m = 0; m < max; ++m)
@@ -140,30 +143,9 @@ void ScripterCore::rebuildRecentScriptsMenu()
 		strippedName.remove(QDir::separator());
 		scrRecentScriptActions.insert(strippedName, new ScrAction( ScrAction::RecentScript, RecentScripts[m], QKeySequence(), this));
 		connect( scrRecentScriptActions[strippedName], SIGNAL(triggeredData(QString)), this, SLOT(RecentScript(QString)) );
-		menuMgr->addMenuItem(scrRecentScriptActions[strippedName], "RecentScripts", true);
+		menuMgr->addMenuItemString(strippedName, "RecentScripts");
 	}
-}
-
-void ScripterCore::buildRecentScriptsMenu()
-{
-	RecentScripts = SavedRecentScripts;
-	scrRecentScriptActions.clear();
-	if (SavedRecentScripts.count() != 0)
-	{
-		uint max = qMin(PrefsManager::instance()->appPrefs.uiPrefs.recentDocCount, SavedRecentScripts.count());
-		for (uint m = 0; m < max; ++m)
-		{
-			QFileInfo fd(SavedRecentScripts[m]);
-			if (fd.exists())
-			{
-				QString strippedName=SavedRecentScripts[m];
-				strippedName.remove(QDir::separator());
-				scrRecentScriptActions.insert(strippedName, new ScrAction( ScrAction::RecentScript, SavedRecentScripts[m], QKeySequence(), this));
-				connect( scrRecentScriptActions[strippedName], SIGNAL(triggeredData(QString)), this, SLOT(RecentScript(QString)) );
-				menuMgr->addMenuItem(scrRecentScriptActions[strippedName], "RecentScripts", true);
-			}
-		}
-	}
+	menuMgr->addMenuItemStringstoRememberedMenu("RecentScripts", scrRecentScriptActions);
 }
 
 void ScripterCore::FinishScriptRun()
@@ -261,7 +243,7 @@ void ScripterCore::slotRunScriptFile(QString fileName, bool inMainInterpreter)
 		ScCore->primaryMainWindow()->propertiesPalette->unsetDoc();
 		ScCore->primaryMainWindow()->pagePalette->setView(NULL);
 		ScCore->primaryMainWindow()->setScriptRunning(true);
-		qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
+		qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 		// Create the sub-interpreter
 		// FIXME: This calls abort() in a Python debug build. We're doing something wrong.
 		//stateo = PyEval_SaveThread();
@@ -367,7 +349,7 @@ void ScripterCore::slotRunScriptFile(QString fileName, bool inMainInterpreter)
 		Py_EndInterpreter(state);
 		PyThreadState_Swap(global_state);
 		//PyEval_RestoreThread(stateo);
-//		qApp->restoreOverrideCursor();
+		qApp->restoreOverrideCursor();
 		ScCore->primaryMainWindow()->setScriptRunning(false);
 	}
 
@@ -457,7 +439,7 @@ void ScripterCore::slotInteractiveScript(bool visible)
 
 	scrScripterActions["scripterShowConsole"]->setChecked(visible);
 	pcon->setFonts();
-	pcon->setShown(visible);
+	pcon->setVisible(visible);
 
 	QObject::connect( scrScripterActions["scripterShowConsole"], SIGNAL(toggled(bool)) , this, SLOT(slotInteractiveScript(bool)) );
 }
@@ -486,7 +468,10 @@ void ScripterCore::ReadPlugPrefs()
 	}
 	// Load recent scripts from the prefs
 	for (int i = 0; i < prefRecentScripts->getRowCount(); i++)
-		SavedRecentScripts.append(prefRecentScripts->get(i,0));
+	{
+		QString rs(prefRecentScripts->get(i,0));
+		SavedRecentScripts.append(rs);
+	}
 	// then get more general preferences
 	m_enableExtPython = prefs->getBool("extensionscripts",false);
 	m_importAllNames = prefs->getBool("importall",true);
@@ -509,7 +494,9 @@ void ScripterCore::SavePlugPrefs()
 		return;
 	}
 	for (int i = 0; i < RecentScripts.count(); i++)
+	{
 		prefRecentScripts->set(i, 0, RecentScripts[i]);
+	}
 	// then save more general preferences
 	prefs->set("extensionscripts", m_enableExtPython);
 	prefs->set("importall", m_importAllNames);
@@ -553,7 +540,7 @@ void ScripterCore::initExtensionScripts()
 
 void ScripterCore::runStartupScript()
 {
-	if ((m_enableExtPython) && (!m_startupScript.isNull()))
+	if ((m_enableExtPython) && (!m_startupScript.isEmpty()))
 	{
 		if (QFile::exists(this->m_startupScript))
 		{
@@ -562,7 +549,7 @@ void ScripterCore::runStartupScript()
 			this->slotRunScriptFile(this->m_startupScript, true);
 		}
 		else
-			qDebug("Startup script enabled, but couln't find script %s.", m_startupScript.toAscii().constData());
+			qDebug("Startup script enabled, but couln't find script %s.", m_startupScript.toLatin1().constData());
 	}
 }
 

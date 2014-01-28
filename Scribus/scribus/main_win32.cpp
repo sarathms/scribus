@@ -62,7 +62,7 @@ static QString exceptionDescription(DWORD exceptionCode);
 static void defaultCrashHandler(DWORD exceptionCode);
 
 // Console IO redirection handling
-void messageHandler( QtMsgType type, const char *msg );
+void messageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg);
 bool consoleOptionEnabled(int argc, char* argv[]);
 void redirectIOToConsole(void);
 
@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 	if (consoleOptionEnabled(argc, argv))
 	{
 		redirectIOToConsole();
-		qInstallMsgHandler( messageHandler );
+		qInstallMessageHandler(messageHandler);
 	}
 #endif
 	ScribusQApp app(argc, argv);
@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
 */
 int mainApp(ScribusQApp& app)
 {
-	int appRetVal;
+	int appRetVal = 0;
 #ifndef _DEBUG
 	__try
 	{
@@ -281,9 +281,9 @@ void defaultCrashHandler(DWORD exceptionCode)
 		QString expHdr  = QObject::tr("Scribus Crash");
 		QString expLine = "-------------";
 		QString expMsg  = QObject::tr("Scribus crashes due to the following exception : %1").arg(expDesc);
-		std::cout << (const char*) expHdr.toAscii().data() << std::endl;
-		std::cout << (const char*) expLine.toAscii().data() << std::endl;
-		std::cout << (const char*) expMsg.toAscii().data() << std::endl;
+		std::cout << expHdr.toStdString() << std::endl;
+		std::cout << expLine.toStdString() << std::endl;
+		std::cout << expMsg.toStdString() << std::endl;
 		if (ScribusQApp::useGUI)
 		{
 			ScCore->closeSplash();
@@ -296,11 +296,30 @@ void defaultCrashHandler(DWORD exceptionCode)
 	ExitProcess(255);
 }
 
-void messageHandler( QtMsgType type, const char *msg )
+void messageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
-	cerr << msg << endl;
-	if( type == QtFatalMsg )
+	QByteArray localMsg = msg.toLocal8Bit();
+	switch (type)
 	{
+	case QtDebugMsg:
+		cerr << "Debug: " << localMsg.constData()
+			 << "(" << context.file << ":" << context.line << ", "
+			 << context.function << ")"
+			 << endl;
+		break;
+	case QtWarningMsg:
+		cerr << "Warning: " << localMsg.constData()
+			 << "(" << context.file << ":" << context.line << ", "
+			 << context.function << ")"
+			 << endl;
+		break;
+	case QtCriticalMsg:
+		cerr << "Critical: " << localMsg.constData()
+			 << "(" << context.file << ":" << context.line << ", "
+			 << context.function << ")"
+			 << endl;
+		break;
+	case QtFatalMsg:
 		if (ScribusQApp::useGUI)
 		{
 			ScCore->closeSplash();
@@ -317,10 +336,10 @@ void messageHandler( QtMsgType type, const char *msg )
 bool consoleOptionEnabled(int argc, char* argv[])
 {
 	bool value = false;
-	for( int i = 0; i < argc; i++ )
+	for (int i = 0; i < argc; i++)
 	{
-		if( strcmp(argv[i], ARG_CONSOLE) == 0 ||
-			strcmp(argv[i], ARG_CONSOLE_SHORT) == 0 )
+		if (strcmp(argv[i], ARG_CONSOLE) == 0 ||
+			strcmp(argv[i], ARG_CONSOLE_SHORT) == 0)
 		{
 			value = true;
 			break;

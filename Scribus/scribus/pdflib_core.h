@@ -83,7 +83,7 @@ private:
 	};
 
 	bool PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QString, QMap<uint, FPointArray> > DocFonts, BookMView* vi);
-	void PDF_Begin_Page(const ScPage* pag, QPixmap pm = 0);
+	void PDF_Begin_Page(const ScPage* pag, QPixmap pm);
 	void PDF_End_Page(int physPage);
 	bool PDF_TemplatePage(const ScPage* pag, bool clip = false);
 	bool PDF_ProcessPage(const ScPage* pag, uint PNr, bool clip = false);
@@ -114,10 +114,15 @@ private:
 	void    CalcUserKey(const QString & User, int Permission);
 	QString FitKey(const QString & pass);
 
-	QString setStrokeMulti(struct SingleLine *sl);
+	QString SetClipPath(PageItem *ite, bool poly = true);
 	QString SetClipPathArray(FPointArray *ite, bool poly = true);
 	QString SetClipPathImage(PageItem *ite);
-	QString SetClipPath(PageItem *ite, bool poly = true);
+
+	QString SetImagePathAndClip(PageItem *item);
+	QString SetPathAndClip(PageItem *item);
+	QString SetPathAndClip(PageItem *item, bool fillRule);
+	
+	QString setStrokeMulti(struct SingleLine *sl);
 	QString SetColor(const QString& farbe, double Shade);
 	QString SetColor(const ScColor& farbe, double Shade);
 	QString SetGradientColor(const QString& farbe, double Shade);
@@ -149,15 +154,10 @@ private:
 	QByteArray ComputeMD5(const QString& in);
 	QByteArray ComputeRC4Key(int ObjNum);
 
+	QString PDF_PutSoftShadow(PageItem* ite, const ScPage* pag);
 	bool    PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* pag, uint PNr, bool embedded = false, bool pattern = false);
-	QString paintBorder(const TableBorder& border, const QPointF& start, const QPointF& end, const QPointF& startOffsetFactors, const QPointF& endOffsetFactors);
-	QString HandleBrushPattern(PageItem* ite, QPainterPath &path, const ScPage* pag, uint PNr);
-	QString drawArrow(PageItem *ite, QTransform &arrowTrans, int arrowIndex);
 	void    PDF_Bookmark(PageItem *currItem, double ypos);
 	bool    PDF_PatternFillStroke(QString& output, PageItem *currItem, int kind = 0, bool forArrow = false);
-	quint32 encode32dVal(double val);
-	quint16 encode16dVal(double val);
-	void    encodeColor(QDataStream &vs, QString colName, int colShade, QStringList &spotColorSet, bool spotMode);
 	bool    PDF_MeshGradientFill(QString& output, PageItem *currItem);
 	bool	PDF_PatchMeshGradientFill(QString& output, PageItem *c);
 	bool    PDF_DiamondGradientFill(QString& output, PageItem *currItem);
@@ -171,7 +171,6 @@ private:
 	void	PDF_RadioButtons();
 	uint    PDF_RadioButton(PageItem *ite, uint parent, QString parentName);
 	bool    PDF_Annotation(PageItem *ite, uint PNr);
-	QString createBorderAppearance(PageItem *ite);
 	void    PDF_Form(const QString& im);
 	void    PDF_xForm(uint objNr, double w, double h, QString im);
 	bool    PDF_Image(PageItem* c, const QString& fn, double sx, double sy, double x, double y, bool fromAN = false, const QString& Profil = "", bool Embedded = false, eRenderIntent Intent = Intent_Relative_Colorimetric, QString* output = NULL);
@@ -181,9 +180,17 @@ private:
 	void copyPoDoFoDirect(const PoDoFo::PdfVariant* obj, QList<PoDoFo::PdfReference>& referencedObjects, QMap<PoDoFo::PdfReference, uint>& importedObjects);
 #endif
 
+	quint32 encode32dVal(double val);
+	quint16 encode16dVal(double val);
+	void    encodeColor(QDataStream &vs, QString colName, int colShade, QStringList &spotColorSet, bool spotMode);
+
+	QString drawArrow(PageItem *ite, QTransform &arrowTrans, int arrowIndex);
+	QString createBorderAppearance(PageItem *ite);
+	QString paintBorder(const TableBorder& border, const QPointF& start, const QPointF& end, const QPointF& startOffsetFactors, const QPointF& endOffsetFactors);
+	QString handleBrushPattern(PageItem* ite, QPainterPath &path, const ScPage* pag, uint PNr);
+
 	void generateXMP(const QString& timeStamp);
 	int bytesWritten() { return Spool.pos(); }
-
 
 	QString Content;
 	QString ErrorMessage;

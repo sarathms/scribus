@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
  *   You should have received a copy of the GNU General Public License     *
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
- *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
  ***************************************************************************/
 
 #include "scconfig.h"
@@ -93,10 +93,12 @@ QString FileUnzip::getFile(QString name)
 		QTemporaryFile *tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_zip_XXXXXX.dat");
 		if (tempImageFile == NULL)
 				return NULL;
+		tempImageFile->setAutoRemove(false);
 		tempImageFile->open();
 		QString fname = getLongPathName(tempImageFile->fileName());
 		tempImageFile->close();
-		tempFileList.append(tempImageFile);
+		delete tempImageFile;
+		tempFileList.append(fname);
 		QDir::setCurrent(QDir::tempPath());
 		unzFile uf = unzOpenFile(zipFile);
 		int ret = do_extract_onefile(uf, name, fname, NULL);
@@ -135,7 +137,7 @@ FileUnzip::~FileUnzip()
 {
 	for (int a = 0; a < tempFileList.count(); a++)
 	{
-		delete tempFileList[a];
+		QFile::remove(tempFileList[a]);
 	}
 }
 

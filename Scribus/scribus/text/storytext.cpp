@@ -40,21 +40,21 @@ pageitem.cpp  -  description
 #include "desaxe/simple_actions.h"
 
 
-StoryText::StoryText(ScribusDoc * doc_) : doc(doc_)
+StoryText::StoryText(ScribusDoc * doc_) : m_doc(doc_)
 {
 	if (doc_) {
 		d = new ScText_Shared(&doc_->paragraphStyles());
-		doc->paragraphStyles().connect(this, SLOT(invalidateAll()));
-		doc->charStyles().connect(this, SLOT(invalidateAll()));
+		m_doc->paragraphStyles().connect(this, SLOT(invalidateAll()));
+		m_doc->charStyles().connect(this, SLOT(invalidateAll()));
 	}
 	else {
 		d = new ScText_Shared(NULL);
 	}
-	selFirst = 0;
-	selLast = -1;
+	m_selFirst = 0;
+	m_selLast = -1;
 	
-	firstFrameItem = 0;
-	lastFrameItem = -1;
+	m_firstFrameItem = 0;
+	m_lastFrameItem = -1;
 	m_magicX = 0.0;
 	m_lastMagicPos = -1;
 	
@@ -62,34 +62,34 @@ StoryText::StoryText(ScribusDoc * doc_) : doc(doc_)
 	invalidateAll();
 }
 
-StoryText::StoryText() : doc(NULL)
+StoryText::StoryText() : m_doc(NULL)
 {
 	d = new ScText_Shared(NULL);
 
-	selFirst = 0;
-	selLast = -1;
+	m_selFirst = 0;
+	m_selLast = -1;
 	
-	firstFrameItem = 0;
-	lastFrameItem = -1;
+	m_firstFrameItem = 0;
+	m_lastFrameItem = -1;
 	m_magicX = 0.0;
 	m_lastMagicPos = -1;
 }
 
-StoryText::StoryText(const StoryText & other) : QObject(), SaxIO(), doc(other.doc)
+StoryText::StoryText(const StoryText & other) : QObject(), SaxIO(), m_doc(other.m_doc)
 {
 	d = other.d;
 	d->refs++;
 	
-	if(doc) {
-		doc->paragraphStyles().connect(this, SLOT(invalidateAll()));
-		doc->charStyles().connect(this, SLOT(invalidateAll()));
+	if (m_doc) {
+		m_doc->paragraphStyles().connect(this, SLOT(invalidateAll()));
+		m_doc->charStyles().connect(this, SLOT(invalidateAll()));
 	}
 	
-	selFirst = 0;
-	selLast = -1;
+	m_selFirst = 0;
+	m_selLast = -1;
 	
-	firstFrameItem = 0;
-	lastFrameItem = -1;
+	m_firstFrameItem = 0;
+	m_lastFrameItem = -1;
 	m_magicX = 0.0;
 	m_lastMagicPos = -1;
 
@@ -116,12 +116,12 @@ StoryText::~StoryText()
 
 void StoryText::setDoc(ScribusDoc *docin)
 {
-	doc = docin;
+	m_doc = docin;
 }
 
 StoryText StoryText::copy() const
 {
-	StoryText result(doc);
+	StoryText result(m_doc);
 	*(result.d) = *d;
 	return result;
 }
@@ -136,24 +136,24 @@ StoryText& StoryText::operator= (const StoryText & other)
 		delete d;
 	}
 	
-	if(doc) {
-		doc->paragraphStyles().disconnect(this, SLOT(invalidateAll()));
-		doc->charStyles().disconnect(this, SLOT(invalidateAll()));
+	if (m_doc) {
+		m_doc->paragraphStyles().disconnect(this, SLOT(invalidateAll()));
+		m_doc->charStyles().disconnect(this, SLOT(invalidateAll()));
 	}
 	
-	doc = other.doc; 
+	m_doc = other.m_doc; 
 	d = other.d;
 	
-	if (doc) {
-		doc->paragraphStyles().connect(this, SLOT(invalidateAll()));
-		doc->charStyles().connect(this, SLOT(invalidateAll()));
+	if (m_doc) {
+		m_doc->paragraphStyles().connect(this, SLOT(invalidateAll()));
+		m_doc->charStyles().connect(this, SLOT(invalidateAll()));
 	}
 	
-	selFirst = 0;
-	selLast = -1;
+	m_selFirst = 0;
+	m_selLast = -1;
 	
-	firstFrameItem = 0;
-	lastFrameItem = -1;
+	m_firstFrameItem = 0;
+	m_lastFrameItem = -1;
 
 	invalidateLayout();
 	return *this;
@@ -183,11 +183,11 @@ int StoryText::normalizedCursorPosition()
 
 void StoryText::clear()
 {
-	selFirst = 0;
-	selLast = -1;
+	m_selFirst = 0;
+	m_selLast = -1;
 
-	firstFrameItem = 0;
-	lastFrameItem = -1;
+	m_firstFrameItem = 0;
+	m_lastFrameItem = -1;
 	
 	d->defaultStyle.erase();
 	d->trailingStyle.erase();
@@ -416,23 +416,29 @@ void StoryText::removeChars(int pos, uint len)
 		if ((it->ch == SpecialChars::PARSEP)) {
 			removeParSep(i);
 		}
+        if (it->mark != NULL)
+        {
+            delete it->mark;
+            it->mark = NULL;
+        }
+
 //		qDebug("remove char %d at %d", (int) it->ch.unicode(), i);
 		d->takeAt(i);
 		d->len--;
 		delete it;
-		// #9592 : adjust selFirst and selLast, those values have to be
+		// #9592 : adjust m_selFirst and m_selLast, those values have to be
 		// consistent in functions such as select()
-		if (i <= selLast) --selLast;
-		if (i < selFirst) --selFirst;
+		if (i <= m_selLast) --m_selLast;
+		if (i < m_selFirst) --m_selFirst;
 		if ((i + 1 ) <= d->cursorPosition && d->cursorPosition > 0) d->cursorPosition -= 1;
 	}
 
 	d->len = d->count();
 	d->cursorPosition = qMin(d->cursorPosition, d->len);
-	if (selFirst > selLast)
+	if (m_selFirst > m_selLast)
 	{
-		selFirst =  0;
-		selLast  = -1;
+		m_selFirst =  0;
+		m_selLast  = -1;
 	}
 	invalidate(pos, length());
 }
@@ -631,8 +637,8 @@ void StoryText::insertObject(int pos, int ob)
 
 	insertChars(pos, SpecialChars::OBJECT);
 	const_cast<StoryText *>(this)->d->at(pos)->embedded = ob;
-	doc->FrameItems[ob]->isEmbedded = true;   // this might not be enough...
-	doc->FrameItems[ob]->OwnPage = -1; // #10379: OwnPage is not meaningful for inline object
+	m_doc->FrameItems[ob]->isEmbedded = true;   // this might not be enough...
+	m_doc->FrameItems[ob]->OwnPage = -1; // #10379: OwnPage is not meaningful for inline object
 }
 
 void StoryText::insertMark(Mark* Mark, int pos)
@@ -653,8 +659,8 @@ void StoryText::replaceObject(int pos, int ob)
 
 	replaceChar(pos, SpecialChars::OBJECT);
 	const_cast<StoryText *>(this)->d->at(pos)->embedded = ob;
-	doc->FrameItems[ob]->isEmbedded = true;   // this might not be enough...
-	doc->FrameItems[ob]->OwnPage = -1; // #10379: OwnPage is not meaningful for inline object
+	m_doc->FrameItems[ob]->isEmbedded = true;   // this might not be enough...
+	m_doc->FrameItems[ob]->OwnPage = -1; // #10379: OwnPage is not meaningful for inline object
 }
 
 
@@ -683,6 +689,31 @@ QString StoryText::plainText() const
 	}
 
 	return result;
+}
+
+
+GlyphLayout* StoryText::getGlyphs(int pos)
+{
+    if (pos < 0)
+        pos += length();
+
+    assert(pos >= 0);
+    assert(pos < length());
+
+	assert((this->d->at(pos)->glyph).scaleH > 0.5);
+	return &(this->d->at(pos)->glyph);
+}
+
+const GlyphLayout* StoryText::getGlyphs(int pos) const
+{
+    if (pos < 0)
+        pos += length();
+
+    assert(pos >= 0);
+    assert(pos < length());
+
+	assert( (const_cast<StoryText *>(this)->d->at(pos)->glyph).scaleH > 0.5);
+	return &(const_cast<StoryText *>(this)->d->at(pos)->glyph);
 }
 
 QChar StoryText::text() const
@@ -759,7 +790,7 @@ bool StoryText::hasObject(int pos) const
 
 	StoryText* that = const_cast<StoryText *>(this);
 	if (that->d->at(pos)->ch == SpecialChars::OBJECT)
-		return that->d->at(pos)->hasObject(doc);
+		return that->d->at(pos)->hasObject(m_doc);
 	return false;
 }
 
@@ -772,10 +803,10 @@ PageItem* StoryText::object(int pos) const
 	assert(pos < length());
 
 	StoryText* that = const_cast<StoryText *>(this);
-	return that->d->at(pos)->getItem(doc);
+	return that->d->at(pos)->getItem(m_doc);
 }
 
-bool StoryText::hasMark(int pos) const
+bool StoryText::hasMark(int pos, Mark* mrk) const
 {
 	if (pos < 0)
 		pos += length();
@@ -785,7 +816,7 @@ bool StoryText::hasMark(int pos) const
 
 	StoryText* that = const_cast<StoryText *>(this);
 	if (that->d->at(pos)->ch == SpecialChars::OBJECT)
-		return that->d->at(pos)->hasMark();
+        return that->d->at(pos)->hasMark(mrk);
 	return false;
 }
 
@@ -800,6 +831,67 @@ Mark* StoryText::mark(int pos) const
 	StoryText* that = const_cast<StoryText *>(this);
 	return that->d->at(pos)->mark;
 }
+
+
+void StoryText::replaceMark(int pos, Mark* mrk)
+{
+    if (pos < 0)
+        pos += length();
+
+    assert(pos >= 0);
+    assert(pos < length());
+
+    this->d->at(pos)->mark = mrk;
+}
+
+
+LayoutFlags StoryText::flags(int pos) const
+{
+    if (pos < 0)
+        pos += length();
+
+    assert(pos >= 0);
+    assert(pos < length());
+
+    StoryText* that = const_cast<StoryText *>(this);
+	return  static_cast<LayoutFlags>((*that->d->at(pos)).effects().value & ScStyle_NonUserStyles);
+}
+
+bool StoryText::hasFlag(int pos, LayoutFlags flags) const
+{
+    if (pos < 0)
+        pos += length();
+
+    assert(pos >= 0);
+    assert(pos < length());
+    assert((flags & ScStyle_UserStyles) == ScStyle_None);
+
+	return (flags & d->at(pos)->effects().value) == flags;
+}
+
+void StoryText::setFlag(int pos, LayoutFlags flags)
+{
+    if (pos < 0)
+        pos += length();
+
+    assert(pos >= 0);
+    assert(pos < length());
+    assert((flags & ScStyle_UserStyles) == ScStyle_None);
+
+	d->at(pos)->setEffects(flags | d->at(pos)->effects().value);
+}
+
+void StoryText::clearFlag(int pos, LayoutFlags flags)
+{
+    if (pos < 0)
+        pos += length();
+
+    assert(pos >= 0);
+    assert(pos < length());
+
+	d->at(pos)->setEffects(~(flags & ScStyle_NonUserStyles) & d->at(pos)->effects().value);
+}
+
 
 const CharStyle & StoryText::charStyle() const
 {
@@ -822,9 +914,6 @@ const CharStyle & StoryText::charStyle(int pos) const
 		qDebug() << "storytext::charstyle: access at end of text %i" << pos;
 		--pos;
 	}
-	//for notes frames - get style from note text, not from mark
-	if ((pos+1 < length()) && hasMark(pos) && mark(pos)->isNoteType())
-		++pos;
 	if (text(pos) == SpecialChars::PARSEP)
 		return paragraphStyle(pos).charStyle();
 	StoryText* that = const_cast<StoryText *>(this);
@@ -1462,7 +1551,7 @@ int StoryText::prevLine(int pos)
 			return ls2.lastItem;
 		}
 	}
-	return firstFrameItem;
+	return m_firstFrameItem;
 }
 
 int StoryText::nextLine(int pos)
@@ -1496,46 +1585,46 @@ int StoryText::nextLine(int pos)
 			return ls2.lastItem + 1;
 		}
 	}
-	return lastFrameItem;
+	return m_lastFrameItem;
 }
 
 int StoryText::startOfFrame(int pos) 
 {
-	return firstFrameItem;
+	return m_firstFrameItem;
 }
 
 int StoryText::endOfFrame(int pos)
 {
-	return lastFrameItem + 1;
+	return m_lastFrameItem + 1;
 }
 
 // selection
 
 int StoryText::startOfSelection() const
 {
-	return selFirst <= selLast? selFirst : 0;
+	return m_selFirst <= m_selLast? m_selFirst : 0;
 }
 
 int StoryText::endOfSelection() const
 {
-	return selFirst <= selLast? selLast + 1 : -1;
+	return m_selFirst <= m_selLast? m_selLast + 1 : -1;
 }
 
 int StoryText::lengthOfSelection() const
 {
 	//FIX ME - sometimes I saw values equal or greater than length of text
-	int last = selLast;
-	if (selFirst >= length())
+	int last = m_selLast;
+	if (m_selFirst >= length())
 		return 0;
-	if (selLast >= length())
+	if (m_selLast >= length())
 		last = length() -1;
-	return selFirst <= last? last - selFirst + 1 : 0;
+	return m_selFirst <= last? last - m_selFirst + 1 : 0;
 }
 
 
 bool StoryText::selected(int pos) const
 {
-	return (selFirst <= pos && pos <= selLast) 
+	return (m_selFirst <= pos && pos <= m_selLast) 
 //	       || (pos >= 0 && pos < length() && const_cast<StoryText*>(this)->d->at(pos)->cselect)
 	;
 }
@@ -1574,7 +1663,7 @@ void StoryText::select(int pos, uint len, bool on)
 	assert( pos >= 0 );
 	assert( pos + signed(len) <= length() );
 
-//	qDebug("old selection: %d - %d", selFirst, selLast);
+//	qDebug("old selection: %d - %d", m_selFirst, m_selLast);
 
 //	StoryText* that = const_cast<StoryText *>(this);
 //	for (int i=pos; i < pos+signed(len); ++i)
@@ -1583,43 +1672,43 @@ void StoryText::select(int pos, uint len, bool on)
 	if (on) {
 		// extend if possible
 		if (selected(pos - 1))
-			selLast = qMax(selLast, pos + static_cast<int>(len) - 1);
+			m_selLast = qMax(m_selLast, pos + static_cast<int>(len) - 1);
 		else if (selected(pos + len))
-			selFirst = qMin(selFirst, pos);
+			m_selFirst = qMin(m_selFirst, pos);
 		else {
-			selFirst = pos;
-			selLast = pos + len - 1;
+			m_selFirst = pos;
+			m_selLast = pos + len - 1;
 		}
 	}
 	else {
-		if (pos <= selFirst && selLast < pos + signed(len))
+		if (pos <= m_selFirst && m_selLast < pos + signed(len))
 			deselectAll();
 		// shrink
 		else if (!selected(pos - 1) && selected(pos + len - 1))
-			selFirst = pos + len;
+			m_selFirst = pos + len;
 		else if (selected(pos) && !selected(pos + len))
-			selLast = pos - 1;
+			m_selLast = pos - 1;
 		else if (selected(pos) || selected(pos + len - 1))
 			// Grr, deselection splits selection
-			selLast = pos - 1;
+			m_selLast = pos - 1;
 	}
 	
-//	qDebug("new selection: %d - %d", selFirst, selLast);
+//	qDebug("new selection: %d - %d", m_selFirst, m_selLast);
 }
 
 void StoryText::extendSelection(int oldPos, int newPos)
 {
-	if (selFirst <= selLast)
+	if (m_selFirst <= m_selLast)
 	{
 		// have selection
-		if (selLast == oldPos - 1)
+		if (m_selLast == oldPos - 1)
 		{
-			selLast = newPos - 1;
+			m_selLast = newPos - 1;
 			return;
 		}
-		else if (selFirst == oldPos)
+		else if (m_selFirst == oldPos)
 		{
-			selFirst = newPos;
+			m_selFirst = newPos;
 			return;
 		}
 		// can't extend, fall through
@@ -1627,13 +1716,13 @@ void StoryText::extendSelection(int oldPos, int newPos)
 	// no previous selection
 	if (newPos > oldPos)
 	{
-		selFirst = oldPos;
-		selLast = newPos - 1;
+		m_selFirst = oldPos;
+		m_selLast = newPos - 1;
 	}
 	else
 	{
-		selFirst = newPos;
-		selLast = oldPos - 1;
+		m_selFirst = newPos;
+		m_selLast = oldPos - 1;
 	}
 }
 
@@ -1646,8 +1735,8 @@ void StoryText::selectAll()
 		that->next();
 	}
 */
-	selFirst = 0;
-	selLast = length() - 1;
+	m_selFirst = 0;
+	m_selLast = length() - 1;
 }
 
 void StoryText::deselectAll()
@@ -1659,20 +1748,20 @@ void StoryText::deselectAll()
 		that->next();
 	}
 */	
-	selFirst = 0;
-	selLast = -1;
+	m_selFirst = 0;
+	m_selLast = -1;
 }
 
 void StoryText::removeSelection()
 {
-//	qDebug("removeSelection: %d - %d", selFirst, selLast);
-	if (selFirst > selLast)
+//	qDebug("removeSelection: %d - %d", m_selFirst, m_selLast);
+	if (m_selFirst > m_selLast)
 		return;
 
-	assert( selFirst >= 0 );
-	assert( selLast < length() );
+	assert( m_selFirst >= 0 );
+	assert( m_selLast < length() );
 
-	removeChars(selFirst, selLast - selFirst+1);
+	removeChars(m_selFirst, m_selLast - m_selFirst+1);
 	deselectAll();
 }
 
@@ -1689,7 +1778,7 @@ void StoryText::invalidateLayout()
 void StoryText::invalidateAll()
 {
 	d->pstyleContext.invalidate();
-	invalidate(0, nrOfItems());
+    invalidate(0, length());
 }
 
 void StoryText::invalidate(int firstItem, int endItem)
@@ -1747,11 +1836,11 @@ int StoryText::screenToPosition(FPoint coord) const
 		if (xpos + 1.0 > coord.x()) // allow 1pt after end of line
 			return ls.lastItem + 1;
 		else if (coord.x() <= ls.x + ls.width) // last line of paragraph?
-			return ((ls.lastItem == lastFrameItem) ? (ls.lastItem + 1) : ls.lastItem);
+			return ((ls.lastItem == m_lastFrameItem) ? (ls.lastItem + 1) : ls.lastItem);
 		else if (xpos < ls.x + 0.01 && maxx >= coord.x()) // check for empty line
 			return ls.firstItem;
 	}
-	return qMax(lastFrameItem+1, firstFrameItem);
+	return qMax(m_lastFrameItem+1, m_firstFrameItem);
 }
 
 
@@ -1766,7 +1855,7 @@ FRect StoryText::boundingBox(int pos, uint len) const
 			continue;
 		if (ls.firstItem <= pos) {
 			/*
-			if (ls.lastItem == pos && (item(pos)->effects() & ScStyle_SuppressSpace)  )
+			if (ls.lastItem == pos && (item(pos)->effects() & ScLayout_SuppressSpace)  )
 			{
 				if (i+1 < lines())
 				{
@@ -1816,18 +1905,6 @@ FRect StoryText::boundingBox(int pos, uint len) const
 	return result;
 }
 
-int StoryText::layout(int startItem)
-{
-	//FIXME:NLS
-	return -1;
-}
-
-
-uint StoryText::nrOfItems() const
-{
-	return length();
-}
-
 
 ScText*  StoryText::item(uint itm)
 {
@@ -1843,36 +1920,36 @@ const ScText*  StoryText::item(uint itm) const
 }
 
 
-const QString StoryText::itemText(uint itm) const
-{
+//const QString StoryText::itemText(uint itm) const
+//{
 	
-	assert( static_cast<int>(itm) < length() );
+//	assert( static_cast<int>(itm) < length() );
 
-	return text(itm, 1);
-}
+//	return text(itm, 1);
+//}
 
 
-const CharStyle StoryText::itemStyle(uint itm) const
-{
-	assert( static_cast<int>(itm) < length() );
+//const CharStyle StoryText::itemStyle(uint itm) const
+//{
+//	assert( static_cast<int>(itm) < length() );
 
-	return charStyle(itm);
-}
+//	return charStyle(itm);
+//}
 	
 
-int StoryText::startOfItem(uint itm) const
-{
-	assert( static_cast<int>(itm) < length() );
+//int StoryText::startOfItem(uint itm) const
+//{
+//	assert( static_cast<int>(itm) < length() );
 
-	return itm;
-}
+//	return itm;
+//}
 
-int StoryText::endOfItem(uint itm) const
-{
-	assert( static_cast<int>(itm) < length() );
+//int StoryText::endOfItem(uint itm) const
+//{
+//	assert( static_cast<int>(itm) < length() );
 
-	return itm + 1;
-}
+//	return itm + 1;
+//}
 
 
 using namespace desaxe;
@@ -1938,8 +2015,8 @@ void StoryText::saxx(SaxHandler& handler, const Xml_string& elemtag) const
 		else if (hasMark(i))
 		{
 			Mark* mrk = mark(i);
-			if ((doc->m_Selection->itemAt(0)->isNoteFrame() && mrk->isType(MARKNoteMasterType))
-				|| (!doc->m_Selection->itemAt(0)->isTextFrame() && mrk->isType(MARKNoteFrameType))
+			if ((m_doc->m_Selection->itemAt(0)->isNoteFrame() && mrk->isType(MARKNoteMasterType))
+				|| (!m_doc->m_Selection->itemAt(0)->isTextFrame() && mrk->isType(MARKNoteFrameType))
 			    || mrk->isType(MARKBullNumType))
 				continue; //do not insert notes marks into text frames nad vice versa
 			Xml_attr mark_attr;
@@ -1972,7 +2049,7 @@ void StoryText::saxx(SaxHandler& handler, const Xml_string& elemtag) const
 				QString l;
 				MarkType t;
 				mrk->getMark(l, t);
-				if (doc->getMarkDefinied(l,t) != NULL)
+				if (m_doc->getMarkDefinied(l,t) != NULL)
 				{
 					mark_attr.insert("mark_l", l);
 					mark_attr.insert("mark_t", QString::number((int) t));
@@ -2065,16 +2142,15 @@ public:
 				if (toInsert > 0)
 					obj->insertChars(obj->length(), txt.mid(lastPos, toInsert));
 				len = obj->length();
-				ScText* lastItem = obj->item(len-1);
 				// qreal SHY means user provided SHY, single SHY is automatic one
-				if (lastItem->effects() & ScStyle_HyphenationPossible)
+				if (obj->hasFlag(len-1, ScLayout_HyphenationPossible))
 				{
-					lastItem->setEffects(lastItem->effects() & ~ScStyle_HyphenationPossible);
+					obj->clearFlag(len-1, ScLayout_HyphenationPossible);
 					obj->insertChars(len, QString(chr));
 				}
 				else
 				{
-					lastItem->setEffects(lastItem->effects() | ScStyle_HyphenationPossible);
+					obj->setFlag(len-1, ScLayout_HyphenationPossible);
 				}
 				lastPos = i + 1;
 			} 

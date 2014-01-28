@@ -28,7 +28,6 @@ for which a new license (GPL+exception) is in place.
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
-#include "text/nlsconfig.h"
 #include "ui/propertiespalette_utils.h"
 
 //using namespace std;
@@ -183,7 +182,7 @@ void PropertiesPalette_Line::handleSelectionChanged()
 	PageItem* currItem = currentItemFromSelection();
 	if (m_doc->m_Selection->count() > 1)
 	{
-		setEnabled(false);
+		setEnabled(true);
 	}
 	else
 	{
@@ -224,7 +223,7 @@ void PropertiesPalette_Line::handleSelectionChanged()
 		setCurrentItem(currItem);
 	}
 	updateGeometry();
-	repaint();
+	//repaint();
 }
 
 void PropertiesPalette_Line::handleUpdateRequest(int updateFlags)

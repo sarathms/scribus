@@ -49,28 +49,31 @@ ImportPdfPlugin::ImportPdfPlugin() : LoadSavePlugin(),
 {
 	// Set action info in languageChange, so we only have to do it in one
 	// place. This includes registering file format support.
+	registerFormats();
 	languageChange();
 }
-/*
-void ImportXfigPlugin::addToMainWindowMenu(ScribusMainWindow *mw)
-{
-	importAction->setEnabled(true);
-	connect( importAction, SIGNAL(triggered()), SLOT(import()) );
-	mw->scrMenuMgr->addMenuItem(importAction, "FileImport");
-}
-*/
+
 void ImportPdfPlugin::languageChange()
 {
 	importAction->setText( tr("Import PDF..."));
-	// (Re)register file format support
-	unregisterAll();
-	registerFormats();
+	FileFormat* fmt = getFormatByExt("pdf");
+	fmt->trName = FormatsManager::instance()->nameOfFormat(FormatsManager::PDF); // Human readable name
+	fmt->filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::PDF); // QFileDialog filter
+	if (ScCore->haveGS())
+	{
+		FileFormat* fmt2 = getFormatByExt("eps");
+		fmt2->trName = FormatsManager::instance()->nameOfFormat(FormatsManager::EPS);
+		fmt2->filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::EPS);
+		FileFormat* fmt3 = getFormatByExt("ps");
+		fmt3->trName = FormatsManager::instance()->nameOfFormat(FormatsManager::PS);
+		fmt3->filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::PS);
+	}
 }
 
 ImportPdfPlugin::~ImportPdfPlugin()
 {
 	unregisterAll();
-};
+}
 
 const QString ImportPdfPlugin::fullTrName() const
 {
@@ -99,9 +102,8 @@ void ImportPdfPlugin::registerFormats()
 {
 	FileFormat fmt(this);
 	fmt.trName = FormatsManager::instance()->nameOfFormat(FormatsManager::PDF); // Human readable name
-	fmt.formatId = FORMATID_PDFIMPORT;
+	fmt.formatId = 0;
 	fmt.filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::PDF); // QFileDialog filter
-	fmt.nameMatch = QRegExp("\\."+FormatsManager::instance()->extensionListForFormat(FormatsManager::PDF, 1)+"$", Qt::CaseInsensitive);
 	fmt.fileExtensions = QStringList() << "pdf";
 	fmt.load = true;
 	fmt.save = false;
@@ -114,9 +116,8 @@ void ImportPdfPlugin::registerFormats()
 	{
 		FileFormat fmt2(this);
 		fmt2.trName = FormatsManager::instance()->nameOfFormat(FormatsManager::EPS); // Human readable name
-		fmt2.formatId = FORMATID_EPSIMPORT;
+		fmt2.formatId = 0;
 		fmt2.filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::EPS);// QFileDialog filter
-		fmt2.nameMatch = QRegExp("\\.("+FormatsManager::instance()->extensionListForFormat(FormatsManager::EPS, 1)+")$", Qt::CaseInsensitive);
 		fmt2.fileExtensions = QStringList() << "eps" << "epsf" << "epsi" << "eps2" << "eps3" << "epi" << "ept";
 		fmt2.load = true;
 		fmt2.save = false;
@@ -126,9 +127,8 @@ void ImportPdfPlugin::registerFormats()
 
 		FileFormat fmt3(this);
 		fmt3.trName = FormatsManager::instance()->nameOfFormat(FormatsManager::PS); // Human readable name
-		fmt3.formatId = FORMATID_PSIMPORT;
+		fmt3.formatId = 0;
 		fmt3.filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::PS);// QFileDialog filter
-		fmt3.nameMatch = QRegExp("\\.("+FormatsManager::instance()->extensionListForFormat(FormatsManager::PS, 1)+")$", Qt::CaseInsensitive);
 		fmt3.fileExtensions = QStringList() << "ps";
 		fmt3.load = true;
 		fmt3.save = false;
@@ -165,7 +165,7 @@ bool ImportPdfPlugin::import(QString fileName, int flags)
 			prefs->set("wdir", fileName.left(fileName.lastIndexOf("/")));
 		}
 		else
-			return true;
+			return false;
 	}
 	m_Doc=ScCore->primaryMainWindow()->doc;
 	UndoTransaction* activeTransaction = NULL;
@@ -216,12 +216,13 @@ bool ImportPdfPlugin::import(QString fileName, int flags)
 			return false;
 		}
 	}
+	bool ret = false;
 	PdfPlug *dia = new PdfPlug(m_Doc, flags);
 	Q_CHECK_PTR(dia);
 	if (isCleanedFile)
-		dia->import(cleanFile, trSettings, flags);
+		ret = dia->import(cleanFile, trSettings, flags);
 	else
-		dia->import(fileName, trSettings, flags);
+		ret = dia->import(fileName, trSettings, flags);
 	if (activeTransaction)
 	{
 		activeTransaction->commit();
@@ -233,7 +234,7 @@ bool ImportPdfPlugin::import(QString fileName, int flags)
 	delete dia;
 	if (isCleanedFile)
 		QFile::remove(cleanFile);
-	return true;
+	return ret;
 }
 
 QImage ImportPdfPlugin::readThumbnail(const QString& fileName)

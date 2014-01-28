@@ -59,19 +59,20 @@ Scribus150Format::Scribus150Format() :
 {
 	// Set action info in languageChange, so we only have to do
 	// it in one place. This includes registering file formats.
+	registerFormats();
 	languageChange();
 }
 
 Scribus150Format::~Scribus150Format()
 {
 	unregisterAll();
-};
+}
 
 void Scribus150Format::languageChange()
 {
-	//(Re)register file formats.
-	unregisterAll();
-	registerFormats();
+	FileFormat* fmt = getFormatByID(FORMATID_SLA150IMPORT);
+	fmt->trName = tr("Scribus 1.5.0+ Document");
+	fmt->filter = fmt->trName + " (*.sla *.SLA *.sla.gz *.SLA.GZ *.scd *.SCD *.scd.gz *.SCD.GZ)";
 }
 
 const QString Scribus150Format::fullTrName() const
@@ -110,7 +111,6 @@ void Scribus150Format::registerFormats()
 	fmt.save = true;
 	fmt.colorReading = true;
 	fmt.filter = fmt.trName + " (*.sla *.SLA *.sla.gz *.SLA.GZ *.scd *.SCD *.scd.gz *.SCD.GZ)";
-	fmt.nameMatch = QRegExp("\\.(sla|scd)(\\.gz)?", Qt::CaseInsensitive);
 	fmt.mimeTypes = QStringList();
 	fmt.mimeTypes.append("application/x-scribus");
 	fmt.fileExtensions = QStringList() << "sla" << "sla.gz" << "scd" << "scd.gz";
@@ -184,8 +184,8 @@ bool Scribus150Format::loadElements(const QString & data, QString fileDir, int t
 	LayerToPaste = toLayer;
 	Xp = Xp_in;
 	Yp = Yp_in;
-//	GrX = 0.0;
-//	GrY = 0.0;
+	GrX = 0.0;
+	GrY = 0.0;
 
 	QMap<int,PageItem*> TableID;
 	QMap<int,PageItem*> TableIDM;
@@ -595,9 +595,10 @@ bool Scribus150Format::loadElements(const QString & data, QString fileDir, int t
 				}
 				m_Doc->DocItems.removeOne(cItem);
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -626,9 +627,10 @@ bool Scribus150Format::loadElements(const QString & data, QString fileDir, int t
 				}
 				m_Doc->FrameItems.remove(m_Doc->FrameItems.key(cItem));
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackF, NULL);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackF, NULL);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -657,9 +659,10 @@ bool Scribus150Format::loadElements(const QString & data, QString fileDir, int t
 				}
 				m_Doc->MasterItems.removeOne(cItem);
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackM, &m_Doc->MasterItems);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackM, &m_Doc->MasterItems);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -1112,9 +1115,10 @@ bool Scribus150Format::loadPalette(const QString & fileName)
 				}
 				m_Doc->DocItems.removeOne(cItem);
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -1143,9 +1147,10 @@ bool Scribus150Format::loadPalette(const QString & fileName)
 				}
 				m_Doc->FrameItems.remove(m_Doc->FrameItems.key(cItem));
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackF, NULL);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackF, NULL);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -1174,9 +1179,10 @@ bool Scribus150Format::loadPalette(const QString & fileName)
 				}
 				m_Doc->MasterItems.removeOne(cItem);
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackM, &m_Doc->MasterItems);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackM, &m_Doc->MasterItems);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -1778,6 +1784,14 @@ bool Scribus150Format::loadFile(const QString & fileName, const FileFormat & /* 
 
 	if (m_Doc->Layers.count() == 0)
 		m_Doc->Layers.newLayer( QObject::tr("Background") );
+	if (!EffVal.isEmpty())
+	{
+		for (int pdoE = 0; pdoE < EffVal.count(); ++pdoE)
+		{
+			if (pdoE < m_Doc->Pages->count())
+				m_Doc->Pages->at(pdoE)->PresentVals = EffVal[pdoE];
+		}
+	}
 
 	if (groupStackP.count() > 0)
 	{
@@ -1804,9 +1818,10 @@ bool Scribus150Format::loadFile(const QString & fileName, const FileFormat & /* 
 				}
 				m_Doc->DocItems.removeOne(cItem);
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -1835,9 +1850,10 @@ bool Scribus150Format::loadFile(const QString & fileName, const FileFormat & /* 
 				}
 				m_Doc->FrameItems.remove(m_Doc->FrameItems.key(cItem));
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackF, NULL);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackF, NULL);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -1866,9 +1882,10 @@ bool Scribus150Format::loadFile(const QString & fileName, const FileFormat & /* 
 				}
 				m_Doc->MasterItems.removeOne(cItem);
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackM, &m_Doc->MasterItems);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackM, &m_Doc->MasterItems);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -2301,6 +2318,7 @@ bool Scribus150Format::readPageSets(ScribusDoc* doc, ScXmlStreamReader& reader)
 bool Scribus150Format::readCheckProfile(ScribusDoc* doc, ScXmlStreamAttributes& attrs)
 {
 	struct CheckerPrefs checkerSettings;
+
 	QString profileName = attrs.valueAsString("Name");
 	if (profileName.isEmpty())
 		return true;
@@ -2319,6 +2337,12 @@ bool Scribus150Format::readCheckProfile(ScribusDoc* doc, ScXmlStreamAttributes& 
 	checkerSettings.checkRasterPDF    = attrs.valueAsBool("checkRasterPDF", true);
 	checkerSettings.checkForGIF       = attrs.valueAsBool("checkForGIF", true);
 	checkerSettings.ignoreOffLayers   = attrs.valueAsBool("ignoreOffLayers", false);
+	checkerSettings.checkNotCMYKOrSpot   = attrs.valueAsBool("checkNotCMYKOrSpot", false);
+	checkerSettings.checkDeviceColorsAndOutputIntent = attrs.valueAsBool("checkDeviceColorsAndOutputIntent", false);
+	checkerSettings.checkFontNotEmbedded = attrs.valueAsBool("checkFontNotEmbedded", false);
+	checkerSettings.checkFontIsOpenType  = attrs.valueAsBool("checkFontIsOpenType", false);
+	checkerSettings.checkAppliedMasterDifferentSide  = attrs.valueAsBool("checkAppliedMasterDifferentSide", true);
+	checkerSettings.checkEmptyTextFrames     = attrs.valueAsBool("checkEmptyTextFrames", true);
 	doc->set1CheckerProfile(profileName, checkerSettings);
 	return true;
 }
@@ -3026,6 +3050,7 @@ bool Scribus150Format::readPDFOptions(ScribusDoc* doc, ScXmlStreamReader& reader
 	doc->pdfOptions().CompressMethod = (PDFOptions::PDFCompression)attrs.valueAsInt("CMethod", 0);
 	doc->pdfOptions().Quality    = attrs.valueAsInt("Quality", 0);
 	doc->pdfOptions().RecalcPic  = attrs.valueAsBool("RecalcPic");
+	doc->pdfOptions().embedPDF   = attrs.valueAsBool("EmbedPDF", false);
 	doc->pdfOptions().Bookmarks  = attrs.valueAsBool("Bookmarks");
 	doc->pdfOptions().MirrorH    = attrs.valueAsBool("MirrorH", false);
 	doc->pdfOptions().MirrorV    = attrs.valueAsBool("MirrorV", false);
@@ -3121,7 +3146,7 @@ bool Scribus150Format::readPDFOptions(ScribusDoc* doc, ScXmlStreamReader& reader
 			ef.Dm = attrs.valueAsInt("Dm");
 			ef.M  = attrs.valueAsInt("M");
 			ef.Di = attrs.valueAsInt("Di");
-			doc->pdfOptions().PresentVals.append(ef);
+			EffVal.append(ef);
 		}
 	}
 	return !reader.hasError();
@@ -3525,6 +3550,14 @@ bool Scribus150Format::readPage(ScribusDoc* doc, ScXmlStreamReader& reader)
 
 	newPage->guides.addHorizontals(newPage->guides.getAutoHorizontals(newPage), GuideManagerCore::Auto);
 	newPage->guides.addVerticals(newPage->guides.getAutoVerticals(newPage), GuideManagerCore::Auto);
+	struct PDFPresentationData ef;
+	ef.pageEffectDuration =  attrs.valueAsInt("pageEffectDuration", 1);
+	ef.pageViewDuration =  attrs.valueAsInt("pageViewDuration", 1);
+	ef.effectType = attrs.valueAsInt("effectType", 0);
+	ef.Dm = attrs.valueAsInt("Dm", 0);
+	ef.M  = attrs.valueAsInt("M", 0);
+	ef.Di = attrs.valueAsInt("Di", 0);
+	newPage->PresentVals = ef;
 	return true;
 }
 
@@ -3580,15 +3613,16 @@ bool Scribus150Format::readObject(ScribusDoc* doc, ScXmlStreamReader& reader, It
 		if (newItem->inlineCharID == -1)
 			FrameItems.append(m_Doc->Items->takeAt(m_Doc->Items->indexOf(newItem)));
 		else
-		doc->FrameItems.insert(newItem->inlineCharID, doc->Items->takeAt(doc->Items->indexOf(newItem)));
+			doc->FrameItems.insert(newItem->inlineCharID, doc->Items->takeAt(doc->Items->indexOf(newItem)));
+		newItem->LayerID = doc->firstLayerID();
 	}
 
 	info.item     = newItem;
 	isNewFormat = attrs.hasAttribute("ItemID");
 	if (isNewFormat)
 	{
-		LinkID.insert(attrs.valueAsInt("ItemID", 0), newItem);
 		info.itemID = attrs.valueAsInt("ItemID", 0);
+		LinkID.insert(info.itemID, newItem);
 	}
 	info.nextItem = attrs.valueAsInt("NEXTITEM", -1);
 	info.ownLink  = newItem->isTableItem ? attrs.valueAsInt("OwnLINK", 0) : 0;
@@ -4201,9 +4235,10 @@ bool Scribus150Format::readPattern(ScribusDoc* doc, ScXmlStreamReader& reader, c
 				}
 				m_Doc->DocItems.removeOne(cItem);
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -4291,16 +4326,15 @@ bool Scribus150Format::readItemText(PageItem *obj, ScXmlStreamAttributes& attrs,
 		else if (ch == SpecialChars::SHYPHEN && pos > 0)
 		{
 //			qDebug() << QString("scribus150format: SHYPHEN at %1").arg(pos);
-			ScText* lastItem = obj->itemText.item(pos-1);
 			// double SHY means user provided SHY, single SHY is automatic one
-			if (lastItem->effects() & ScStyle_HyphenationPossible)
+			if (obj->itemText.hasFlag(pos-1, ScLayout_HyphenationPossible))
 			{
-				lastItem->setEffects(lastItem->effects() & ~ScStyle_HyphenationPossible);
+				obj->itemText.clearFlag(pos-1, ScLayout_HyphenationPossible);
 				obj->itemText.insertChars(pos, QString(ch));
 			}
 			else
 			{
-				lastItem->setEffects(lastItem->effects() | ScStyle_HyphenationPossible);
+				obj->itemText.setFlag(pos-1, ScLayout_HyphenationPossible);
 			}
 		}
 		else {
@@ -4440,10 +4474,11 @@ PageItem* Scribus150Format::pasteItem(ScribusDoc *doc, ScXmlStreamAttributes& at
 			{
 				if (inlineImageData.size() > 0)
 				{
-					currItem->tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_XXXXXX." + inlineImageExt);
-					currItem->tempImageFile->open();
-					QString fileName = getLongPathName(currItem->tempImageFile->fileName());
-					currItem->tempImageFile->close();
+					QTemporaryFile *tempFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_XXXXXX." + inlineImageExt);
+					tempFile->setAutoRemove(false);
+					tempFile->open();
+					QString fileName = getLongPathName(tempFile->fileName());
+					tempFile->close();
 					inlineImageData = qUncompress(QByteArray::fromBase64(inlineImageData));
 					QFile outFil(fileName);
 					if (outFil.open(QIODevice::WriteOnly))
@@ -4452,7 +4487,9 @@ PageItem* Scribus150Format::pasteItem(ScribusDoc *doc, ScXmlStreamAttributes& at
 						outFil.close();
 						currItem->isInlineImage = true;
 						currItem->Pfile = fileName;
+						currItem->isTempFile = true;
 					}
+					delete tempFile;
 				}
 			}
 			else
@@ -4572,6 +4609,7 @@ PageItem* Scribus150Format::pasteItem(ScribusDoc *doc, ScXmlStreamAttributes& at
 		break;
 	}
 
+	currItem->setGroupClipping(attrs.valueAsBool("groupClips", true));
 	currItem->FrameType = attrs.valueAsInt("FRTYPE", 0);
 	int startArrowIndex = attrs.valueAsInt("startArrowIndex", 0);
 	if ((startArrowIndex < 0) || (startArrowIndex > static_cast<int>(doc->arrowStyles().size())))
@@ -5198,6 +5236,15 @@ PageItem* Scribus150Format::pasteItem(ScribusDoc *doc, ScXmlStreamAttributes& at
 	else
 		currItem->inlineCharID = -1;
 
+	currItem->setHasSoftShadow(attrs.valueAsBool("HASSOFTSHADOW", false));
+	currItem->setSoftShadowXOffset(attrs.valueAsDouble("SOFTSHADOWXOFFSET", 5.0));
+	currItem->setSoftShadowYOffset(attrs.valueAsDouble("SOFTSHADOWYOFFSET", 5.0));
+	currItem->setSoftShadowColor(attrs.valueAsString("SOFTSHADOWCOLOR", CommonStrings::None));
+	currItem->setSoftShadowShade(attrs.valueAsInt("SOFTSHADOWSHADE", 100));
+	currItem->setSoftShadowBlurRadius(attrs.valueAsDouble("SOFTSHADOWBLURRADIUS", 5.0));
+	currItem->setSoftShadowBlendMode(attrs.valueAsInt("SOFTSHADOWBLENDMODE", 0));
+	currItem->setSoftShadowOpacity(attrs.valueAsDouble("SOFTSHADOWOPACITY", 1.0));
+
 	//currItem->setRedrawBounding();
 	//currItem->OwnPage = view->OnPage(currItem);
 	return currItem;
@@ -5211,7 +5258,7 @@ bool Scribus150Format::readItemTableData(PageItem_Table* item, ScXmlStreamReader
 		item->setFillColor(fColor);
 	item->setFillShade(attrs.valueAsInt("FillShade", 100));
 	QStringRef tagName = reader.name();
-	LastStyles * lastStyle = new LastStyles();
+	LastStyles lastStyle;
 	doc->dontResize = true;
 	while (!reader.atEnd() && !reader.hasError())
 	{
@@ -5223,6 +5270,7 @@ bool Scribus150Format::readItemTableData(PageItem_Table* item, ScXmlStreamReader
 			ScXmlStreamAttributes tAtt = reader.scAttributes();
 			int row = tAtt.valueAsInt("Row", -1);
 			int col = tAtt.valueAsInt("Column", -1);
+			lastStyle = LastStyles();
 			if ((row >= 0) && (col >= 0))
 			{
 				if (tAtt.hasAttribute("Style"))
@@ -5333,7 +5381,7 @@ bool Scribus150Format::readItemTableData(PageItem_Table* item, ScXmlStreamReader
 				else if (reader.name() == "ITEXT")
 				{
 					ScXmlStreamAttributes tAttT = reader.scAttributes();
-					readItemText(item->cellAt(row, col).textFrame(), tAttT, lastStyle);
+					readItemText(item->cellAt(row, col).textFrame(), tAttT, &lastStyle);
 				}
 				else if (reader.name() == "para")
 				{
@@ -5342,7 +5390,7 @@ bool Scribus150Format::readItemTableData(PageItem_Table* item, ScXmlStreamReader
 					ParagraphStyle newStyle;
 					readParagraphStyle(doc, reader, newStyle);
 					newItem->itemText.setStyle(newItem->itemText.length()-1, newStyle);
-					newItem->itemText.setCharStyle(newItem->itemText.length()-1, 1, lastStyle->Style);
+					newItem->itemText.setCharStyle(newItem->itemText.length()-1, 1, lastStyle.Style);
 				}
 				else if (reader.name() == "trail")
 				{
@@ -5358,8 +5406,8 @@ bool Scribus150Format::readItemTableData(PageItem_Table* item, ScXmlStreamReader
 					newItem->itemText.insertChars(newItem->itemText.length(), SpecialChars::TAB);
 					readCharacterStyleAttrs(doc, tAtt, newStyle);
 					newItem->itemText.setCharStyle(newItem->itemText.length()-1, 1, newStyle);
-					lastStyle->StyleStart = newItem->itemText.length()-1;
-					lastStyle->Style = newStyle;
+					lastStyle.StyleStart = newItem->itemText.length()-1;
+					lastStyle.Style = newStyle;
 				}
 				else if (reader.name() == "breakline")
 				{
@@ -5406,8 +5454,8 @@ bool Scribus150Format::readItemTableData(PageItem_Table* item, ScXmlStreamReader
 						newItem->itemText.insertChars(newItem->itemText.length(), SpecialChars::PAGECOUNT);
 					readCharacterStyleAttrs(doc, tAtt, newStyle);
 					newItem->itemText.setCharStyle(newItem->itemText.length()-1, 1, newStyle);
-					lastStyle->StyleStart = newItem->itemText.length()-1;
-					lastStyle->Style = newStyle;
+					lastStyle.StyleStart = newItem->itemText.length()-1;
+					lastStyle.Style = newStyle;
 				}
 			}
 		}
@@ -5753,8 +5801,8 @@ bool Scribus150Format::loadPage(const QString & fileName, int pageNumber, bool M
 			newPage->marginPreset = attrs.valueAsInt("PRESET", 0);
 			newPage->Margins.Top = newPage->initialMargins.Top;
 			newPage->Margins.Bottom = newPage->initialMargins.Bottom;
-			pageX = attrs.valueAsDouble( attrs.valueAsString("PAGEXPOS"));
-			pageY = attrs.valueAsDouble( attrs.valueAsString("PAGEYPOS"));
+			pageX = attrs.valueAsDouble("PAGEXPOS");
+			pageY = attrs.valueAsDouble("PAGEYPOS");
 
 			// guides reading
 			newPage->guides.setHorizontalAutoGap(attrs.valueAsDouble("AGhorizontalAutoGap", 0.0));
@@ -5871,6 +5919,7 @@ bool Scribus150Format::loadPage(const QString & fileName, int pageNumber, bool M
 						FrameItems.append(m_Doc->Items->takeAt(m_Doc->Items->indexOf(newItem)));
 					else
 						m_Doc->FrameItems.insert(newItem->inlineCharID, m_Doc->Items->takeAt(m_Doc->Items->indexOf(newItem)));
+					newItem->LayerID = m_Doc->firstLayerID();
 				}
 				if (groupStack.count() > 0)
 				{
@@ -6083,9 +6132,10 @@ bool Scribus150Format::loadPage(const QString & fileName, int pageNumber, bool M
 				}
 				m_Doc->DocItems.removeOne(cItem);
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackP, &m_Doc->DocItems);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}
@@ -6114,9 +6164,10 @@ bool Scribus150Format::loadPage(const QString & fileName, int pageNumber, bool M
 				}
 				m_Doc->FrameItems.remove(m_Doc->FrameItems.key(cItem));
 			}
+			bool converted = false;
 			if (isTableIt)
-				convertOldTable(m_Doc, gItem, gpL, &groupStackF, NULL);
-			else
+				converted = convertOldTable(m_Doc, gItem, gpL, &groupStackF, NULL);
+			if (!converted)
 				gItem->groupItemList = gpL;
 		}
 	}

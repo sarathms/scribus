@@ -44,28 +44,22 @@ ImportXfigPlugin::ImportXfigPlugin() : LoadSavePlugin(),
 {
 	// Set action info in languageChange, so we only have to do it in one
 	// place. This includes registering file format support.
+	registerFormats();
 	languageChange();
 }
-/*
-void ImportXfigPlugin::addToMainWindowMenu(ScribusMainWindow *mw)
-{
-	importAction->setEnabled(true);
-	connect( importAction, SIGNAL(triggered()), SLOT(import()) );
-	mw->scrMenuMgr->addMenuItem(importAction, "FileImport");
-}
-*/
+
 void ImportXfigPlugin::languageChange()
 {
 	importAction->setText( tr("Import Xfig..."));
-	// (Re)register file format support
-	unregisterAll();
-	registerFormats();
+	FileFormat* fmt = getFormatByExt("fig");
+	fmt->trName = FormatsManager::instance()->nameOfFormat(FormatsManager::XFIG);
+	fmt->filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::XFIG);
 }
 
 ImportXfigPlugin::~ImportXfigPlugin()
 {
 	unregisterAll();
-};
+}
 
 const QString ImportXfigPlugin::fullTrName() const
 {
@@ -94,9 +88,8 @@ void ImportXfigPlugin::registerFormats()
 {
 	FileFormat fmt(this);
 	fmt.trName = FormatsManager::instance()->nameOfFormat(FormatsManager::XFIG); // Human readable name
-	fmt.formatId = FORMATID_XFIGIMPORT;
+	fmt.formatId = 0;
 	fmt.filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::XFIG); // QFileDialog filter
-	fmt.nameMatch = QRegExp("\\."+FormatsManager::instance()->extensionListForFormat(FormatsManager::XFIG, 1)+"$", Qt::CaseInsensitive);
 	fmt.fileExtensions = QStringList() << "fig";
 	fmt.load = true;
 	fmt.save = false;

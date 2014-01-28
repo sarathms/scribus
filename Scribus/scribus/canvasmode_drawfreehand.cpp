@@ -68,8 +68,6 @@ void FreehandMode::enterEvent(QEvent *)
 
 void FreehandMode::leaveEvent(QEvent *e)
 {
-	if (!m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -84,7 +82,7 @@ void FreehandMode::activate(bool flag)
 
 void FreehandMode::deactivate(bool flag)
 {
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void FreehandMode::mouseDoubleClickEvent(QMouseEvent *m)
@@ -120,7 +118,7 @@ void FreehandMode::mouseMoveEvent(QMouseEvent *m)
 		else
 			RecordP.addPoint(FPoint(newXF, newYF));
 		QPolygon& redrawPolygon(m_canvas->newRedrawPolygon());
-		for (uint pp = 0; pp < RecordP.size(); pp++)
+		for (int pp = 0; pp < RecordP.size(); pp++)
 		{
 			redrawPolygon << RecordP.pointQ(pp);
 		}
@@ -162,9 +160,8 @@ void FreehandMode::mouseMoveEvent(QMouseEvent *m)
 			SeRx = newX;
 			SeRy = newY;
 			QPoint startP = m_canvas->canvasToGlobal(m_doc->appMode == modeDrawTable2 ? QPointF(Dxp, Dyp) : QPointF(Mxp, Myp));
-			m_view->redrawMarker->setGeometry(QRect(startP, m->globalPos()).normalized());
-			if (!m_view->redrawMarker->isVisible())
-				m_view->redrawMarker->show();
+			m_view->redrawMarker->setGeometry(QRect(m_view->mapFromGlobal(startP), m_view->mapFromGlobal(m->globalPos())).normalized());
+			m_view->setRedrawMarkerShown(true);
 			m_view->HaveSelRect = true;
 			return;
 		}
@@ -237,7 +234,7 @@ void FreehandMode::mouseReleaseEvent(QMouseEvent *m)
 			if (m->modifiers() & Qt::ControlModifier)
 			{
 				QList<QPointF> clip;
-				for (uint px = 0; px < RecordP.size()-1; ++px)
+				for (int px = 0; px < RecordP.size()-1; ++px)
 				{
 					FPoint clp = RecordP.point(px);
 					clip.append(QPointF(clp.x(), clp.y()));
@@ -249,7 +246,7 @@ void FreehandMode::mouseReleaseEvent(QMouseEvent *m)
 			{
 				currItem->PoLine.addPoint(RecordP.point(0));
 				currItem->PoLine.addPoint(RecordP.point(0));
-				for (uint px = 1; px < RecordP.size()-1; ++px)
+				for (int px = 1; px < RecordP.size()-1; ++px)
 				{
 					currItem->PoLine.addPoint(RecordP.point(px));
 					currItem->PoLine.addPoint(RecordP.point(px));

@@ -62,27 +62,21 @@ WMFImportPlugin::WMFImportPlugin() : LoadSavePlugin(),
 	// Set action info in languageChange, so we only have to do
 	// it in one place. This includes registering file format
 	// support.
+	registerFormats();
 	languageChange();
 }
-/*
-void WMFImportPlugin::addToMainWindowMenu(ScribusMainWindow *mw)
-{
-	importAction->setEnabled(true);
-	connect( importAction, SIGNAL(triggered()), SLOT(import()) );
-	mw->scrMenuMgr->addMenuItem(importAction, "FileImport");
-}
-*/
+
 WMFImportPlugin::~WMFImportPlugin()
 {
 	unregisterAll();
-};
+}
 
 void WMFImportPlugin::languageChange()
 {
 	importAction->setText( tr("Import &WMF..."));
-	// (Re)register file format support.
-	unregisterAll();
-	registerFormats();
+	FileFormat* fmt = getFormatByExt("wmf");
+	fmt->trName = FormatsManager::instance()->nameOfFormat(FormatsManager::WMF);
+	fmt->filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::WMF);
 }
 
 const QString WMFImportPlugin::fullTrName() const
@@ -111,9 +105,8 @@ void WMFImportPlugin::registerFormats()
 {
 	FileFormat fmt(this);
 	fmt.trName = FormatsManager::instance()->nameOfFormat(FormatsManager::WMF);
-	fmt.formatId = FORMATID_WMFIMPORT;
+	fmt.formatId = 0;
 	fmt.filter = FormatsManager::instance()->extensionsForFormat(FormatsManager::WMF);
-	fmt.nameMatch = QRegExp("\\."+FormatsManager::instance()->extensionListForFormat(FormatsManager::WMF, 1)+"$", Qt::CaseInsensitive);
 	fmt.fileExtensions = QStringList() << "wmf";
 	fmt.load = true;
 	fmt.save = false;
@@ -139,7 +132,8 @@ bool WMFImportPlugin::import(QString filename, int flags)
 {
 	if (!checkFlags(flags))
 		return false;
-	m_Doc=ScCore->primaryMainWindow()->doc;
+	if (m_Doc == 0)
+		m_Doc = ScCore->primaryMainWindow()->doc;
 	ScribusMainWindow* mw=(m_Doc==0) ? ScCore->primaryMainWindow() : m_Doc->scMW();
 	if (filename.isEmpty())
 	{

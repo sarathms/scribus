@@ -8,12 +8,11 @@ for which a new license (GPL+exception) is in place.
 #define UPGRADECHECKER_H
 
 #include <QFile>
+#include <QNetworkReply>
 #include <QObject>
 #include <QString>
 #include <QStringList>
-class QHttp;
-class QHttpResponseHeader;
-
+#include <QNetworkAccessManager>
 class ScTextBrowser;
 
 /**
@@ -32,13 +31,9 @@ public:
 	void show(bool error);
 	QStringList upgradeData();
 	
-public slots:
-	void abort();
-	
 private slots:
-	void requestFinished(int requestId, bool error);
-	void responseHeaderReceived(const QHttpResponseHeader &responseHeader);
-	void done(bool);
+	void downloadFinished();
+	void downloadReadyRead();
 	
 protected:
 	void init();
@@ -53,14 +48,11 @@ protected:
 	QStringList updates;
 	QString tempFile;
 	bool fin;
-	QHttp* getter;
-	int getterID;
+	QNetworkAccessManager* networkManager;
+	QNetworkReply *networkReply;
 	QString message;
-	int httpGetId;
-	bool httpRequestAborted;
 	QFile *rcvdFile;
 	bool errorReported;
-	bool userAbort;
 };
 
 class UpgradeCheckerGUI : public UpgradeChecker

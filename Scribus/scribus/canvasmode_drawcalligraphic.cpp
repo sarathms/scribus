@@ -71,8 +71,6 @@ void CalligraphicMode::enterEvent(QEvent *)
 
 void CalligraphicMode::leaveEvent(QEvent *e)
 {
-	if (!m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -86,7 +84,7 @@ void CalligraphicMode::activate(bool flag)
 
 void CalligraphicMode::deactivate(bool flag)
 {
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void CalligraphicMode::mouseDoubleClickEvent(QMouseEvent *m)
@@ -127,7 +125,7 @@ void CalligraphicMode::mouseMoveEvent(QMouseEvent *m)
 		QPolygon& redrawPolygon(m_canvas->newRedrawPolygon());
 		double mx = sin(m_doc->itemToolPrefs().calligrapicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligrapicPenWidth / 2.0);
 		double my = cos(m_doc->itemToolPrefs().calligrapicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligrapicPenWidth / 2.0);
-		for (uint px = 0; px < RecordP.size()-1; ++px)
+		for (int px = 0; px < RecordP.size()-1; ++px)
 		{
 			FPoint clp = RecordP.point(px);
 			redrawPolygon.append(QPoint(qRound(clp.x() - mx), qRound(clp.y() - my)));
@@ -174,9 +172,8 @@ void CalligraphicMode::mouseMoveEvent(QMouseEvent *m)
 			SeRx = newX;
 			SeRy = newY;
 			QPoint startP = m_canvas->canvasToGlobal(m_doc->appMode == modeDrawTable2 ? QPointF(Dxp, Dyp) : QPointF(Mxp, Myp));
-			m_view->redrawMarker->setGeometry(QRect(startP, m->globalPos()).normalized());
-			if (!m_view->redrawMarker->isVisible())
-				m_view->redrawMarker->show();
+			m_view->redrawMarker->setGeometry(QRect(m_view->mapFromGlobal(startP), m_view->mapFromGlobal(m->globalPos())).normalized());
+			m_view->setRedrawMarkerShown(true);
 			m_view->HaveSelRect = true;
 			return;
 		}
@@ -252,7 +249,7 @@ void CalligraphicMode::mouseReleaseEvent(QMouseEvent *m)
 			QList<QPointF> clipL;
 			double mx = sin(m_doc->itemToolPrefs().calligrapicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligrapicPenWidth / 2.0);
 			double my = cos(m_doc->itemToolPrefs().calligrapicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligrapicPenWidth / 2.0);
-			for (uint px = 0; px < RecordP.size()-1; ++px)
+			for (int px = 0; px < RecordP.size()-1; ++px)
 			{
 				FPoint clp = RecordP.point(px);
 				clipU.append(QPointF(clp.x() - mx, clp.y() - my));

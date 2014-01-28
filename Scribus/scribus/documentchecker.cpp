@@ -30,7 +30,6 @@ for which a new license (GPL+exception) is in place.
 #include "scpage.h"
 #include "scribusdoc.h"
 #include "scribusstructs.h"
-#include "text/nlsconfig.h"
 #include "util.h"
 #include "util_formats.h"
 
@@ -39,41 +38,71 @@ for which a new license (GPL+exception) is in place.
 
 bool isPartFilledImageFrame(PageItem * currItem)
 {
-    //qDebug() << "X" << currItem->width() << currItem->imageXScale() / 72.0 * currItem->pixm.imgInfo.xres * currItem->pixm.width();
-    //qDebug() << "Y" << currItem->height() << currItem->imageYScale() / 72.0 * currItem->pixm.imgInfo.yres * currItem->pixm.height();
-	return (currItem->height() > currItem->imageYScale() / 72.0 * currItem->pixm.imgInfo.yres * currItem->pixm.height()
-			|| currItem->width() > currItem->imageXScale() / 72.0 * currItem->pixm.imgInfo.xres * currItem->pixm.width());
+	double imageRealWidth  = currItem->imageXScale() * currItem->pixm.imgInfo.lowResScale * currItem->pixm.width();
+	double imageRealHeight = currItem->imageYScale() * currItem->pixm.imgInfo.lowResScale * currItem->pixm.height();
+	qDebug() << "X" << currItem->width() << imageRealWidth;
+    qDebug() << "Y" << currItem->height() << imageRealHeight;
+	return ((currItem->width() - imageRealWidth) > 0.05 || (currItem->height() - imageRealHeight) > 0.05);
 }
 
 
 bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 {
-	QString chstr;
 	struct CheckerPrefs checkerSettings;
-	checkerSettings.ignoreErrors = currDoc->checkerProfiles()[currDoc->curCheckProfile()].ignoreErrors;
-	checkerSettings.autoCheck = currDoc->checkerProfiles()[currDoc->curCheckProfile()].autoCheck;
-	checkerSettings.checkGlyphs = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkGlyphs;
-	checkerSettings.checkOrphans = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkOrphans;
-	checkerSettings.checkOverflow = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkOverflow;
-	checkerSettings.checkPictures = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkPictures;
-	checkerSettings.checkResolution = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkResolution;
-	checkerSettings.checkPartFilledImageFrames = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkPartFilledImageFrames;
-	checkerSettings.checkTransparency = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkTransparency;
-	checkerSettings.minResolution = currDoc->checkerProfiles()[currDoc->curCheckProfile()].minResolution;
-	checkerSettings.maxResolution = currDoc->checkerProfiles()[currDoc->curCheckProfile()].maxResolution;
-	checkerSettings.checkAnnotations = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkAnnotations;
-	checkerSettings.checkRasterPDF = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkRasterPDF;
-	checkerSettings.checkForGIF = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkForGIF;
-	checkerSettings.ignoreOffLayers = currDoc->checkerProfiles()[currDoc->curCheckProfile()].ignoreOffLayers;
-	checkerSettings.checkOffConflictLayers = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkOffConflictLayers;
-	checkerSettings.checkNotCMYKOrSpot = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkNotCMYKOrSpot;
-	checkerSettings.checkDeviceColorsAndOutputIntend = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkDeviceColorsAndOutputIntend;
-	checkerSettings.checkFontNotEmbedded = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkFontNotEmbedded;
-	checkerSettings.checkFontIsOpenType = currDoc->checkerProfiles()[currDoc->curCheckProfile()].checkFontIsOpenType;
+	checkerSettings=currDoc->checkerProfiles()[currDoc->curCheckProfile()];
+	currDoc->pageErrors.clear();
 	currDoc->docItemErrors.clear();
 	currDoc->masterItemErrors.clear();
 	currDoc->docLayerErrors.clear();
-	errorCodes itemError;
+
+	checkPages(currDoc, checkerSettings);
+	checkLayers(currDoc, checkerSettings);
+	//update all marks references and check if that changes anything in doc
+	currDoc->setNotesChanged(currDoc->updateMarks(true));
+
+	checkItems(currDoc, checkerSettings);
+
+	return (currDoc->hasPreflightErrors());
+}
+
+void DocumentChecker::checkPages(ScribusDoc *currDoc, struct CheckerPrefs checkerSettings)
+{
+	errorCodes pageError;
+	for (int i=0; i < currDoc->DocPages.count(); ++i )
+	{
+		pageError.clear();
+		if (checkerSettings.checkAppliedMasterDifferentSide)
+		{
+			PageLocation pageLoc=currDoc->locationOfPage(i);
+			int masterPageNumber = currDoc->MasterNames[currDoc->DocPages[i]->MPageNam];
+			int masterPageLocation=currDoc->MasterPages[masterPageNumber]->LeftPg;
+			bool error=0;
+			if (currDoc->pagePositioning() == singlePage)
+			{
+				if (!(pageLoc==LeftPage && masterPageLocation==0))
+					error=1;
+			}
+			else
+			{
+				if (pageLoc==LeftPage && masterPageLocation==1)
+					error=0;
+				else if (pageLoc==RightPage && masterPageLocation==0)
+					error=0;
+				else if (pageLoc==MiddlePage && masterPageLocation==2)
+					error=0;
+				else
+					error=1;
+			}
+			if (error)
+				pageError.insert(AppliedMasterDifferentSide,0);
+		}
+		if (pageError.count() != 0)
+			currDoc->pageErrors.insert(i, pageError);
+	}
+}
+
+void DocumentChecker::checkLayers(ScribusDoc *currDoc, struct CheckerPrefs checkerSettings)
+{
 	errorCodes layerError;
 	int Lnr;
 	ScLayer ll;
@@ -98,9 +127,12 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 		if (layerError.count() != 0)
 			currDoc->docLayerErrors.insert(ll.ID, layerError);
 	}
+}
 
-	//update all marks references and check if that changes anything in doc
-	currDoc->setNotesChanged(currDoc->updateMarks(true));
+void DocumentChecker::checkItems(ScribusDoc *currDoc, struct CheckerPrefs checkerSettings)
+{
+	QString chstr;
+	errorCodes itemError;
 
 	QList<PageItem*> allItems;
 	uint masterItemsCount = currDoc->MasterItems.count();
@@ -121,7 +153,7 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 			itemError.clear();
 			if (((currItem->isAnnotation()) || (currItem->isBookmark)) && (checkerSettings.checkAnnotations))
 				itemError.insert(PDFAnnotField, 0);
-			if (((currItem->fillTransparency() != 0.0) || (currItem->lineTransparency() != 0.0) || (currItem->fillBlendmode() != 0) || (currItem->lineBlendmode() != 0)) && (checkerSettings.checkTransparency))
+			if ((currItem->hasSoftShadow() || (currItem->fillTransparency() != 0.0) || (currItem->lineTransparency() != 0.0) || (currItem->fillBlendmode() != 0) || (currItem->lineBlendmode() != 0)) && (checkerSettings.checkTransparency))
 				itemError.insert(Transparency, 0);
 			if ((currItem->GrType != 0) && (checkerSettings.checkTransparency))
 			{
@@ -237,7 +269,7 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 						bool succeeded = analyst.inspectPDF(pageNum, usedColorSpaces, hasTransparency, usedFonts, imgs);
 						if (succeeded)
 						{
-							if (checkerSettings.checkNotCMYKOrSpot || checkerSettings.checkDeviceColorsAndOutputIntend)
+							if (checkerSettings.checkNotCMYKOrSpot || checkerSettings.checkDeviceColorsAndOutputIntent)
 							{
 								eColorSpaceType currPrintProfCS = ColorSpace_Unknown;
 								if (currDoc->HasCMS)
@@ -257,18 +289,18 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 										}
 									}
 								}
-								if (checkerSettings.checkDeviceColorsAndOutputIntend && currDoc->HasCMS)
+								if (checkerSettings.checkDeviceColorsAndOutputIntent && currDoc->HasCMS)
 								{
 									for (int i=0; i<usedColorSpaces.size(); ++i)
 									{
 										if (currPrintProfCS == ColorSpace_Cmyk && (usedColorSpaces[i] == CS_DeviceRGB || usedColorSpaces[i] == CS_DeviceGray))
 										{
-											itemError.insert(DeviceColorAndOutputIntend, 0);
+											itemError.insert(DeviceColorsAndOutputIntent, 0);
 											break;
 										}
 										else if (currPrintProfCS == ColorSpace_Rgb && (usedColorSpaces[i] == CS_DeviceCMYK || usedColorSpaces[i] == CS_DeviceGray))
 										{
-											itemError.insert(DeviceColorAndOutputIntend, 0);
+											itemError.insert(DeviceColorsAndOutputIntent, 0);
 											break;
 										}
 									}
@@ -303,9 +335,12 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 			}
 			if ((currItem->asTextFrame()) || (currItem->asPathText()))
 			{
-	#ifndef NLS_PROTO
 				if ( currItem->frameOverflows() && (checkerSettings.checkOverflow) && (!((currItem->isAnnotation()) && ((currItem->annotation().Type() == Annotation::Combobox) || (currItem->annotation().Type() == Annotation::Listbox)))))
 					itemError.insert(TextOverflow, 0);
+
+				if (checkerSettings.checkEmptyTextFrames && (currItem->itemText.length()==0 || currItem->frameUnderflows()))
+					itemError.insert(EmptyTextFrame, 0);
+
 				if (currItem->isAnnotation())
 				{
 					ScFace::FontFormat fformat = currItem->itemText.defaultStyle().charStyle().font().format();
@@ -368,7 +403,6 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 					if ((!currItem->itemText.charStyle(e).font().canRender(chr)) && (checkerSettings.checkGlyphs))
 						itemError.insert(MissingGlyph, e);
 				}
-	#endif
 			}
 			if (((currItem->fillColor() != CommonStrings::None) || (currItem->lineColor() != CommonStrings::None)) && (checkerSettings.checkNotCMYKOrSpot))
 			{
@@ -410,7 +444,7 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 			if (!(currDoc->layerPrintable(currItem->LayerID)) && (checkerSettings.ignoreOffLayers))
 				continue;
 			itemError.clear();
-			if (((currItem->fillTransparency() != 0.0) || (currItem->lineTransparency() != 0.0) || (currItem->fillBlendmode() != 0) || (currItem->lineBlendmode() != 0)) && (checkerSettings.checkTransparency))
+			if ((currItem->hasSoftShadow() || (currItem->fillTransparency() != 0.0) || (currItem->lineTransparency() != 0.0) || (currItem->fillBlendmode() != 0) || (currItem->lineBlendmode() != 0)) && (checkerSettings.checkTransparency))
 				itemError.insert(Transparency, 0);
 			if ((currItem->GrType != 0) && (checkerSettings.checkTransparency))
 			{
@@ -528,7 +562,7 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 						bool succeeded = analyst.inspectPDF(pageNum, usedColorSpaces, hasTransparency, usedFonts, imgs);
 						if (succeeded)
 						{
-							if (checkerSettings.checkNotCMYKOrSpot || checkerSettings.checkDeviceColorsAndOutputIntend)
+							if (checkerSettings.checkNotCMYKOrSpot || checkerSettings.checkDeviceColorsAndOutputIntent)
 							{
 								int currPrintProfCS = -1;
 								if (currDoc->HasCMS)
@@ -548,18 +582,18 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 										}
 									}
 								}
-								if (checkerSettings.checkDeviceColorsAndOutputIntend && currDoc->HasCMS)
+								if (checkerSettings.checkDeviceColorsAndOutputIntent && currDoc->HasCMS)
 								{
 									for (int i=0; i<usedColorSpaces.size(); ++i)
 									{
 										if (currPrintProfCS == ColorSpace_Cmyk && (usedColorSpaces[i] == CS_DeviceRGB || usedColorSpaces[i] == CS_DeviceGray))
 										{
-											itemError.insert(DeviceColorAndOutputIntend, 0);
+											itemError.insert(DeviceColorsAndOutputIntent, 0);
 											break;
 										}
 										else if (currPrintProfCS == ColorSpace_Rgb && (usedColorSpaces[i] == CS_DeviceCMYK || usedColorSpaces[i] == CS_DeviceGray))
 										{
-											itemError.insert(DeviceColorAndOutputIntend, 0);
+											itemError.insert(DeviceColorsAndOutputIntent, 0);
 											break;
 										}
 									}
@@ -594,9 +628,12 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 			}
 			if ((currItem->asTextFrame()) || (currItem->asPathText()))
 			{
-	#ifndef NLS_PROTO
 				if ( currItem->frameOverflows() && (checkerSettings.checkOverflow) && (!((currItem->isAnnotation()) && ((currItem->annotation().Type() == Annotation::Combobox) || (currItem->annotation().Type() == Annotation::Listbox)))))
 					itemError.insert(TextOverflow, 0);
+
+				if (checkerSettings.checkEmptyTextFrames && (currItem->itemText.length()==0 || currItem->frameUnderflows()))
+					itemError.insert(EmptyTextFrame, 0);
+
 				if (currItem->isAnnotation())
 				{
 					ScFace::FontFormat fformat = currItem->itemText.defaultStyle().charStyle().font().format();
@@ -659,7 +696,6 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 					if ((!currItem->itemText.charStyle(e).font().canRender(chr)) && (checkerSettings.checkGlyphs))
 						itemError.insert(MissingGlyph, e);
 				}
-	#endif
 			}
 			if (((currItem->fillColor() != CommonStrings::None) || (currItem->lineColor() != CommonStrings::None)) && (checkerSettings.checkNotCMYKOrSpot))
 			{
@@ -684,5 +720,4 @@ bool DocumentChecker::checkDocument(ScribusDoc *currDoc)
 		}
 		allItems.clear();
 	}
-	return ((currDoc->docItemErrors.count() != 0) || (currDoc->masterItemErrors.count() != 0) || (currDoc->docLayerErrors.count() != 0));
 }

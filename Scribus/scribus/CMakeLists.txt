@@ -9,6 +9,7 @@ ADD_SUBDIRECTORY(desaxe)
 ADD_SUBDIRECTORY(fonts)
 ADD_SUBDIRECTORY(styles)
 ADD_SUBDIRECTORY(text)
+ADD_SUBDIRECTORY(ui/qml)
 IF(WITH_TESTS)
   ADD_SUBDIRECTORY(tests)
 ENDIF(WITH_TESTS)
@@ -137,6 +138,7 @@ SET(SCRIBUS_UI_SRC
   ui/propertiespalette_groupbase.ui
   ui/propertiespalette_imagebase.ui
   ui/propertiespalette_linebase.ui
+  ui/propertiespalette_shadowbase.ui
   ui/propertiespalette_shapebase.ui
   ui/propertiespalette_tablebase.ui
   ui/propertiespalette_textbase.ui
@@ -216,7 +218,6 @@ SET(SCRIBUS_MOC_CLASSES
   latexhelpers.h
   loadsaveplugin.h
   menumanager.h
-  numeration.h
   navigator.h
   notesstyles.h
   observable.h
@@ -258,6 +259,7 @@ SET(SCRIBUS_MOC_CLASSES
   scribusview.h
   scribuswin.h
   selection.h
+  selectionrubberband.h
   styleitem.h
   tocgenerator.h
   undogui.h
@@ -403,6 +405,7 @@ SET(SCRIBUS_MOC_CLASSES
   ui/propertiespalette_group.h
   ui/propertiespalette_image.h
   ui/propertiespalette_line.h
+  ui/propertiespalette_shadow.h
   ui/propertiespalette_shape.h
   ui/propertiespalette_table.h
   ui/propertiespalette_text.h
@@ -421,13 +424,14 @@ SET(SCRIBUS_MOC_CLASSES
   ui/replaceonecolor.h
   ui/rulermover.h
   ui/scdockpalette.h
+  ui/scescapecatcher.h
   ui/scfilewidget.h
   ui/scinputdialog.h
   ui/sclistwidgetdelegate.h
   ui/scmenu.h
   ui/scmessagebox.h
-  ui/scrapbookpalette.h
   ui/scmwmenumanager.h
+  ui/scrapbookpalette.h
   ui/scrpalettebase.h
   ui/scrspinbox.h
   ui/sctablewidget.h
@@ -481,7 +485,7 @@ SET(SCRIBUS_MOC_CLASSES
   ui/copypagetomasterpagedialog.h
   ui/createrange.h
   ui/edittoolbar.h
-  ui/filetoolbar.h  
+  ui/filetoolbar.h
   ui/modetoolbar.h
   ui/pdftoolbar.h
   ui/unicodesearch.h
@@ -679,6 +683,7 @@ SET(SCRIBUS_SOURCES
   sctextstruct.cpp
   scxmlstreamreader.cpp
   selection.cpp
+  selectionrubberband.cpp
   serializer.cpp
   styleitem.cpp
   tableborder.cpp
@@ -847,6 +852,7 @@ SET(SCRIBUS_SOURCES
   ui/propertiespalette_image.cpp
   ui/propertiespalette_group.cpp
   ui/propertiespalette_line.cpp
+  ui/propertiespalette_shadow.cpp
   ui/propertiespalette_shape.cpp
   ui/propertiespalette_table.cpp
   ui/propertiespalette_text.cpp
@@ -867,14 +873,15 @@ SET(SCRIBUS_SOURCES
   ui/rulermover.cpp
   ui/sccombobox.cpp
   ui/scdockpalette.cpp
+  ui/scescapecatcher.cpp
   ui/scfilewidget.cpp
   ui/scinputdialog.cpp
   ui/sclistwidgetdelegate.cpp
   ui/scmenu.cpp
   ui/scmessagebox.cpp
+  ui/scmwmenumanager.cpp
   ui/scrapbookpalette.cpp
   ui/scresizecursor.cpp
-  ui/scmwmenumanager.cpp
   ui/scrpalettebase.cpp
   ui/scrspinbox.cpp
   ui/sctablewidget.cpp
@@ -967,9 +974,9 @@ ELSE(WIN32)
   SET(SCRIBUS_MAIN_CPP main.cpp)
 ENDIF(WIN32)
 
-QT4_WRAP_UI(SCRIBUS_UI_SOURCES ${SCRIBUS_UI_SRC} )
+QT5_WRAP_UI(SCRIBUS_UI_SOURCES ${SCRIBUS_UI_SRC} )
 
-QT4_WRAP_CPP(SCRIBUS_MOC_SOURCES
+QT5_WRAP_CPP(SCRIBUS_MOC_SOURCES
 	${SCRIBUS_MOC_CLASSES}
 	${SCRIBUS_MOC_WIN32_ONLY_CLASSES}
 	)
@@ -982,6 +989,7 @@ LINK_DIRECTORIES(
   ${CMAKE_CURRENT_BINARY_DIR}/text
   ${CMAKE_CURRENT_BINARY_DIR}/third_party/wpg
   ${CMAKE_CURRENT_BINARY_DIR}/third_party/pgf
+  ${CMAKE_CURRENT_BINARY_DIR}/third_party/zip
 )
 
 IF(WITH_TESTS)
@@ -1015,6 +1023,7 @@ ENDIF (HAVE_BOOST)
 SET(SCRIBUS_WPG_LIB "scribus_wpg_lib")
 
 SET(SCRIBUS_PGF_LIB "scribus_pgf_lib")
+SET(SCRIBUS_ZIP_LIB "scribus_zip_lib")
 
 INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}
@@ -1122,24 +1131,22 @@ ENDIF (GCC AND NOT WIN32)
 
 
 #Set up libraries to link with all found packages
-
-IF(WANT_PRIVATE_CAIRO)
-	SET(SCRIBUS_CAIRO_LIB "scribus_cairo_lib")
-	INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/third_party/cairo)
-	LINK_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/third_party/cairo)
-	TARGET_LINK_LIBRARIES(${EXE_NAME} ${PIXMAN_LIBRARIES} ${SCRIBUS_CAIRO_LIB})
-ELSE(WANT_PRIVATE_CAIRO)
-	#Select system Cairo
-	INCLUDE_DIRECTORIES(${CAIRO_INCLUDE_DIR})
-	TARGET_LINK_LIBRARIES(${EXE_NAME} ${CAIRO_LIBRARIES})
-	LINK_DIRECTORIES(${PREFIX_CAIRO_LIB})
-	SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${PREFIX_CAIRO_LIB}")
-ENDIF(WANT_PRIVATE_CAIRO)
+INCLUDE_DIRECTORIES(${CAIRO_INCLUDE_DIR})
+TARGET_LINK_LIBRARIES(${EXE_NAME} ${CAIRO_LIBRARIES})
+LINK_DIRECTORIES(${PREFIX_CAIRO_LIB})
+SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${PREFIX_CAIRO_LIB}")
 
 MESSAGE("RPATH: ${CMAKE_INSTALL_RPATH}")
 
 TARGET_LINK_LIBRARIES(${EXE_NAME}
-  ${QT_LIBRARIES}
+  ${Qt5Core_LIBRARIES}
+  ${Qt5Widgets_LIBRARIES}
+  ${Qt5Gui_LIBRARIES}
+  ${Qt5Xml_LIBRARIES}
+  ${Qt5WebKit_LIBRARIES}
+  ${Qt5WebKitWidgets_LIBRARIES}
+  ${Qt5Network_LIBRARIES}
+  ${Qt5OpenGL_LIBRARIES}
   ${CUPS_LIBRARIES}
   ${FREETYPE_LIBRARIES}
   ${FONTCONFIG_LIBRARIES}
@@ -1152,11 +1159,17 @@ TARGET_LINK_LIBRARIES(${EXE_NAME}
   ${GMAGICK_LIBRARIES}
 )
 
+IF (NOT WIN32 AND NOT HAIKU)
+  TARGET_LINK_LIBRARIES(${EXE_NAME}
+	${CUPS_LIBRARIES}
+  )
+ENDIF (NOT WIN32 AND NOT HAIKU)
+
 # required to resolve symbols from libdl when ld is called with --no-add-needed
 # #9310 for the OpenBSD addition
-IF(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" AND NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+IF(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" AND NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" AND NOT HAIKU)
   TARGET_LINK_LIBRARIES(${EXE_NAME} dl)
-ENDIF(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" AND NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+ENDIF(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" AND NOT CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" AND NOT HAIKU)
 
 # #9311 for the OpenBSD addition
 IF(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
@@ -1181,13 +1194,14 @@ TARGET_LINK_LIBRARIES(${EXE_NAME}
   ${SCRIBUS_FONTS_LIB}
   ${SCRIBUS_WPG_LIB}
   ${SCRIBUS_PGF_LIB}
-  ${LCMS_LIBRARIES}
+  ${SCRIBUS_ZIP_LIB}
+  ${LCMS2_LIBRARIES}
 )
 
 IF(WITH_TESTS)
-  TARGET_LINK_LIBRARIES(${EXE_NAME} 
+  TARGET_LINK_LIBRARIES(${EXE_NAME}
   	${QT_QTTEST_LIBRARY}
-	${SCRIBUS_TESTS_LIB} 
+	${SCRIBUS_TESTS_LIB}
   )
 ENDIF(WITH_TESTS)
 
@@ -1216,11 +1230,20 @@ IF (HAVE_BOOST)
 ENDIF(HAVE_BOOST)
 
 # Now build plugins
-SET(PLUGIN_LIBRARIES
-  ${QT_QTCORE_LIBRARY} ${QT_QTGUI_LIBRARY} ${QT_QTXML_LIBRARY}
-  ${LIBXML2_LIBRARIES}
-  ${ZLIB_LIBRARIES}
-)
+
+	SET(PLUGIN_LIBRARIES
+		${Qt5Core_LIBRARIES}
+		${Qt5Widgets_LIBRARIES}
+		${Qt5Gui_LIBRARIES}
+		${Qt5Xml_LIBRARIES}
+		${Qt5WebKit_LIBRARIES}
+		${Qt5WebKitWidgets_LIBRARIES}
+		${Qt5Network_LIBRARIES}
+		${Qt5OpenGL_LIBRARIES}
+		${LIBXML2_LIBRARIES}
+		${ZLIB_LIBRARIES}
+		)
+
 IF(WIN32)
   # IF your plugin needs more than this, please link them privately
   # in the CMakeLists.txt for your plugin.
@@ -1252,7 +1275,7 @@ IF(APPLEBUNDLE)
 #  )
 
 #  INSTALL(
-#	CODE "SET(input_file ${CMAKE_INSTALL_PREFIX}/MacOS/${EXE_NAME})"  
+#	CODE "SET(input_file ${CMAKE_INSTALL_PREFIX}/MacOS/${EXE_NAME})"
 #	SCRIPT ${CMAKE_MODULE_PATH}/ScribusIngestOSXBundleLibraries.cmake )
 ELSE(APPLEBUNDLE)
   IF(WIN32)
@@ -1271,8 +1294,8 @@ ENDIF(APPLEBUNDLE)
 #Install our header files, selected from all existing dirs, excluding unwanted directories and svn files
 IF(NOT WANT_NOHEADERINSTALL)
   MESSAGE(STATUS "Source header files will be installed")
-  INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ DESTINATION ${INCLUDEDIR} 
-    FILES_MATCHING 
+  INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ DESTINATION ${INCLUDEDIR}
+    FILES_MATCHING
     PATTERN "*.h"
     PATTERN "dicts" EXCLUDE
     PATTERN "doc" EXCLUDE
@@ -1281,7 +1304,7 @@ IF(NOT WANT_NOHEADERINSTALL)
     PATTERN "icon*" EXCLUDE
     PATTERN "manpages" EXCLUDE
     PATTERN "old" EXCLUDE
-    PATTERN ".svn" EXCLUDE 
+    PATTERN ".svn" EXCLUDE
   )
 ELSE(NOT WANT_NOHEADERINSTALL)
   MESSAGE(STATUS "No source header files will be installed")

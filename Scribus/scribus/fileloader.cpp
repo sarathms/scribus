@@ -39,7 +39,6 @@ for which a new license (GPL+exception) is in place.
 #include "util.h"
 
 #include "plugins/formatidlist.h"
-#include "text/nlsconfig.h"
 #include "ui/guidemanager.h"
 #include "ui/fontreplacedialog.h"
 #include "ui/missing.h"
@@ -65,10 +64,6 @@ FileLoader::FileLoader(const QString & fileName) :
 	formatSLA13x(LoadSavePlugin::getFormatById(FORMATID_SLA13XIMPORT)),
 	formatSLA134(LoadSavePlugin::getFormatById(FORMATID_SLA134IMPORT)),
 	formatSLA150(LoadSavePlugin::getFormatById(FORMATID_SLA150IMPORT)),
-	formatPS(LoadSavePlugin::getFormatById(FORMATID_PSIMPORT)),
-	formatSVG(LoadSavePlugin::getFormatById(FORMATID_SVGIMPORT)),
-	formatSXD(LoadSavePlugin::getFormatById(FORMATID_SXDIMPORT)),
-	formatODG(LoadSavePlugin::getFormatById(FORMATID_ODGIMPORT)),
 	prefsManager(PrefsManager::instance()),
 	m_fileName(fileName),
 	m_fileType(-1)
@@ -128,23 +123,26 @@ int FileLoader::testFile()
 	QList<FileFormat>::const_iterator itEnd(fileFormats.constEnd());
 	for ( ; it != itEnd ; ++it )
 	{
-		if (it->nameMatch.indexIn("."+ext)!=-1)
+		bool found = false;
+		for (int a = 0; a < it->fileExtensions.count(); a++)
 		{
-//  		qDebug() << QString("Match :%1: :.%2: on %3").arg(it->nameMatch.pattern()).arg(ext).arg(it->trName);
-			if (it->plug != 0)
+			QString exts = it->fileExtensions[a];
+			if (ext.contains(exts, Qt::CaseInsensitive))
 			{
-				if (it->plug->fileSupported(0, m_fileName))
+				if (it->plug != 0)
 				{
-// 					qDebug(QString("File Supported With: %1").arg(it->trName));
-					ret = it->formatId;
-					break;
+					if (it->plug->fileSupported(0, m_fileName))
+					{
+						ret = it->formatId;
+						found = true;
+						break;
+					}
 				}
 			}
 		}
-// 		else
-// 			qDebug() << QString("No Match :%1: :.%2: on %3").arg(it->nameMatch.pattern()).arg(ext).arg(it->trName);
+		if (found)
+			break;
 	}
-	
 	m_fileType = ret;
 	return ret;
 }

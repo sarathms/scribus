@@ -173,7 +173,7 @@ void CanvasMode_Rotate::activate(bool fromGesture)
 
 void CanvasMode_Rotate::deactivate(bool)
 {
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 	m_inItemRotation = false;
 }
 
@@ -187,8 +187,6 @@ void CanvasMode_Rotate::enterEvent(QEvent *)
 
 void CanvasMode_Rotate::leaveEvent(QEvent *)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 void CanvasMode_Rotate::mousePressEvent(QMouseEvent *m)
@@ -409,7 +407,7 @@ void CanvasMode_Rotate::mouseMoveEvent(QMouseEvent *m)
 					{
 						setResizeCursor(how);
 					}
-					qApp->changeOverrideCursor(QCursor(loadIcon("Rotieren2.png")));
+					m_view->setCursor(QCursor(loadIcon("Rotieren2.png")));
 				}
 				else
 				{
@@ -430,7 +428,7 @@ void CanvasMode_Rotate::mouseMoveEvent(QMouseEvent *m)
 					tx = p.mapRect(QRect(0, 0, static_cast<int>(currItem->width()), static_cast<int>(currItem->height())));
 					if ((tx.intersects(mpo)) && (!currItem->locked()))
 					{
-						qApp->changeOverrideCursor(QCursor(loadIcon("Rotieren2.png")));
+						m_view->setCursor(QCursor(loadIcon("Rotieren2.png")));
 						if (!currItem->sizeLocked())
 							m_view->HandleCurs(currItem, mpo);
 					}
@@ -447,9 +445,8 @@ void CanvasMode_Rotate::mouseMoveEvent(QMouseEvent *m)
 		if ((m_canvas->m_viewMode.m_MouseButtonPressed) && (m->buttons() & Qt::LeftButton))
 		{
 			QPoint startP = m_canvas->canvasToGlobal(m_canvasPressCoord);
-			m_view->redrawMarker->setGeometry(QRect(startP, m->globalPos()).normalized());
-			if (!m_view->redrawMarker->isVisible())
-				m_view->redrawMarker->show();
+			m_view->redrawMarker->setGeometry(QRect(m_view->mapFromGlobal(startP), m_view->mapFromGlobal(m->globalPos())).normalized());
+			m_view->setRedrawMarkerShown(true);
 			m_view->HaveSelRect = true;
 		}
 	}
@@ -458,7 +455,6 @@ void CanvasMode_Rotate::mouseMoveEvent(QMouseEvent *m)
 void CanvasMode_Rotate::createContextMenu(PageItem* currItem, double mx, double my)
 {
 	ContextMenu* cmen=NULL;
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 	m_view->setObjectUndoMode();
 	m_canvasPressCoord.setXY(mx, my);
 	if(currItem!=NULL)

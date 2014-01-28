@@ -85,8 +85,8 @@ void PageItem_ImageFrame::DrawObj_Item(ScPainter *p, QRectF /*e*/)
 		if ((drawFrame()) && (m_Doc->guidesPrefs().framesShown))
 		{
 			p->setPen(Qt::black, 1, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
-			p->drawLine(FPoint(0, 0), FPoint(Width, Height));
-			p->drawLine(FPoint(0, Height), FPoint(Width, 0));
+			p->drawLine(FPoint(0, 0), FPoint(m_width, m_height));
+			p->drawLine(FPoint(0, m_height), FPoint(m_width, 0));
 		}
 	}
 	else
@@ -106,7 +106,7 @@ void PageItem_ImageFrame::DrawObj_Item(ScPainter *p, QRectF /*e*/)
 						htmlText.append( tr("Embedded Image") + "\n");
 					else
 						htmlText.append( tr("File:") + " " + fi.fileName() + "\n");
-					htmlText.append( tr("Original PPI:") + " " + QString::number(qRound(pixm.imgInfo.xres))+" x "+QString::number(qRound(pixm.imgInfo.yres)) + "\n");
+					htmlText.append( tr("Original PPI:") + " " + QString::number(pixm.imgInfo.xres)+" x "+QString::number(pixm.imgInfo.yres) + "\n");
 					htmlText.append( tr("Actual PPI:") + " " + QString::number(qRound(72.0 / imageXScale()))+" x "+ QString::number(qRound(72.0 / imageYScale())) + "\n");
 					htmlText.append( tr("Size:") + " " + QString::number(OrigW) + " x " + QString::number(OrigH) + "\n");
 					htmlText.append( tr("Colorspace:") + " ");
@@ -130,10 +130,10 @@ void PageItem_ImageFrame::DrawObj_Item(ScPainter *p, QRectF /*e*/)
 					p->setPen(Qt::red, 1, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
 					htmlText = fi.fileName();
 				}
-				p->drawLine(FPoint(0, 0), FPoint(Width, Height));
-				p->drawLine(FPoint(0, Height), FPoint(Width, 0));
+				p->drawLine(FPoint(0, 0), FPoint(m_width, m_height));
+				p->drawLine(FPoint(0, m_height), FPoint(m_width, 0));
 				p->setFont(QApplication::font());
-				p->drawText(QRectF(0.0, 0.0, Width, Height), htmlText);
+				p->drawText(QRectF(0.0, 0.0, m_width, m_height), htmlText);
 			}
 		}
 		else
@@ -142,12 +142,12 @@ void PageItem_ImageFrame::DrawObj_Item(ScPainter *p, QRectF /*e*/)
 			p->setClipPath();
 			if (imageFlippedH())
 			{
-				p->translate(Width, 0);
+				p->translate(m_width, 0);
 				p->scale(-1, 1);
 			}
 			if (imageFlippedV())
 			{
-				p->translate(0, Height);
+				p->translate(0, m_height);
 				p->scale(1, -1);
 			}
 			if (imageClip.size() != 0)
@@ -246,9 +246,9 @@ void PageItem_ImageFrame::clearContents()
 	setFillTransparency(0.0);
 	setLineTransparency(0.0);
 	imageClip.resize(0);
-	if (tempImageFile != NULL)
-		delete tempImageFile;
-	tempImageFile = NULL;
+	if ((isTempFile) && (!Pfile.isEmpty()))
+		QFile::remove(Pfile);
+	isTempFile = false;
 	isInlineImage = false;
 	//				emit UpdtObj(Doc->currentPage->pageNr(), ItemNr);
 }
@@ -378,7 +378,7 @@ bool PageItem_ImageFrame::createInfoGroup(QFrame *infoGroup, QGridLayout *infoGr
 		
 		oPpiCT->setText( tr("Original PPI:"));
 		infoGroupLayout->addWidget( oPpiCT, 2, 0, Qt::AlignRight );
-		oPpiT->setText(QString::number(qRound(pixm.imgInfo.xres))+" x "+QString::number(qRound(pixm.imgInfo.yres)));
+		oPpiT->setText(QString::number(pixm.imgInfo.xres)+" x "+QString::number(pixm.imgInfo.yres));
 		infoGroupLayout->addWidget( oPpiT, 2, 1 );
 		
 		aPpiCT->setText( tr("Actual PPI:"));
@@ -470,7 +470,7 @@ QString PageItem_ImageFrame::infoDescription()
 			htmlText.append( tr("Embedded Image") + "<br/>");
 		else
 			htmlText.append( tr("File:") + " " + fi.fileName() + "<br/>");
-		htmlText.append( tr("Original PPI:") + " " + QString::number(qRound(pixm.imgInfo.xres))+" x "+QString::number(qRound(pixm.imgInfo.yres)) + "<br/>");
+		htmlText.append( tr("Original PPI:") + " " + QString::number(pixm.imgInfo.xres)+" x "+QString::number(pixm.imgInfo.yres) + "<br/>");
 		htmlText.append( tr("Actual PPI:") + " " + QString::number(qRound(72.0 / imageXScale()))+" x "+ QString::number(qRound(72.0 / imageYScale())) + "<br/>");
 		htmlText.append( tr("Colorspace:") + " ");
 		QString cSpace;

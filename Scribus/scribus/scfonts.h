@@ -15,18 +15,13 @@ for which a new license (GPL+exception) is in place.
 #include <QString>
 #include <QStringList>
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_OUTLINE_H
-#include FT_GLYPH_H
-
-FT_Error ftIOFunc( FT_Stream fts, unsigned long offset, unsigned char* buffer, unsigned long count);
-
 #include "fonts/scface.h"
 #include "fpointarray.h"
 #include "scconfig.h"
 #include "scribusapi.h"
 
+/* Forward declaration so we don't have to include all of Freetype. */
+typedef struct FT_LibraryRec_  *FT_Library;
 
 class ScribusDoc;
 
@@ -45,6 +40,7 @@ class SCRIBUS_API SCFonts : public QMap<QString,ScFace>
 		~SCFonts();
 		void updateFontMap();
 		void GetFonts(QString pf, bool showFontInfo=false);
+		ScFace LoadScalableFont(const QString &filename);
 		void AddScalableFonts(const QString& path, QString DocName = "");
 		/// Returns a font with that name; creates a replacement font if not found
 		const ScFace& findFont(const QString& fontName, ScribusDoc* doc = NULL);

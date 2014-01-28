@@ -227,7 +227,7 @@ public:
 				   GBool interpolate,
 				   Stream *maskStr,
 				   int maskWidth, int maskHeight,
-				   GBool maskInvert, GBool maskInterpolate) { qDebug() << "Draw Masked Image"; }
+				   GBool maskInvert, GBool maskInterpolate); // { qDebug() << "Draw Masked Image"; }
 
 	//----- transparency groups and soft masks
 	virtual void beginTransparencyGroup(GfxState *state, double *bbox, GfxColorSpace * /*blendingColorSpace*/, GBool /*isolated*/, GBool /*knockout*/, GBool /*forSoftMask*/);
@@ -236,7 +236,8 @@ public:
 	virtual void setSoftMask(GfxState * /*state*/, double * /*bbox*/, GBool /*alpha*/, Function * /*transferFunc*/, GfxColor * /*backdropColor*/);
 	virtual void clearSoftMask(GfxState * /*state*/);
 
-//	virtual void updateFillColor(GfxState *state);
+	virtual void updateFillColor(GfxState *state);
+	virtual void updateStrokeColor(GfxState *state);
 	virtual void updateFont(GfxState *state);
 	//----- text drawing
 	virtual void beginTextObject(GfxState *state);
@@ -266,7 +267,9 @@ private:
 	QString UnicodeParsedString(GooString *s1);
 	bool pathIsClosed;
 	QString CurrColorFill;
+	int CurrFillShade;
 	QString CurrColorStroke;
+	int CurrStrokeShade;
 	Qt::PenCapStyle PLineEnd;
 	Qt::PenJoinStyle PLineJoin;
 	QVector<double> DashValues;
@@ -295,17 +298,9 @@ private:
 	QTransform m_ctm;
 	struct F3Entry
 	{
-		QTransform ctm;
-		QString glyphRef;
 		bool colored;
 	};
 	QStack<F3Entry> m_F3Stack;
-	struct F3GlyphEntry
-	{
-		QString pattern;
-		bool colored;
-	};
-	QMap<QString, F3GlyphEntry> m_Font_Pattern_Map;
 	struct mContent
 	{
 		QString name;

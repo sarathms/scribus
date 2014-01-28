@@ -78,7 +78,6 @@ for which a new license (GPL+exception) is in place.
 #include "styleitem.h"
 //#include "ui/stylemanager.h"
 #include "styleselect.h"
-#include "text/nlsconfig.h"
 #include "units.h"
 #include "util.h"
 #include "util_icon.h"
@@ -128,8 +127,10 @@ void SideBar::mouseReleaseEvent(QMouseEvent *m)
 	CurrentPar = editor->StyledText.nrOfParagraph(p);
 	int pos = editor->StyledText.startOfParagraph( editor->StyledText.nrOfParagraph(p) );
 
+	pmen->clear();
+
 	QString styleName = "";
-	ParaStyleComboBox* paraStyleCombo = new ParaStyleComboBox(this);
+	ParaStyleComboBox* paraStyleCombo = new ParaStyleComboBox(pmen);
 	paraStyleCombo->setDoc(editor->doc);
 	if ((CurrentPar < static_cast<int>(editor->StyledText.nrOfParagraphs())) && (editor->StyledText.length() != 0))
 	{
@@ -139,11 +140,10 @@ void SideBar::mouseReleaseEvent(QMouseEvent *m)
 	}
 	paraStyleCombo->setFormat(styleName);
 	connect(paraStyleCombo, SIGNAL(newStyle(const QString&)), this, SLOT(setPStyle(const QString&)));
-	pmen->clear();
-	paraStyleAct = new QWidgetAction(this);
+	
+	paraStyleAct = new QWidgetAction(pmen);
 	paraStyleAct->setDefaultWidget(paraStyleCombo);
 	pmen->addAction(paraStyleAct);
-	//pmen->addAction( tr("Edit Styles..."), this, SLOT(editStyles()));
 	pmen->exec(QCursor::pos());
 }
 
@@ -177,7 +177,7 @@ void SideBar::paintEvent(QPaintEvent *e)
 		while ((pos1 <= pos2) && (pos1 < editor->StyledText.length()))
 		{
 			paraInfo.first = pos1;
-			if (editor->StyledText.item(pos1)->ch == SpecialChars::PARSEP)
+            if (editor->StyledText.text(pos1) == SpecialChars::PARSEP)
 			{
 				paraInfo.second = pos1;
 				pos1 += 1;
@@ -1506,25 +1506,25 @@ void SToolBFont::newSizeHandler()
 // 	: QMainWindow(parent, "StoryEditor", WType_TopLevel) //  WType_Dialog) //WShowModal |
 // {
 // 	prefsManager=PrefsManager::instance();
-// 	currDoc = docc;
+// 	m_doc = docc;
 // 	seMenuMgr=NULL;
 // 	buildGUI();
 // 	currItem = ite;
 // // 	charSelect = NULL;
-// 	firstSet = false;
+// 	m_firstSet = false;
 // 	activFromApp = true;
 // 	Editor->loadItemText(ite);
-// 	Editor->getCursorPosition(&CurrPara, &CurrChar);
+// 	Editor->getCursorPosition(&m_currPara, &m_currChar);
 // 	EditorBar->setRepaint(true);
 // 	EditorBar->doRepaint();
-// 	updateProps(CurrPara, CurrChar);
+// 	updateProps(m_currPara, m_currChar);
 // 	updateStatus();
-// 	textChanged = false;
+// 	m_textChanged = false;
 // 	disconnectSignals();
 // 	connectSignals();
 // 	Editor->setFocus();
 // 	Editor->setColor(false);
-// 	blockUpdate = false;
+// 	m_blockUpdate = false;
 // 	loadPrefs();
 // 	// hack to keep charPalette visible. See destructor too - PV
 // 	ScCore->primaryMainWindow()->charPalette->reparent(this, QPoint(0, 0));
@@ -1533,19 +1533,19 @@ void SToolBFont::newSizeHandler()
 /* Main Story Editor Class, no current document */
 StoryEditor::StoryEditor(QWidget* parent) : QMainWindow(parent, Qt::Window), // WType_Dialog) //WShowModal |
 	activFromApp(true),
-	currDoc(NULL),
-	currItem(NULL),
-	textChanged(false),
-	firstSet(false),
-	blockUpdate(false),
-	CurrPara(0),
-	CurrChar(0),
+	m_doc(NULL),
+	m_item(NULL),
+	m_textChanged(false),
+	m_firstSet(false),
+	m_blockUpdate(false),
+	m_currPara(0),
+	m_currChar(0),
 	charSelect(NULL),
 	charSelectUsed(false)
 {
 	m_spellActive=false;
 	prefsManager=PrefsManager::instance();
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
 	noIcon = loadIcon("noicon.xpm");
 #endif
 	buildGUI();
@@ -1571,8 +1571,8 @@ void StoryEditor::showEvent(QShowEvent *)
 	connect(charSelect, SIGNAL(insertSpecialChar()), this, SLOT(slot_insertSpecialChar()));
 	connect(charSelect, SIGNAL(insertUserSpecialChar(QChar, QString)), this, SLOT(slot_insertUserSpecialChar(QChar, QString)));
 
-	smartSelection=prefsManager->appPrefs.storyEditorPrefs.smartTextSelection;
-	seActions["settingsSmartTextSelection"]->setChecked(smartSelection);
+	m_smartSelection = prefsManager->appPrefs.storyEditorPrefs.smartTextSelection;
+	seActions["settingsSmartTextSelection"]->setChecked(m_smartSelection);
 }
 
 void StoryEditor::hideEvent(QHideEvent *)
@@ -1630,7 +1630,7 @@ void StoryEditor::loadPrefs()
 		vheight = qMax( gStrut.height(), scr.height() - vtop );
 	setGeometry(vleft, vtop, vwidth, vheight);
 	QByteArray state = "";
-	state = prefs->get("winstate","").toAscii();
+	state = prefs->get("winstate","").toLatin1();
 	if (!state.isEmpty())
 		restoreState(QByteArray::fromBase64(state));
 	int side = prefs->getInt("side", -1);
@@ -1694,7 +1694,7 @@ void StoryEditor::initActions()
 	seActions.insert("settingsBackground", new ScrAction("", QKeySequence(), this));
 	seActions.insert("settingsDisplayFont", new ScrAction("", QKeySequence(), this));
 	seActions.insert("settingsSmartTextSelection", new ScrAction("", QKeySequence(), this));
-	seActions["settingsSmartTextSelection"]->setChecked(smartSelection);
+	seActions["settingsSmartTextSelection"]->setChecked(m_smartSelection);
 	seActions["settingsSmartTextSelection"]->setToggleAction(true);
 
 	connect( seActions["settingsBackground"], SIGNAL(triggered()), this, SLOT(setBackPref()) );
@@ -1714,103 +1714,111 @@ void StoryEditor::buildMenus()
 {
 	seMenuMgr = new MenuManager(this->menuBar(), this->menuBar());
 	seMenuMgr->createMenu("File", tr("&File"));
-	seMenuMgr->addMenuItem(seActions["fileNew"], "File", true);
-	seMenuMgr->addMenuItem(seActions["fileRevert"], "File", false);
-	seMenuMgr->addMenuSeparator("File");
-	seMenuMgr->addMenuItem(seActions["fileSaveToFile"], "File", true);
-	seMenuMgr->addMenuItem(seActions["fileLoadFromFile"], "File", true);
-	seMenuMgr->addMenuItem(seActions["fileSaveDocument"], "File", true);
-	seMenuMgr->addMenuSeparator("File");
-	seMenuMgr->addMenuItem(seActions["fileUpdateAndExit"], "File", true);
-	seMenuMgr->addMenuItem(seActions["fileExit"], "File", true);
+	seMenuMgr->addMenuItemString("fileNew", "File");
+	seMenuMgr->addMenuItemString("fileRevert", "File");
+	seMenuMgr->addMenuItemString("SEPARATOR", "File");
+	seMenuMgr->addMenuItemString("fileSaveToFile", "File");
+	seMenuMgr->addMenuItemString("fileLoadFromFile", "File");
+	seMenuMgr->addMenuItemString("fileSaveDocument", "File");
+	seMenuMgr->addMenuItemString("SEPARATOR", "File");
+	seMenuMgr->addMenuItemString("fileUpdateAndExit", "File");
+	seMenuMgr->addMenuItemString("fileExit", "File");
 	seMenuMgr->createMenu("Edit", tr("&Edit"));
-	seMenuMgr->addMenuItem(seActions["editSelectAll"], "Edit", true);
-	seMenuMgr->addMenuItem(seActions["editCut"], "Edit", false);
-	seMenuMgr->addMenuItem(seActions["editCopy"], "Edit", false);
-	seMenuMgr->addMenuItem(seActions["editPaste"], "Edit", false);
-	seMenuMgr->addMenuItem(seActions["editClear"], "Edit", false);
-	seMenuMgr->addMenuSeparator("Edit");
-	seMenuMgr->addMenuItem(seActions["editSearchReplace"], "Edit", true);
-	seMenuMgr->addMenuSeparator("Edit");
-//	seMenuMgr->addMenuItem(seActions["editEditStyle"], "Edit", true);
-	seMenuMgr->addMenuItem(seActions["editFontPreview"], "Edit", true);
-	seMenuMgr->addMenuItem(seActions["editUpdateFrame"], "Edit", false);
-	seMenuMgr->addMenuSeparator("Edit");
-	seMenuMgr->addMenuItem(seActions["settingsSmartTextSelection"], "Edit", true);
+	seMenuMgr->addMenuItemString("editSelectAll", "Edit");
+	seMenuMgr->addMenuItemString("editCut", "Edit");
+	seMenuMgr->addMenuItemString("editCopy", "Edit");
+	seMenuMgr->addMenuItemString("editPaste", "Edit");
+	seMenuMgr->addMenuItemString("editClear", "Edit");
+	seMenuMgr->addMenuItemString("SEPARATOR", "Edit");
+	seMenuMgr->addMenuItemString("editSearchReplace", "Edit");
+	seMenuMgr->addMenuItemString("SEPARATOR", "Edit");
+//	seMenuMgr->addMenuItemString("editEditStyle", "Edit");
+	seMenuMgr->addMenuItemString("editFontPreview", "Edit");
+	seMenuMgr->addMenuItemString("editUpdateFrame", "Edit");
+	seMenuMgr->addMenuItemString("SEPARATOR", "Edit");
+	seMenuMgr->addMenuItemString("settingsSmartTextSelection", "Edit");
 	seMenuMgr->createMenu("Insert", tr("&Insert"));
-	seMenuMgr->addMenuItem(seActions["insertGlyph"], "Insert", true);
-	seMenuMgr->addMenuItem(seActions["insertSampleText"], "Insert", true);
+	seMenuMgr->addMenuItemString("insertGlyph", "Insert");
+	seMenuMgr->addMenuItemString("insertSampleText", "Insert");
 	seMenuMgr->createMenu("InsertChar", tr("Character"), "Insert");
-	seMenuMgr->addMenuItem(seActions["unicodePageNumber"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodePageCount"], "InsertChar", true);
-	//seMenuMgr->addMenuItem(seActions["unicodeSoftHyphen"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodeNonBreakingHyphen"], "InsertChar", true);
-	seMenuMgr->addMenuSeparator("InsertChar");
-	seMenuMgr->addMenuItem(seActions["unicodeCopyRight"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodeRegdTM"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodeTM"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodeSolidus"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodeBullet"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodeMidpoint"], "InsertChar", true);
-	seMenuMgr->addMenuSeparator("InsertChar");
-	seMenuMgr->addMenuItem(seActions["unicodeDashEm"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodeDashEn"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodeDashFigure"], "InsertChar", true);
-	seMenuMgr->addMenuItem(seActions["unicodeDashQuotation"], "InsertChar", true);
+	seMenuMgr->addMenuItemString("InsertChar", "Insert");
+	seMenuMgr->addMenuItemString("unicodePageNumber", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodePageCount", "InsertChar");
+	//seMenuMgr->addMenuItemString("unicodeSoftHyphen", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeNonBreakingHyphen", "InsertChar");
+	seMenuMgr->addMenuItemString("SEPARATOR", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeCopyRight", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeRegdTM", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeTM", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeSolidus", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeBullet", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeMidpoint", "InsertChar");
+	seMenuMgr->addMenuItemString("SEPARATOR", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeDashEm", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeDashEn", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeDashFigure", "InsertChar");
+	seMenuMgr->addMenuItemString("unicodeDashQuotation", "InsertChar");
 	seMenuMgr->createMenu("InsertQuote", tr("Quote"), "Insert");
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteApostrophe"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteStraight"], "InsertQuote", true);
-	seMenuMgr->addMenuSeparator("InsertQuote");
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteSingleLeft"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteSingleRight"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteDoubleLeft"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteDoubleRight"], "InsertQuote", true);
-	seMenuMgr->addMenuSeparator("InsertQuote");
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteSingleReversed"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteDoubleReversed"], "InsertQuote", true);
-	seMenuMgr->addMenuSeparator("InsertQuote");
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteLowSingleComma"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteLowDoubleComma"], "InsertQuote", true);
-	seMenuMgr->addMenuSeparator("InsertQuote");
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteSingleLeftGuillemet"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteSingleRightGuillemet"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteDoubleLeftGuillemet"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteDoubleRightGuillemet"], "InsertQuote", true);
-	seMenuMgr->addMenuSeparator("InsertQuote");
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteCJKSingleLeft"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteCJKSingleRight"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteCJKDoubleLeft"], "InsertQuote", true);
-	seMenuMgr->addMenuItem(seActions["unicodeQuoteCJKDoubleRight"], "InsertQuote", true);
+	seMenuMgr->addMenuItemString("InsertQuote", "Insert");
+	seMenuMgr->addMenuItemString("unicodeQuoteApostrophe", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteStraight", "InsertQuote");
+	seMenuMgr->addMenuItemString("SEPARATOR", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteSingleLeft", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteSingleRight", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteDoubleLeft", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteDoubleRight", "InsertQuote");
+	seMenuMgr->addMenuItemString("SEPARATOR", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteSingleReversed", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteDoubleReversed", "InsertQuote");
+	seMenuMgr->addMenuItemString("SEPARATOR", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteLowSingleComma", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteLowDoubleComma", "InsertQuote");
+	seMenuMgr->addMenuItemString("SEPARATOR", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteSingleLeftGuillemet", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteSingleRightGuillemet", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteDoubleLeftGuillemet", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteDoubleRightGuillemet", "InsertQuote");
+	seMenuMgr->addMenuItemString("SEPARATOR", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteCJKSingleLeft", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteCJKSingleRight", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteCJKDoubleLeft", "InsertQuote");
+	seMenuMgr->addMenuItemString("unicodeQuoteCJKDoubleRight", "InsertQuote");
 	seMenuMgr->createMenu("InsertSpace", tr("Spaces && Breaks"), "Insert");
-	seMenuMgr->addMenuItem(seActions["unicodeNonBreakingSpace"], "InsertSpace", true);
-	seMenuMgr->addMenuItem(seActions["unicodeSpaceEN"], "InsertSpace", true);
-	seMenuMgr->addMenuItem(seActions["unicodeSpaceEM"], "InsertSpace", true);
-	seMenuMgr->addMenuItem(seActions["unicodeSpaceThin"], "InsertSpace", true);
-	seMenuMgr->addMenuItem(seActions["unicodeSpaceThick"], "InsertSpace", true);
-	seMenuMgr->addMenuItem(seActions["unicodeSpaceMid"], "InsertSpace", true);
-	seMenuMgr->addMenuItem(seActions["unicodeSpaceHair"], "InsertSpace", true);
-	seMenuMgr->addMenuSeparator("InsertSpace");
-	seMenuMgr->addMenuItem(seActions["unicodeNewLine"], "InsertSpace", true);
-	seMenuMgr->addMenuItem(seActions["unicodeFrameBreak"], "InsertSpace", true);
-	seMenuMgr->addMenuItem(seActions["unicodeColumnBreak"], "InsertSpace", true);
+	seMenuMgr->addMenuItemString("InsertSpace", "Insert");
+	seMenuMgr->addMenuItemString("unicodeNonBreakingSpace", "InsertSpace");
+	seMenuMgr->addMenuItemString("unicodeSpaceEN", "InsertSpace");
+	seMenuMgr->addMenuItemString("unicodeSpaceEM", "InsertSpace");
+	seMenuMgr->addMenuItemString("unicodeSpaceThin", "InsertSpace");
+	seMenuMgr->addMenuItemString("unicodeSpaceThick", "InsertSpace");
+	seMenuMgr->addMenuItemString("unicodeSpaceMid", "InsertSpace");
+	seMenuMgr->addMenuItemString("unicodeSpaceHair", "InsertSpace");
+	seMenuMgr->addMenuItemString("SEPARATOR", "InsertSpace");
+	seMenuMgr->addMenuItemString("unicodeNewLine", "InsertSpace");
+	seMenuMgr->addMenuItemString("unicodeFrameBreak", "InsertSpace");
+	seMenuMgr->addMenuItemString("unicodeColumnBreak", "InsertSpace");
 	seMenuMgr->createMenu("InsertLigature", tr("Ligature"), "Insert");
-	seMenuMgr->addMenuItem(seActions["unicodeLigature_ff"], "InsertLigature", true);
-	seMenuMgr->addMenuItem(seActions["unicodeLigature_fi"], "InsertLigature", true);
-	seMenuMgr->addMenuItem(seActions["unicodeLigature_fl"], "InsertLigature", true);
-	seMenuMgr->addMenuItem(seActions["unicodeLigature_ffi"], "InsertLigature", true);
-	seMenuMgr->addMenuItem(seActions["unicodeLigature_ffl"], "InsertLigature", true);
-	seMenuMgr->addMenuItem(seActions["unicodeLigature_ft"], "InsertLigature", true);
-	seMenuMgr->addMenuItem(seActions["unicodeLigature_st"], "InsertLigature", true);
+	seMenuMgr->addMenuItemString("InsertLigature", "Insert");
+	seMenuMgr->addMenuItemString("unicodeLigature_ff", "InsertLigature");
+	seMenuMgr->addMenuItemString("unicodeLigature_fi", "InsertLigature");
+	seMenuMgr->addMenuItemString("unicodeLigature_fl", "InsertLigature");
+	seMenuMgr->addMenuItemString("unicodeLigature_ffi", "InsertLigature");
+	seMenuMgr->addMenuItemString("unicodeLigature_ffl", "InsertLigature");
+	seMenuMgr->addMenuItemString("unicodeLigature_ft", "InsertLigature");
+	seMenuMgr->addMenuItemString("unicodeLigature_st", "InsertLigature");
 
 	seMenuMgr->createMenu("Settings", tr("&Settings"));
-	seMenuMgr->addMenuItem(seActions["settingsBackground"], "Settings", true);
-	seMenuMgr->addMenuItem(seActions["settingsDisplayFont"], "Settings", true);
-//	seMenuMgr->addMenuItem(seActions["settingsSmartTextSelection"], "Settings", true);
+	seMenuMgr->addMenuItemString("settingsBackground", "Settings");
+	seMenuMgr->addMenuItemString("settingsDisplayFont", "Settings");
+//	seMenuMgr->addMenuItemString("settingsSmartTextSelection", "Settings");
 
-	seMenuMgr->addMenuToMenuBar("File");
-	seMenuMgr->addMenuToMenuBar("Edit");
-	seMenuMgr->addMenuToMenuBar("Insert");
-	seMenuMgr->addMenuToMenuBar("Settings");
+	seMenuMgr->addMenuStringToMenuBar("File");
+	seMenuMgr->addMenuItemStringstoMenuBar("File", seActions);
+	seMenuMgr->addMenuStringToMenuBar("Edit");
+	seMenuMgr->addMenuItemStringstoMenuBar("Edit", seActions);
+	seMenuMgr->addMenuStringToMenuBar("Insert");
+	seMenuMgr->addMenuItemStringstoMenuBar("Insert", seActions);
+	seMenuMgr->addMenuStringToMenuBar("Settings");
+	seMenuMgr->addMenuItemStringstoMenuBar("Settings", seActions);
 	
 	PluginManager::instance().setupPluginActions(this);
 	PluginManager::instance().languageChange();
@@ -1820,7 +1828,7 @@ void StoryEditor::buildGUI()
 {
 	unicodeCharActionNames.clear();
 	seActions.clear();
-	smartSelection=prefsManager->appPrefs.storyEditorPrefs.smartTextSelection;
+	m_smartSelection = prefsManager->appPrefs.storyEditorPrefs.smartTextSelection;
 	initActions();
 	ActionManager::initUnicodeActions(&seActions, this, &unicodeCharActionNames);
 	seActions["unicodeSoftHyphen"]->setEnabled(false);//CB TODO doesnt work in SE yet.
@@ -1862,7 +1870,7 @@ void StoryEditor::buildGUI()
 	AlignTools->setAllowedAreas(Qt::RightToolBarArea);
 	AlignTools->setAllowedAreas(Qt::BottomToolBarArea);
 	AlignTools->setAllowedAreas(Qt::TopToolBarArea);
-	AlignTools->paraStyleCombo->setDoc(currDoc);
+	AlignTools->paraStyleCombo->setDoc(m_doc);
 	StyleTools = new SToolBStyle(this);
 	StyleTools->setIconSize(QSize(16,16));
 	StyleTools->setObjectName("Style");
@@ -1870,7 +1878,7 @@ void StoryEditor::buildGUI()
 	StyleTools->setAllowedAreas(Qt::RightToolBarArea);
 	StyleTools->setAllowedAreas(Qt::BottomToolBarArea);
 	StyleTools->setAllowedAreas(Qt::TopToolBarArea);
-	StrokeTools = new SToolBColorS(this, currDoc);
+	StrokeTools = new SToolBColorS(this, m_doc);
 	StrokeTools->setIconSize(QSize(16,16));
 	StrokeTools->setObjectName("Strok");
 	StrokeTools->setAllowedAreas(Qt::LeftToolBarArea);
@@ -1879,7 +1887,7 @@ void StoryEditor::buildGUI()
 	StrokeTools->setAllowedAreas(Qt::TopToolBarArea);
 	StrokeTools->TxStroke->setEnabled(false);
 	StrokeTools->PM1->setEnabled(false);
-	FillTools = new SToolBColorF(this, currDoc);
+	FillTools = new SToolBColorF(this, m_doc);
 	FillTools->setIconSize(QSize(16,16));
 	FillTools->setObjectName("Fill");
 	FillTools->setAllowedAreas(Qt::LeftToolBarArea);
@@ -1901,7 +1909,7 @@ void StoryEditor::buildGUI()
 	EditorBar = new SideBar(this);
 	EdSplit->addWidget(EditorBar);
 /* Editor Widget, subclass of QTextEdit */
-	Editor = new SEditor(this, currDoc, this);
+	Editor = new SEditor(this, m_doc, this);
 	EdSplit->addWidget(Editor);
 	StoryEd2Layout->addWidget( EdSplit );
 
@@ -2082,19 +2090,19 @@ void StoryEditor::connectSignals()
 void StoryEditor::setCurrentDocumentAndItem(ScribusDoc *doc, PageItem *item)
 {
 	disconnectSignals();
-	currDoc=doc;
-	textChanged=false;
-	AlignTools->paraStyleCombo->setDoc(currDoc);
-	StrokeTools->setCurrentDocument(currDoc);
-	FillTools->setCurrentDocument(currDoc);
-	Editor->setCurrentDocument(currDoc);
-	currItem = item;
-	if (currItem!=NULL)
+	m_doc=doc;
+	m_textChanged=false;
+	AlignTools->paraStyleCombo->setDoc(m_doc);
+	StrokeTools->setCurrentDocument(m_doc);
+	FillTools->setCurrentDocument(m_doc);
+	Editor->setCurrentDocument(m_doc);
+	m_item = item;
+	if (m_item != NULL)
 	{
-		setWindowTitle( tr("Story Editor - %1").arg(currItem->itemName()));
-		firstSet = false;
-		FontTools->Fonts->RebuildList(currDoc, currItem->isAnnotation());
-		Editor->loadItemText(currItem);
+		setWindowTitle( tr("Story Editor - %1").arg(m_item->itemName()));
+		m_firstSet = false;
+		FontTools->Fonts->RebuildList(m_doc, m_item->isAnnotation());
+		Editor->loadItemText(m_item);
 		Editor->moveCursor(QTextCursor::Start, QTextCursor::MoveAnchor);
 		Editor->repaint();
 		EditorBar->offs = 0;
@@ -2130,7 +2138,7 @@ void StoryEditor::doubleClick(int para, int position)
 {
 	int indexFrom=0, indexTo=0;
 	QString selText = Editor->textCursor().selectedText();
-	if (selText.length() == 0 || !smartSelection)
+	if (selText.length() == 0 || !m_smartSelection)
 	{
 		updateProps(para, position);
 		return;
@@ -2146,14 +2154,14 @@ void StoryEditor::doubleClick(int para, int position)
 
 void StoryEditor::setSmart(bool newSmartSelection)
 {
-	smartSelection = newSmartSelection;
+	m_smartSelection = newSmartSelection;
 }
 
 void StoryEditor::closeEvent(QCloseEvent *e)
 {
-	if (textChanged)
+	if (m_textChanged)
 	{
-		blockUpdate = true;
+		m_blockUpdate = true;
 		int t = QMessageBox::warning(this, CommonStrings::trWarning,
 									tr("Do you want to save your changes?"),
 									QMessageBox::Yes|QMessageBox::Default,
@@ -2163,25 +2171,25 @@ void StoryEditor::closeEvent(QCloseEvent *e)
 		if (t == QMessageBox::Yes)
 		{
 			updateTextFrame();
-			result = QDialog::Accepted;
+			m_result = QDialog::Accepted;
 		}
 		else if (t == QMessageBox::Cancel)
 		{
 			e->ignore();
-			blockUpdate = false;
+			m_blockUpdate = false;
 			return;
 		}
 		else if (t == QMessageBox::No)
-			result = QDialog::Rejected;
+			m_result = QDialog::Rejected;
 	}
 	else
-		result = QDialog::Rejected;
+		m_result = QDialog::Rejected;
 	setCurrentDocumentAndItem(NULL, NULL);
 	savePrefs();
 // 	if (charSelect != NULL)
 // 		charSelect->close();
 	hide();
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 void StoryEditor::keyPressEvent (QKeyEvent * e)
@@ -2201,21 +2209,21 @@ bool StoryEditor::eventFilter( QObject* ob, QEvent* ev )
 	{
 		if ( ev->type() == QEvent::WindowDeactivate )
 		{
-			if ((currItem!=NULL) && (!blockUpdate))
+			if ((m_item != NULL) && (!m_blockUpdate))
 				updateTextFrame();
 			activFromApp = false;
-	//		Editor->getCursorPosition(&CurrPara, &CurrChar);
+	//		Editor->getCursorPosition(&m_currPara, &m_currChar);
 		}
 		if ( ev->type() == QEvent::WindowActivate )
 		{
-			if ((!activFromApp) && (!textChanged) && (!blockUpdate))
+			if ((!activFromApp) && (!m_textChanged) && (!m_blockUpdate))
 			{
 				activFromApp = true;
-				if (currItem!=NULL)
+				if (m_item != NULL)
 				{
 					//set to false otherwise some dialog properties wont be set correctly
-					if (currItem->itemText.length() == 0)
-						firstSet = false; 
+					if (m_item->itemText.length() == 0)
+						m_firstSet = false; 
 					disconnectSignals();
 					Editor->setUndoRedoEnabled(false);
 					Editor->setUndoRedoEnabled(true);
@@ -2224,12 +2232,12 @@ bool StoryEditor::eventFilter( QObject* ob, QEvent* ev )
 					seActions["editCopy"]->setEnabled(false);
 					seActions["editCut"]->setEnabled(false);
 					seActions["editClear"]->setEnabled(false);
-					textChanged = false;
-					FontTools->Fonts->RebuildList(currDoc, currItem->isAnnotation());
-					Editor->loadItemText(currItem);
-	//				Editor->getCursorPosition(&CurrPara, &CurrChar);
+					m_textChanged = false;
+					FontTools->Fonts->RebuildList(m_doc, m_item->isAnnotation());
+					Editor->loadItemText(m_item);
+	//				Editor->getCursorPosition(&m_currPara, &m_currChar);
 					updateStatus();
-					textChanged = false;
+					m_textChanged = false;
 					Editor->moveCursor(QTextCursor::Start, QTextCursor::MoveAnchor);
 					Editor->repaint();
 					EditorBar->offs = 0;
@@ -2247,7 +2255,7 @@ bool StoryEditor::eventFilter( QObject* ob, QEvent* ev )
 
 void StoryEditor::setBackPref()
 {
-	blockUpdate = true;
+	m_blockUpdate = true;
 	QColor newColor(QColorDialog::getColor(Editor->palette().color(QPalette::Base), this));
 	if (newColor.isValid())
 	{
@@ -2258,16 +2266,16 @@ void StoryEditor::setBackPref()
 		Editor->setPalette(pal);
 		prefsManager->appPrefs.storyEditorPrefs.guiFontColorBackground = newColor;
 	}
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 void StoryEditor::setFontPref()
 {
-	blockUpdate = true;
+	m_blockUpdate = true;
 	Editor->setFont( QFontDialog::getFont( 0, Editor->font(), this ) );
 	prefsManager->appPrefs.storyEditorPrefs.guiFont = Editor->font().toString();
 	EditorBar->doRepaint();
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 void StoryEditor::newTxFill(int c, int s)
@@ -2300,10 +2308,10 @@ void StoryEditor::newTxStroke(int c, int s)
 
 void StoryEditor::newTxFont(const QString &f)
 {
-	if(!currDoc->UsedFonts.contains(f)) {
-		if (!currDoc->AddFont(f)) {
+	if(!m_doc->UsedFonts.contains(f)) {
+		if (!m_doc->AddFont(f)) {
 //, prefsManager->appPrefs.AvailFonts[f]->Font)) {
-			FontTools->Fonts->RebuildList(currDoc);
+			FontTools->Fonts->RebuildList(m_doc);
 			return;
 		};
 	}
@@ -2311,7 +2319,7 @@ void StoryEditor::newTxFont(const QString &f)
 	Editor->CurrFont = f;
 	updateUnicodeActions();
 	CharStyle charStyle;
-	charStyle.setFont((*currDoc->AllFonts)[Editor->CurrFont]);
+	charStyle.setFont((*m_doc->AllFonts)[Editor->CurrFont]);
 	Editor->updateSel(charStyle);
 	modifiedText();
 	Editor->setFocus();
@@ -2440,13 +2448,13 @@ void StoryEditor::updateProps(int p, int ch)
 	ColorList::Iterator it;
 	int c = 0;
 
-	if ((p >= static_cast<int>(Editor->StyledText.nrOfParagraphs())) || (Editor->StyledText.length() == 0) || (!firstSet))
+	if ((p >= static_cast<int>(Editor->StyledText.nrOfParagraphs())) || (Editor->StyledText.length() == 0) || (!m_firstSet))
 	{
 		int pos = Editor->StyledText.startOfParagraph(p) + ch;
-		if (!firstSet)
+		if (!m_firstSet)
 		{
-			const CharStyle& curstyle(pos < Editor->StyledText.length()? currItem->itemText.charStyle(pos) : currItem->itemText.defaultStyle().charStyle());
-			const ParagraphStyle parStyle(pos < Editor->StyledText.length()? currItem->itemText.paragraphStyle(pos) : currItem->itemText.defaultStyle());
+			const CharStyle& curstyle(pos < Editor->StyledText.length()? m_item->itemText.charStyle(pos) : m_item->itemText.defaultStyle().charStyle());
+			const ParagraphStyle parStyle(pos < Editor->StyledText.length()? m_item->itemText.paragraphStyle(pos) : m_item->itemText.defaultStyle());
 			Editor->currentParaStyle = parStyle.parent();
 			Editor->CurrAlign = parStyle.alignment();
 			Editor->CurrTextFill = curstyle.fillColor();
@@ -2475,7 +2483,7 @@ void StoryEditor::updateProps(int p, int ch)
 			if ((b != CommonStrings::None) && (!b.isEmpty()))
 			{
 				c++;
-				for (it = currDoc->PageColors.begin(); it != currDoc->PageColors.end(); ++it)
+				for (it = m_doc->PageColors.begin(); it != m_doc->PageColors.end(); ++it)
 				{
 					if (it.key() == b)
 						break;
@@ -2488,7 +2496,7 @@ void StoryEditor::updateProps(int p, int ch)
 			if ((b != CommonStrings::None) && (!b.isEmpty()))
 			{
 				c++;
-				for (it = currDoc->PageColors.begin(); it != currDoc->PageColors.end(); ++it)
+				for (it = m_doc->PageColors.begin(); it != m_doc->PageColors.end(); ++it)
 				{
 					if (it.key() == b)
 						break;
@@ -2520,7 +2528,7 @@ void StoryEditor::updateProps(int p, int ch)
 			StrokeTools->PM1->setEnabled(false);
 		}
 		Editor->setEffects(Editor->CurrentEffects);
-		firstSet = true;
+		m_firstSet = true;
 		updateUnicodeActions();
 		return;
 	}
@@ -2596,7 +2604,7 @@ void StoryEditor::updateProps(int p, int ch)
 	if ((b != CommonStrings::None) && (!b.isEmpty()))
 	{
 		c++;
-		for (it = currDoc->PageColors.begin(); it != currDoc->PageColors.end(); ++it)
+		for (it = m_doc->PageColors.begin(); it != m_doc->PageColors.end(); ++it)
 		{
 			if (it.key() == b)
 				break;
@@ -2609,7 +2617,7 @@ void StoryEditor::updateProps(int p, int ch)
 	if ((b != CommonStrings::None) && (!b.isEmpty()))
 	{
 		c++;
-		for (it = currDoc->PageColors.begin(); it != currDoc->PageColors.end(); ++it)
+		for (it = m_doc->PageColors.begin(); it != m_doc->PageColors.end(); ++it)
 		{
 			if (it.key() == b)
 				break;
@@ -2683,38 +2691,38 @@ void StoryEditor::Do_insSp()
 	if (charSelect->isVisible())
 		return;
 	charSelect->setEnabled(true, 0);
-	charSelect->setDoc(currDoc);
+	charSelect->setDoc(m_doc);
 	charSelect->show();
 }
 
 void StoryEditor::insertSampleText()
 {
-	LoremManager dia(currDoc, this);
+	LoremManager dia(m_doc, this);
 	if (!dia.exec())
 		return;
-	blockUpdate = true;
+	m_blockUpdate = true;
 	Editor->insertChars(dia.loremIpsum());
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 void StoryEditor::slot_insertSpecialChar()
 {
-	blockUpdate = true;
+	m_blockUpdate = true;
 	if (!charSelect->getCharacters().isEmpty())
 		Editor->insertPlainText(charSelect->getCharacters());
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 void StoryEditor::slot_insertUserSpecialChar(QChar c, QString)
 {
-	blockUpdate = true;
+	m_blockUpdate = true;
 	Editor->insertPlainText(c);
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 void StoryEditor::Do_fontPrev()
 {
-	blockUpdate = true;
+	m_blockUpdate = true;
 	QString retval;
 	ScActionPlugin* plugin;
 	bool result = false;
@@ -2723,7 +2731,7 @@ void StoryEditor::Do_fontPrev()
 	{
 		plugin = dynamic_cast<ScActionPlugin*>(PluginManager::instance().getPlugin("fontpreview", false));
 		if (plugin)
-			result = plugin->run(this, currDoc, Editor->CurrFont);
+			result = plugin->run(this, m_doc, Editor->CurrFont);
 		if (result)
 		{
 			retval = plugin->runResult();
@@ -2734,59 +2742,59 @@ void StoryEditor::Do_fontPrev()
 			}
 		}
 	}
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 void StoryEditor::Do_leave2()
 {
 	updateTextFrame();
-	result = QDialog::Accepted;
-	setCurrentDocumentAndItem(currDoc, NULL);
+	m_result = QDialog::Accepted;
+	setCurrentDocumentAndItem(m_doc, NULL);
 	hide();
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 void StoryEditor::Do_leave()
 {
-	if (textChanged)
+	if (m_textChanged)
 	{
-		blockUpdate = true;
+		m_blockUpdate = true;
 		int t = QMessageBox::warning(this, CommonStrings::trWarning,
 									 tr("Do you really want to lose all your changes?"),
 									 QMessageBox::Yes, QMessageBox::No | QMessageBox::Default);
 		qApp->processEvents();
 		if (t == QMessageBox::No)
 		{
-			blockUpdate = false;
+			m_blockUpdate = false;
 			return;
 		}
 	}
-	result = QDialog::Rejected;
-	setCurrentDocumentAndItem(currDoc, NULL);
+	m_result = QDialog::Rejected;
+	setCurrentDocumentAndItem(m_doc, NULL);
 	hide();
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 void StoryEditor::Do_saveDocument()
 {
-	blockUpdate = true;
+	m_blockUpdate = true;
 	if (ScCore->primaryMainWindow()->slotFileSave())
 		updateTextFrame();
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 bool StoryEditor::Do_new()
 {
 	if (!Editor->document()->isEmpty())
 	{
-		blockUpdate = true;
+		m_blockUpdate = true;
 		int t = QMessageBox::warning(this, CommonStrings::trWarning,
 								 tr("Do you really want to clear all your text?"),
 								 QMessageBox::Yes, QMessageBox::No | QMessageBox::Default);
 		qApp->processEvents();
 		if (t == QMessageBox::No)
 		{
-			blockUpdate = false;
+			m_blockUpdate = false;
 			return false;
 		}
 	}
@@ -2799,12 +2807,12 @@ bool StoryEditor::Do_new()
 	seActions["editCopy"]->setEnabled(false);
 	seActions["editCut"]->setEnabled(false);
 	seActions["editClear"]->setEnabled(false);
-//	textChanged = false;
+//	m_textChanged = false;
 	EditorBar->setRepaint(true);
 	EditorBar->doRepaint();
 	updateProps(0, 0);
 	updateStatus();
-	blockUpdate = false;
+	m_blockUpdate = false;
 	return true;
 }
 
@@ -2812,8 +2820,8 @@ void StoryEditor::slotFileRevert()
 {
 	if (Do_new())
 	{
-		Editor->loadItemText(currItem);
-//		Editor->getCursorPosition(&CurrPara, &CurrChar);
+		Editor->loadItemText(m_item);
+//		Editor->getCursorPosition(&m_currPara, &m_currChar);
 		updateStatus();
 		EditorBar->setRepaint(true);
 		EditorBar->doRepaint();
@@ -2881,11 +2889,11 @@ void StoryEditor::PasteAvail()
 void StoryEditor::updateTextFrame()
 {
 	//Return immediately if we dont have to update the frame
-	if (!textChanged)
+	if (!m_textChanged)
 		return;
-	PageItem *nextItem = currItem;
+	PageItem *nextItem = m_item;
 #if 0
-	if (currItem->asTextFrame())
+	if (m_item->asTextFrame())
 	{
 		while (nextItem != 0)
 		{
@@ -2896,11 +2904,11 @@ void StoryEditor::updateTextFrame()
 		}
 	}
 #endif
-	currItem->invalidateLayout();
+	m_item->invalidateLayout();
 	PageItem* nb2 = nextItem;
 	nb2->itemText.clear();
 #if 0
-	if (currItem->asTextFrame())
+	if (m_item->asTextFrame())
 	{
 		while (nb2 != 0)
 		{
@@ -2930,7 +2938,7 @@ void StoryEditor::updateTextFrame()
 				}
 				for (uint em = 0; em < emG.count(); ++em)
 				{
-					currDoc->FrameItems.remove(emG.at(em));
+					m_doc->FrameItems.remove(emG.at(em));
 				}
 			}
 		}
@@ -2951,7 +2959,7 @@ void StoryEditor::updateTextFrame()
 	FrameItemsDel.setAutoDelete(true);
 	for (uint a = 0; a < Editor->FrameItems.count(); ++a)
 	{
-		if (currDoc->FrameItems.findRef(Editor->FrameItems.at(a)) == -1)
+		if (m_doc->FrameItems.findRef(Editor->FrameItems.at(a)) == -1)
 			FrameItemsDel.append(Editor->FrameItems.at(a));
 	}
 	for (uint a = 0; a < FrameItemsDel.count(); ++a)
@@ -2973,7 +2981,7 @@ void StoryEditor::updateTextFrame()
 	}
 #endif
 	ScCore->primaryMainWindow()->view->DrawNew();
-	textChanged = false;
+	m_textChanged = false;
 	seActions["fileRevert"]->setEnabled(false);
 	seActions["editUpdateFrame"]->setEnabled(false);
 	emit DocChanged();
@@ -2981,13 +2989,13 @@ void StoryEditor::updateTextFrame()
 
 void StoryEditor::SearchText()
 {
-	blockUpdate = true;
+	m_blockUpdate = true;
 	EditorBar->setRepaint(false);
-	SearchReplace* dia = new SearchReplace(this, currDoc, currItem, false);
+	SearchReplace* dia = new SearchReplace(this, m_doc, m_item, false);
 	dia->exec();
 	delete dia;
 	qApp->processEvents();
-	blockUpdate = false;
+	m_blockUpdate = false;
 	EditorBar->setRepaint(true);
 	EditorBar->doRepaint();
 }
@@ -3055,20 +3063,20 @@ void StoryEditor::changeStyleSB(int pa, const QString& name)
 	else
 	{
 		Editor->prevFont = Editor->CurrFont;
-		Editor->CurrFont = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().font().scName();
-		Editor->CurrFontSize   = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fontSize();
-		Editor->CurrentEffects = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().effects();
-		Editor->CurrTextFill   = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fillColor();
-		Editor->CurrTextFillSh = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fillShade();
-		Editor->CurrTextStroke = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strokeColor();
-		Editor->CurrTextStrokeSh = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strokeShade();
-		Editor->CurrTextShadowX = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().shadowXOffset();
-		Editor->CurrTextShadowY = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().shadowYOffset();
-		Editor->CurrTextOutline = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().outlineWidth();
-		Editor->CurrTextUnderPos = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().underlineOffset();
-		Editor->CurrTextUnderWidth = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().underlineWidth();
-		Editor->CurrTextStrikePos = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strikethruOffset();
-		Editor->CurrTextStrikeWidth = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strikethruWidth();
+		Editor->CurrFont = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().font().scName();
+		Editor->CurrFontSize   = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fontSize();
+		Editor->CurrentEffects = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().effects();
+		Editor->CurrTextFill   = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fillColor();
+		Editor->CurrTextFillSh = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fillShade();
+		Editor->CurrTextStroke = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strokeColor();
+		Editor->CurrTextStrokeSh = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strokeShade();
+		Editor->CurrTextShadowX = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().shadowXOffset();
+		Editor->CurrTextShadowY = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().shadowYOffset();
+		Editor->CurrTextOutline = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().outlineWidth();
+		Editor->CurrTextUnderPos = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().underlineOffset();
+		Editor->CurrTextUnderWidth = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().underlineWidth();
+		Editor->CurrTextStrikePos = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strikethruOffset();
+		Editor->CurrTextStrikeWidth = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strikethruWidth();
 
 		Editor->setEffects(Editor->CurrentEffects);
 		if ((Editor->CurrentEffects & ScStyle_Outline) || (Editor->CurrentEffects & ScStyle_Shadowed))
@@ -3143,20 +3151,20 @@ void StoryEditor::changeStyle()
 	else
 	{
 		Editor->prevFont = Editor->CurrFont;
-		Editor->CurrFont = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().font().scName();
-		Editor->CurrFontSize   = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fontSize();
-		Editor->CurrentEffects = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().effects();
-		Editor->CurrTextFill   = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fillColor();
-		Editor->CurrTextFillSh = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fillShade();
-		Editor->CurrTextStroke = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strokeColor();
-		Editor->CurrTextStrokeSh = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strokeShade();
-		Editor->CurrTextShadowX = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().shadowXOffset();
-		Editor->CurrTextShadowY = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().shadowYOffset();
-		Editor->CurrTextOutline = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().outlineWidth();
-		Editor->CurrTextUnderPos = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().underlineOffset();
-		Editor->CurrTextUnderWidth = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().underlineWidth();
-		Editor->CurrTextStrikePos = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strikethruOffset();
-		Editor->CurrTextStrikeWidth = currDoc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strikethruWidth();
+		Editor->CurrFont = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().font().scName();
+		Editor->CurrFontSize   = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fontSize();
+		Editor->CurrentEffects = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().effects();
+		Editor->CurrTextFill   = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fillColor();
+		Editor->CurrTextFillSh = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().fillShade();
+		Editor->CurrTextStroke = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strokeColor();
+		Editor->CurrTextStrokeSh = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strokeShade();
+		Editor->CurrTextShadowX = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().shadowXOffset();
+		Editor->CurrTextShadowY = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().shadowYOffset();
+		Editor->CurrTextOutline = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().outlineWidth();
+		Editor->CurrTextUnderPos = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().underlineOffset();
+		Editor->CurrTextUnderWidth = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().underlineWidth();
+		Editor->CurrTextStrikePos = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strikethruOffset();
+		Editor->CurrTextStrikeWidth = m_doc->paragraphStyles().get(Editor->currentParaStyle).charStyle().strikethruWidth();
 
 		Editor->setEffects(Editor->CurrentEffects);
 		if ((Editor->CurrentEffects & ScStyle_Outline) || (Editor->CurrentEffects & ScStyle_Shadowed))
@@ -3234,8 +3242,8 @@ void StoryEditor::changeAlign(int )
 
 void StoryEditor::modifiedText()
 {
-	textChanged = true;
-	firstSet = true;
+	m_textChanged = true;
+	m_firstSet = true;
 	seActions["fileRevert"]->setEnabled(true);
 	seActions["editUpdateFrame"]->setEnabled(true);
 //	seActions["editPaste"]->setEnabled(Editor->tBuffer.length() != 0);
@@ -3266,7 +3274,7 @@ void StoryEditor::LoadTextFile()
 			{
 				txt.replace(QRegExp("\r"), "");
 				txt.replace(QRegExp("\n"), QChar(13));
-				Editor->loadText(txt, currItem);
+				Editor->loadText(txt, m_item);
 				seActions["editPaste"]->setEnabled(false);
 				seActions["editCopy"]->setEnabled(false);
 				seActions["editCut"]->setEnabled(false);
@@ -3281,7 +3289,7 @@ void StoryEditor::LoadTextFile()
 
 void StoryEditor::SaveTextFile()
 {
-	blockUpdate = true;
+	m_blockUpdate = true;
 	QString LoadEnc = "";
 	QString fileName = "";
 	PrefsContext* dirs = prefsManager->prefsFile->getContext("dirs");
@@ -3290,7 +3298,7 @@ void StoryEditor::SaveTextFile()
 	qApp->processEvents();
 	if (dia.exec() != QDialog::Accepted)
 	{
-		blockUpdate = false;
+		m_blockUpdate = false;
 		return;
 	}
 	LoadEnc = dia.TxCodeM->currentText();
@@ -3302,22 +3310,22 @@ void StoryEditor::SaveTextFile()
 		dirs->set("story_save", fileName.left(fileName.lastIndexOf("/")));
 		Serializer::writeWithEncoding(fileName, LoadEnc, Editor->StyledText.plainText());
 	}
-	blockUpdate = false;
+	m_blockUpdate = false;
 }
 
 bool StoryEditor::textDataChanged() const
 {
-	return textChanged;
+	return m_textChanged;
 }
 
 PageItem* StoryEditor::currentItem() const
 {
-	return currItem;
+	return m_item;
 }
 
 ScribusDoc* StoryEditor::currentDocument() const
 {
-	return currDoc;
+	return m_doc;
 }
 
 void StoryEditor::specialActionKeyEvent(const QString& /*actionName*/, int unicodevalue)

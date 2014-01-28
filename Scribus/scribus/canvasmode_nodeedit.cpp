@@ -89,7 +89,7 @@ void CanvasMode_NodeEdit::drawControls(QPainter* p)
 	const double onePerScale = 1 / scale;
 	if (cli.size() > 3)
 	{
-		for (uint poi=0; poi<cli.size()-3; poi += 4)
+		for (int poi=0; poi<cli.size()-3; poi += 4)
 		{
 			if (cli.point(poi).x() > 900000)
 				continue;
@@ -108,7 +108,7 @@ void CanvasMode_NodeEdit::drawControls(QPainter* p)
 		}
 	}
 	// draw points
-	for (uint a=0; a<cli.size()-1; a += 2)
+	for (int a = 0; a < cli.size()-1; a += 2)
 	{
 		if (cli.point(a).x() > 900000)
 			continue;
@@ -196,7 +196,7 @@ void CanvasMode_NodeEdit::activate(bool fromGesture)
 				}
 			}
 		}
-		for (uint a = 0; a < Clip.size(); ++a)
+		for (int a = 0; a < Clip.size(); ++a)
 		{
 			if (Clip.point(a).x() > 900000)
 				continue;
@@ -252,17 +252,11 @@ inline bool CanvasMode_NodeEdit::GetItem(PageItem** pi)
 
 void CanvasMode_NodeEdit::enterEvent(QEvent *)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-	{
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-	}
 }
 
 
 void CanvasMode_NodeEdit::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -332,9 +326,9 @@ void CanvasMode_NodeEdit::mouseMoveEvent(QMouseEvent *m)
 						MoveGY = true;
 					if (npf.x() < m_doc->currentPage()->xOffset() || 
 						npf.x() >= m_doc->currentPage()->xOffset() + m_doc->currentPage()->width() - 1)
-						qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+						m_view->setCursor(QCursor(Qt::ArrowCursor));
 					else
-						qApp->changeOverrideCursor(QCursor(Qt::SplitVCursor));
+						m_view->setCursor(QCursor(Qt::SplitVCursor));
 					return;
 				}
 			}
@@ -348,13 +342,13 @@ void CanvasMode_NodeEdit::mouseMoveEvent(QMouseEvent *m)
 						MoveGX = true;
 					if (npf.y() < m_doc->currentPage()->yOffset() || 
 						npf.y() >= m_doc->currentPage()->yOffset() + m_doc->currentPage()->height() - 1)
-						qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+						m_view->setCursor(QCursor(Qt::ArrowCursor));
 					else
-						qApp->changeOverrideCursor(QCursor(Qt::SplitHCursor));
+						m_view->setCursor(QCursor(Qt::SplitHCursor));
 					return;
 				}
 			}
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+			m_view->setCursor(QCursor(Qt::ArrowCursor));
 		}
 	}
 }
@@ -566,16 +560,16 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 	FPointArray cli;
 	uint EndInd = Clip.size();
 	uint StartInd = 0;
-	for (uint n = m_doc->nodeEdit.ClRe; n < Clip.size(); ++n)
-	{
-		if (Clip.point(n).x() > 900000)
-		{
-			EndInd = n;
-			break;
-		}
-	}
 	if (m_doc->nodeEdit.ClRe > 0)
 	{
+		for (int n = m_doc->nodeEdit.ClRe; n < Clip.size(); ++n)
+		{
+			if (Clip.point(n).x() > 900000)
+			{
+				EndInd = n;
+				break;
+			}
+		}
 		for (uint n2 = m_doc->nodeEdit.ClRe; n2 > 0; n2--)
 		{
 			if (n2 == 0)
@@ -603,7 +597,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 			double nearT = 0.0;
 			QRect mpo2(0, 0, m_doc->guidesPrefs().grabRadius*3, m_doc->guidesPrefs().grabRadius*3);
 			mpo2.moveCenter(QPoint(qRound(npf2.x()), qRound(npf2.y())));
-			for (uint poi=0; poi<Clip.size()-3; poi += 4)
+			for (int poi=0; poi<Clip.size()-3; poi += 4)
 			{
 				FPoint a1 = Clip.point(poi);
 				FPoint a2 = Clip.point(poi+1);
@@ -669,7 +663,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 				m_doc->nodeEdit.ClRe2 = -1;
 				EndInd = Clip.size();
 				StartInd = 0;
-				for (uint n = m_doc->nodeEdit.ClRe; n < Clip.size(); ++n)
+				for (int n = m_doc->nodeEdit.ClRe; n < Clip.size(); ++n)
 				{
 					if (Clip.point(n).x() > 900000)
 					{
@@ -856,7 +850,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 		double nearT = 0.0;
 		QRect mpo2(0, 0, m_doc->guidesPrefs().grabRadius*3, m_doc->guidesPrefs().grabRadius*3);
 		mpo2.moveCenter(QPoint(qRound(npf2.x()), qRound(npf2.y())));
-		for (uint poi=0; poi<Clip.size()-3; poi += 4)
+		for (int poi = 0; poi < Clip.size()-3; poi += 4)
 		{
 			FPoint a1 = Clip.point(poi);
 			FPoint a2 = Clip.point(poi+1);
@@ -1011,11 +1005,11 @@ bool CanvasMode_NodeEdit::handleNodeEditMove(QMouseEvent* m, QRect, PageItem* cu
 			if (m_canvas->hitsCanvasPoint(m->globalPos(), itemPos.map(point)))
 			{
 				if (m_doc->nodeEdit.submode == NodeEditContext::MOVE_POINT)
-					qApp->changeOverrideCursor(QCursor(Qt::SizeAllCursor));
+					m_view->setCursor(QCursor(Qt::SizeAllCursor));
 				if (m_doc->nodeEdit.submode == NodeEditContext::DEL_POINT)
-					qApp->changeOverrideCursor(QCursor(loadIcon("DelPoint.png"), 1, 1));
+					m_view->setCursor(QCursor(loadIcon("DelPoint.png"), 1, 1));
 				if (m_doc->nodeEdit.submode == NodeEditContext::SPLIT_PATH)
-					qApp->changeOverrideCursor(QCursor(loadIcon("Split.png"), 1, 1));
+					m_view->setCursor(QCursor(loadIcon("Split.png"), 1, 1));
 				return true;
 			}
 		}
@@ -1024,7 +1018,7 @@ bool CanvasMode_NodeEdit::handleNodeEditMove(QMouseEvent* m, QRect, PageItem* cu
 		(m_doc->nodeEdit.submode == NodeEditContext::MOVE_POINT) || 
 		(m_doc->nodeEdit.submode == NodeEditContext::SPLIT_PATH && m_doc->nodeEdit.EdPoints))
 	{
-		for (uint poi=0; poi<Clip.size()-3; poi += 4)
+		for (int poi = 0; poi < Clip.size()-3; poi += 4)
 		{
 			// create bezier curve in canvas coords
 			QPointF a1 = itemPos.map(Clip.pointQF(poi));
@@ -1044,13 +1038,13 @@ bool CanvasMode_NodeEdit::handleNodeEditMove(QMouseEvent* m, QRect, PageItem* cu
 					if (m_canvas->hitsCanvasPoint(m->globalPos(), FPoint(pl.x(), pl.y())))
 					{
 						if (m_doc->nodeEdit.submode == NodeEditContext::MOVE_POINT)
-							qApp->changeOverrideCursor(QCursor(loadIcon("HandC.xpm")));
+							m_view->setCursor(QCursor(loadIcon("HandC.xpm")));
 						else if (m_doc->nodeEdit.submode == NodeEditContext::ADD_POINT)
-							qApp->changeOverrideCursor(QCursor(loadIcon("AddPoint.png"), 1, 1));
+							m_view->setCursor(QCursor(loadIcon("AddPoint.png"), 1, 1));
 						else if (m_doc->nodeEdit.submode == NodeEditContext::SPLIT_PATH)
-							qApp->changeOverrideCursor(QCursor(loadIcon("Split.png"), 1, 1));
+							m_view->setCursor(QCursor(loadIcon("Split.png"), 1, 1));
 						else
-							qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+							m_view->setCursor(QCursor(Qt::ArrowCursor));
 						m_doc->nodeEdit.ClRe2 = poi;
 						return true;
 					}
@@ -1058,7 +1052,7 @@ bool CanvasMode_NodeEdit::handleNodeEditMove(QMouseEvent* m, QRect, PageItem* cu
 			}
 		}
 	}
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+	m_view->setCursor(QCursor(Qt::ArrowCursor));
 	return false;
 }
 

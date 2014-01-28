@@ -57,7 +57,6 @@ for which a new license (GPL+exception) is in place.
 #include "util_icon.h"
 #include "util_math.h"
 
-#include "text/nlsconfig.h"
 #include "ui/autoform.h"
 #include "ui/nodeeditpalette.h"
 #include "ui/propertiespalette.h"
@@ -101,6 +100,7 @@ PropertiesPalette_Group::PropertiesPalette_Group( QWidget* parent) : QWidget(par
 	connect(editShape    , SIGNAL(clicked())                 , this, SLOT(handleShapeEdit()));
 	connect(evenOdd      , SIGNAL(clicked())                 , this, SLOT(handleFillRule()) );
 	connect(nonZero      , SIGNAL(clicked())                 , this, SLOT(handleFillRule()) );
+	connect(clipGroups   , SIGNAL(clicked())                 , this, SLOT(handleClipping()) );
 	connect(transPalWidget , SIGNAL(editGradient())          , this, SLOT(handleGradientEdit()));
 	connect(transPalWidget , SIGNAL(NewSpecial(double, double, double, double, double, double, double, double, double, double)), this, SLOT(handleSpecialGradient(double, double, double, double, double, double, double, double )));
 }
@@ -252,7 +252,7 @@ void PropertiesPalette_Group::handleSelectionChanged()
 		setCurrentItem(currItem);
 	}
 	updateGeometry();
-	repaint();
+	//repaint();
 }
 
 void PropertiesPalette_Group::handleUpdateRequest(int updateFlags)
@@ -286,6 +286,7 @@ void PropertiesPalette_Group::setCurrentItem(PageItem *item)
 	transPalWidget->setCurrentItem(m_item);
 	nonZero->setChecked(!m_item->fillRule);
 	evenOdd->setChecked(m_item->fillRule);
+	clipGroups->setChecked(m_item->groupClipping());
 
 	if ((m_item->isGroup()) && (!m_item->isSingleSel))
 	{
@@ -379,7 +380,6 @@ void PropertiesPalette_Group::updateColorSpecialGradient()
 		return;
 	if(m_doc->m_Selection->isEmpty())
 		return;
-	double ratio = m_doc->unitRatio();
 	PageItem *currItem = m_doc->m_Selection->itemAt(0);
 	if (currItem)
 	{
@@ -395,7 +395,7 @@ void PropertiesPalette_Group::updateColorSpecialGradient()
 			break;
 		default:
 			if (currItem->isGroup())
-				transPalWidget->setSpecialGradient(currItem->GrMaskStartX * ratio, currItem->GrMaskStartY * ratio, currItem->GrMaskEndX * ratio, currItem->GrMaskEndY * ratio, currItem->GrMaskFocalX * ratio, currItem->GrMaskFocalY * ratio, currItem->GrMaskScale, currItem->GrMaskSkew);
+				transPalWidget->setSpecialGradient(currItem->GrMaskStartX, currItem->GrMaskStartY, currItem->GrMaskEndX, currItem->GrMaskEndY, currItem->GrMaskFocalX, currItem->GrMaskFocalY, currItem->GrMaskScale, currItem->GrMaskSkew);
 		}
 	}
 }
@@ -564,6 +564,14 @@ void PropertiesPalette_Group::handleFillRule()
 	if (!m_haveDoc || !m_haveItem || !m_ScMW || m_ScMW->scriptIsRunning())
 		return;
 	m_item->fillRule = evenOdd->isChecked();
+	m_item->update();
+}
+
+void PropertiesPalette_Group::handleClipping()
+{
+	if (!m_haveDoc || !m_haveItem || !m_ScMW || m_ScMW->scriptIsRunning())
+		return;
+	m_item->setGroupClipping(clipGroups->isChecked());
 	m_item->update();
 }
 

@@ -81,7 +81,8 @@ inline bool BezierMode::GetItem(PageItem** pi)
 
 void BezierMode::finalizeItem(PageItem* currItem)
 {
-	currItem->PoLine.resize(currItem->PoLine.size()-2);
+	if (currItem->PoLine.size() >= 2)
+		currItem->PoLine.resize(currItem->PoLine.size()-2);
 	if (currItem->PoLine.size() < 4)
 	{
 //		emit DelObj(m_doc->currentPage->pageNr(), currItem->ItemNr);
@@ -115,8 +116,6 @@ void BezierMode::enterEvent(QEvent *)
 
 void BezierMode::leaveEvent(QEvent *e)
 {
-	if (!m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -149,7 +148,7 @@ void BezierMode::deactivate(bool flag)
 			target = m_doc->Pages->at(currItem->OwnPage);
 		undoManager->action(target, is);
 	}
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void BezierMode::mouseDoubleClickEvent(QMouseEvent *m)
@@ -225,16 +224,9 @@ void BezierMode::mouseMoveEvent(QMouseEvent *m)
 				newY = qRound(mousePointDoc.y()); //m_view->translateToDoc(m->x(), m->y()).y());
 				SeRx = newX;
 				SeRy = newY;
-				/*
-				if (m_doc->appMode == modeDrawTable)
-					m_view->redrawMarker->setGeometry(QRect(Dxp, Dyp, m->globalPos().x() - Dxp, m->globalPos().y() - Dyp).normalized());
-				else
-					m_view->redrawMarker->setGeometry(QRect(Mxp, Myp, m->globalPos().x() - Mxp, m->globalPos().y() - Myp).normalized());
-				*/
 				QPoint startP = m_canvas->canvasToGlobal(QPointF(Mxp, Myp));
-				m_view->redrawMarker->setGeometry(QRect(startP, m->globalPos()).normalized());
-				if (!m_view->redrawMarker->isVisible())
-					m_view->redrawMarker->show();
+				m_view->redrawMarker->setGeometry(QRect(m_view->mapFromGlobal(startP), m_view->mapFromGlobal(m->globalPos())).normalized());
+				m_view->setRedrawMarkerShown(true);
 				m_view->HaveSelRect = true;
 				return;
 			}
@@ -297,7 +289,7 @@ void BezierMode::mousePressEvent(QMouseEvent *m)
 		currItem = m_doc->Items->at(z);
 		m_doc->m_Selection->clear();
 		m_doc->m_Selection->addItem(currItem);
-		qApp->changeOverrideCursor(QCursor(Qt::CrossCursor));
+		m_view->setCursor(QCursor(Qt::CrossCursor));
 		m_canvas->setRenderModeFillBuffer();
 		inItemCreation = true;
 	}

@@ -148,8 +148,6 @@ void CanvasMode_EditArc::enterEvent(QEvent *)
 
 void CanvasMode_EditArc::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 }
 
 
@@ -222,11 +220,6 @@ void CanvasMode_EditArc::applyValues(double start, double end, double height, do
 {
 	PageItem *currItem = m_doc->m_Selection->itemAt(0);
 	PageItem_Arc *item = currItem->asArc();
-	QPointF mPoint = item->PoLine.pointQF(0);
-	QRectF upRect = QRectF(QPointF(0, 0), QPointF(currItem->width(), currItem->height())).normalized();
-	QRectF upRect2 = QRectF(mPoint.x() - item->arcWidth / 2.0, mPoint.y() - item->arcHeight / 2.0, item->arcWidth, item->arcHeight);
-	upRect = upRect2.united(upRect);
-	upRect.translate(currItem->xPos(), currItem->yPos());
 	QTransform bb;
 	bb.scale(height / width, 1.0);
 	QLineF inp = QLineF(QPointF(width / 2.0, height / 2.0), QPointF(width, height / 2.0));
@@ -239,21 +232,34 @@ void CanvasMode_EditArc::applyValues(double start, double end, double height, do
 	double nSweep = endAngle - startAngle;
 	if (nSweep < 0)
 		nSweep += 360;
-	QPainterPath pp;
-	pp.moveTo(mPoint);
-	pp.arcTo(QRectF(mPoint.x() - width / 2.0, mPoint.y() - height / 2.0, width, height), startAngle, nSweep);
-	pp.closeSubpath();
-	currItem->PoLine.fromQPainterPath(pp);
+	double oldX = currItem->xPos();
+	double oldY = currItem->yPos();
+	FPointArray old = item->PoLine;
+	QPainterPath ppr;
+	ppr.moveTo(centerPoint.x() - width / 2.0, centerPoint.y() - height / 2.0);
+	ppr.lineTo(centerPoint.x() + width / 2.0, centerPoint.y() - height / 2.0);
+	ppr.lineTo(centerPoint.x() + width / 2.0, centerPoint.y() + height / 2.0);
+	ppr.lineTo(centerPoint.x() - width / 2.0, centerPoint.y() + height / 2.0);
+	ppr.closeSubpath();
+	currItem->PoLine.fromQPainterPath(ppr, true);
+	FPoint wh = getMaxClipF(&currItem->PoLine);
+	currItem->setWidthHeight(wh.x(),wh.y());
 	m_doc->AdjustItemSize(currItem);
+	currItem->OldB2 = currItem->width();
+	currItem->OldH2 = currItem->height();
+	QPainterPath pp;
+	pp.moveTo(width / 2.0, height / 2.0);
+	pp.arcTo(QRectF(0, 0, width, height), startAngle, nSweep);
+	pp.closeSubpath();
+	currItem->PoLine.fromQPainterPath(pp, true);
 	if(UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<FPointArray, FPointArray> > *ss = new ScItemState<QPair<FPointArray, FPointArray> >(Um::EditArc,"",Um::IPolygon);
-		FPointArray old = item->PoLine;
 		ss->set("ARC","arc");
 		ss->set("OLD_WIDTH",item->arcWidth);
 		ss->set("NEW_WIDTH",width);
-		ss->set("OLD_XPOS",item->xPos());
-		ss->set("OLD_YPOS",item->yPos());
+		ss->set("OLD_XPOS",oldX);
+		ss->set("OLD_YPOS",oldY);
 		ss->set("OLD_HEIGHT",item->arcHeight);
 		ss->set("NEW_HEIGHT",height);
 		ss->set("OLD_START",item->arcStartAngle);
@@ -283,7 +289,7 @@ void CanvasMode_EditArc::deactivate(bool forGesture)
 	disconnect(VectorDialog, SIGNAL(paletteShown(bool)), this, SLOT(endEditing(bool)));
 	VectorDialog->close();
 	delete VectorDialog;
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 	m_arcPoint = noPointDefined;
 	disconnect(m_doc, SIGNAL(docChanged()), this, SLOT(updateFromItem()));
 }
@@ -397,7 +403,7 @@ void CanvasMode_EditArc::mousePressEvent(QMouseEvent *m)
 	else
 		m_arcPoint = noPointDefined;
 	m_canvas->m_viewMode.m_MouseButtonPressed = true;
-	qApp->changeOverrideCursor(QCursor(Qt::CrossCursor));
+	m_view->setCursor(QCursor(Qt::CrossCursor));
 	m_doc->regionsChanged()->update(itemMatrix.mapRect(QRectF(0, 0, currItem->width(), currItem->height())).adjusted(-currItem->width() / 2.0, -currItem->height() / 2.0, currItem->width(), currItem->height()));
 }
 

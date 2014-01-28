@@ -22,6 +22,7 @@ for which a new license (GPL+exception) is in place.
  *                                                                         *
  ***************************************************************************/
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
@@ -80,7 +81,7 @@ ImIconProvider::ImIconProvider() : QFileIconProvider()
 
 QIcon ImIconProvider::icon(const QFileInfo &fi) const
 {
-	QStringList allFormatsV = LoadSavePlugin::getExtensionsForImport(FORMATID_ODGIMPORT);
+	QStringList allFormatsV = LoadSavePlugin::getExtensionsForImport(FORMATID_FIRSTUSER);
 	QString ext = fi.suffix().toLower();
 	if (ext.isEmpty())
 		return QFileIconProvider::icon(fi);
@@ -149,7 +150,7 @@ void FDialogPreview::GenPreview(QString name)
 	formats.append("pat");
 	formats.removeAll("pdf");
 	
-	QStringList allFormatsV = LoadSavePlugin::getExtensionsForPreview(FORMATID_ODGIMPORT);
+	QStringList allFormatsV = LoadSavePlugin::getExtensionsForPreview(FORMATID_FIRSTUSER);
 	if (ext.isEmpty())
 		ext = getImageType(name);
 	if (formats.contains(ext.toUtf8()))
@@ -203,7 +204,7 @@ void FDialogPreview::GenPreview(QString name)
 		FileLoader *fileLoader = new FileLoader(name);
 		int testResult = fileLoader->testFile();
 		delete fileLoader;
-		if ((testResult != -1) && (testResult >= FORMATID_ODGIMPORT))
+		if ((testResult != -1) && (testResult >= FORMATID_FIRSTUSER))
 		{
 			const FileFormat * fmt = LoadSavePlugin::getFormatById(testResult);
 			if( fmt )
@@ -304,8 +305,8 @@ CustomFDialog::CustomFDialog(QWidget *parent, QString wDir, QString caption, QSt
 	fileDialog = new ScFileWidget(this);
 	hboxLayout->addWidget(fileDialog);
 	fileDialog->setIconProvider(new ImIconProvider());
-	fileDialog->setFilter(filter);
-	fileDialog->selectFilter(filter);
+	fileDialog->setNameFilter(filter);
+	fileDialog->selectNameFilter(filter);
 	fileDialog->setDirectory(wDir);
 	vboxLayout1 = new QVBoxLayout;
 	vboxLayout1->setSpacing(0);
@@ -461,11 +462,7 @@ CustomFDialog::CustomFDialog(QWidget *parent, QString wDir, QString caption, QSt
 		if (flags & fdCompressFile)
 			connect(SaveZip, SIGNAL(clicked()), this, SLOT(handleCompress()));
 	}
-#if QT_VERSION >= 0x040600
 	fileDialog->setNameFilterDetailsVisible(false);
-#else
-	fileDialog->setOption(QFileDialog::HideNameFilterDetails);
-#endif
 	extZip = "gz";
 	connect(OKButton, SIGNAL(clicked()), this, SLOT(accept()));
 	connect(CancelB, SIGNAL(clicked()), this, SLOT(reject()));
@@ -494,6 +491,14 @@ void CustomFDialog::togglePreview()
 		if (!sel.isEmpty())
 			pw->GenPreview(QDir::fromNativeSeparators(sel[0]));
 	}
+	// #11856: Hack to avoid file dialog widget turning black with Qt5
+	qApp->processEvents();
+	pw->setVisible(!previewIsShown);
+	qApp->processEvents();
+	pw->setVisible(previewIsShown);
+	fileDialog->repaint();
+	qApp->processEvents();
+	repaint();
 }
 
 void CustomFDialog::setSelection(QString sel)

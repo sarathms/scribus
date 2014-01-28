@@ -47,14 +47,7 @@ ImportSmlPlugin::ImportSmlPlugin() : LoadSavePlugin(),
 	registerFormats();
 	languageChange();
 }
-/*
-void ImportXfigPlugin::addToMainWindowMenu(ScribusMainWindow *mw)
-{
-	importAction->setEnabled(true);
-	connect( importAction, SIGNAL(triggered()), SLOT(import()) );
-	mw->scrMenuMgr->addMenuItem(importAction, "FileImport");
-}
-*/
+
 void ImportSmlPlugin::languageChange()
 {
 	importAction->setText( tr("Import Sml..."));
@@ -66,7 +59,7 @@ void ImportSmlPlugin::languageChange()
 ImportSmlPlugin::~ImportSmlPlugin()
 {
 	unregisterAll();
-};
+}
 
 const QString ImportSmlPlugin::fullTrName() const
 {
@@ -97,7 +90,6 @@ void ImportSmlPlugin::registerFormats()
 	fmt.trName = tr("Kivio Stencils \"*.sml\" File"); // Human readable name
 	fmt.formatId = 0;
 	fmt.filter = tr("Kivio Stencils \"*.sml\" File (*.sml *.SML)"); // QFileDialog filter
-	fmt.nameMatch = QRegExp("\\.sml$", Qt::CaseInsensitive);
 	fmt.fileExtensions = QStringList() << "sml";
 	fmt.load = true;
 	fmt.save = false;

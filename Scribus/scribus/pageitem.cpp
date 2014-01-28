@@ -71,7 +71,6 @@ for which a new license (GPL+exception) is in place.
 #include "scribuswin.h"
 #include "sctextstream.h"
 #include "selection.h"
-#include "text/nlsconfig.h"
 #include "text/storytext.h"
 #include "undomanager.h"
 #include "undostate.h"
@@ -133,6 +132,10 @@ PageItem::PageItem(const PageItem & other)
 	snapToPatchGrid(other.snapToPatchGrid),
 	Cols(other.Cols),
 	ColGap(other.ColGap),
+	m_startArrowIndex(other.m_startArrowIndex),
+	m_endArrowIndex(other.m_endArrowIndex),
+	m_startArrowScale(other.m_startArrowScale),
+	m_endArrowScale(other.m_endArrowScale),
 	PLineArt(other.PLineArt),
 	PLineEnd(other.PLineEnd),
 	PLineJoin(other.PLineJoin),
@@ -175,11 +178,6 @@ PageItem::PageItem(const PageItem & other)
 	isBookmark(other.isBookmark),
 	HasSel(other.HasSel),
 	isAutoText(other.isAutoText),
-	BackBox(NULL),  // otherwise other.BackBox->NextBox would be inconsistent
-	NextBox(NULL),  // otherwise other.NextBox->BackBox would be inconsistent
-	firstChar(0),   // since this box is unlinked now
-	MaxChars(0),   // since the layout is invalid now
-	m_sampleItem(false),
 	inPdfArticle(other.inPdfArticle),
 	isRaster(other.isRaster),
 	OldB(other.OldB),
@@ -187,7 +185,6 @@ PageItem::PageItem(const PageItem & other)
 	OldB2(other.OldB2),
 	OldH2(other.OldH2),
 	Sizing(other.Sizing),
-//	toPixmap(other.toPixmap),
 	LayerID(other.LayerID),
 	ScaleType(other.ScaleType),
 	AspectRatio(other.AspectRatio),
@@ -196,6 +193,14 @@ PageItem::PageItem(const PageItem & other)
 	fill_gradient(other.fill_gradient),
 	fillRule(other.fillRule),
 	doOverprint(other.doOverprint),
+	m_hasSoftShadow(other.m_hasSoftShadow),
+	m_softShadowColor(other.m_softShadowColor),
+	m_softShadowShade(other.m_softShadowShade),
+	m_softShadowBlurRadius(other.m_softShadowBlurRadius),
+	m_softShadowXOffset(other.m_softShadowXOffset),
+	m_softShadowYOffset(other.m_softShadowYOffset),
+	m_softShadowOpacity(other.m_softShadowOpacity),
+	m_softShadowBlendMode(other.m_softShadowBlendMode),
 	LeftLink(other.LeftLink),
 	RightLink(other.RightLink),
 	TopLink(other.TopLink),
@@ -220,64 +225,6 @@ PageItem::PageItem(const PageItem & other)
 	ChangedMasterItem(other.ChangedMasterItem),
 	OnMasterPage(other.OnMasterPage),
 	isEmbedded(other.isEmbedded),
-
-	// protected
-	undoManager(other.undoManager),
-	m_ItemType(other.m_ItemType),
-	AnName(other.AnName),
-	gradientVal(other.gradientVal),
-	patternVal(other.patternVal),
-	patternScaleX(other.patternScaleX),
-	patternScaleY(other.patternScaleY),
-	patternOffsetX(other.patternOffsetX),
-	patternOffsetY(other.patternOffsetY),
-	patternRotation(other.patternRotation),
-	patternSkewX(other.patternSkewX),
-	patternSkewY(other.patternSkewY),
-	patternMirrorX(other.patternMirrorX),
-	patternMirrorY(other.patternMirrorY),
-	fillColorVal(other.fillColorVal),
-	lineColorVal(other.lineColorVal),
-	lineShadeVal(other.lineShadeVal),
-	fillShadeVal(other.fillShadeVal),
-	fillTransparencyVal(other.fillTransparencyVal),
-	lineTransparencyVal(other.lineTransparencyVal),
-	fillBlendmodeVal(other.fillBlendmodeVal),
-	lineBlendmodeVal(other.lineBlendmodeVal),
-	m_ImageIsFlippedH(other.m_ImageIsFlippedH),
-	m_ImageIsFlippedV(other.m_ImageIsFlippedV),
-	m_Locked(other.m_Locked),
-	m_SizeLocked(other.m_SizeLocked),
-	m_SizeHLocked(other.m_SizeHLocked),
-	m_SizeVLocked(other.m_SizeVLocked),
-	textFlowModeVal(other.textFlowModeVal),
-	pageItemAttributes(other.pageItemAttributes),
-	m_PrintEnabled(other.m_PrintEnabled),
-	tagged(other.tagged),
-	fillQColor(other.fillQColor),
-	strokeQColor(other.strokeQColor),
-	GrColorP1QColor(other.GrColorP1QColor),
-	GrColorP2QColor(other.GrColorP2QColor),
-	GrColorP3QColor(other.GrColorP3QColor),
-	GrColorP4QColor(other.GrColorP4QColor),
-	m_xPos(other.m_xPos),
-	m_yPos(other.m_yPos),
-	Width(other.Width),
-	Height(other.Height),
-	m_rotation(other.m_rotation),
-	m_isSelected(other.m_isSelected),
-	m_imageXScale(other.m_imageXScale),
-	m_imageYScale(other.m_imageYScale),
-	m_imageXOffset(other.m_imageXOffset),
-	m_imageYOffset(other.m_imageYOffset),
-	m_imageRotation(other.m_imageRotation),
-	m_isReversed(other.m_isReversed),
-	m_startArrowIndex(other.m_startArrowIndex),
-	m_endArrowIndex(other.m_endArrowIndex),
-	m_startArrowScale(other.m_startArrowScale),
-	m_endArrowScale(other.m_endArrowScale),
-	m_textDistanceMargins(other.m_textDistanceMargins),
-	firstLineOffsetP(other.firstLineOffsetP),
 	m_roundedCorderRadius(other.m_roundedCorderRadius),
 	oldXpos(other.oldXpos),
 	oldYpos(other.oldYpos),
@@ -336,7 +283,66 @@ PageItem::PageItem(const PageItem & other)
 	patternMaskMirrorX(other.patternMaskMirrorX),
 	patternMaskMirrorY(other.patternMaskMirrorY),
 	patternMaskVal(other.patternMaskVal),
-	mask_gradient(other.mask_gradient)
+	mask_gradient(other.mask_gradient),
+	// protected
+	undoManager(other.undoManager),
+	BackBox(NULL),  // otherwise other.BackBox->NextBox would be inconsistent
+	NextBox(NULL),  // otherwise other.NextBox->BackBox would be inconsistent
+	firstChar(0),   // since this box is unlinked now
+	MaxChars(0),   // since the layout is invalid now
+	m_sampleItem(false),
+	m_textDistanceMargins(other.m_textDistanceMargins),
+	m_ItemType(other.m_ItemType),
+	AnName(other.AnName),
+	gradientVal(other.gradientVal),
+	patternVal(other.patternVal),
+	patternScaleX(other.patternScaleX),
+	patternScaleY(other.patternScaleY),
+	patternOffsetX(other.patternOffsetX),
+	patternOffsetY(other.patternOffsetY),
+	patternRotation(other.patternRotation),
+	patternSkewX(other.patternSkewX),
+	patternSkewY(other.patternSkewY),
+	patternMirrorX(other.patternMirrorX),
+	patternMirrorY(other.patternMirrorY),
+	fillColorVal(other.fillColorVal),
+	lineColorVal(other.lineColorVal),
+	lineShadeVal(other.lineShadeVal),
+	fillShadeVal(other.fillShadeVal),
+	fillTransparencyVal(other.fillTransparencyVal),
+	lineTransparencyVal(other.lineTransparencyVal),
+	fillBlendmodeVal(other.fillBlendmodeVal),
+	lineBlendmodeVal(other.lineBlendmodeVal),
+	m_ImageIsFlippedH(other.m_ImageIsFlippedH),
+	m_ImageIsFlippedV(other.m_ImageIsFlippedV),
+	m_Locked(other.m_Locked),
+	m_SizeLocked(other.m_SizeLocked),
+	m_SizeHLocked(other.m_SizeHLocked),
+	m_SizeVLocked(other.m_SizeVLocked),
+	textFlowModeVal(other.textFlowModeVal),
+	pageItemAttributes(other.pageItemAttributes),
+	m_PrintEnabled(other.m_PrintEnabled),
+	tagged(other.tagged),
+	fillQColor(other.fillQColor),
+	strokeQColor(other.strokeQColor),
+	GrColorP1QColor(other.GrColorP1QColor),
+	GrColorP2QColor(other.GrColorP2QColor),
+	GrColorP3QColor(other.GrColorP3QColor),
+	GrColorP4QColor(other.GrColorP4QColor),
+	m_xPos(other.m_xPos),
+	m_yPos(other.m_yPos),
+	m_width(other.m_width),
+	m_height(other.m_height),
+	m_rotation(other.m_rotation),
+	m_isSelected(other.m_isSelected),
+	m_imageXScale(other.m_imageXScale),
+	m_imageYScale(other.m_imageYScale),
+	m_imageXOffset(other.m_imageXOffset),
+	m_imageYOffset(other.m_imageYOffset),
+	m_imageRotation(other.m_imageRotation),
+	m_isReversed(other.m_isReversed),
+	firstLineOffsetP(other.firstLineOffsetP),
+	m_groupClips(other.m_groupClips)
 {
 	QString tmp;
 	m_Doc->TotalItems++;
@@ -347,18 +353,21 @@ PageItem::PageItem(const PageItem & other)
 	{
 		QFileInfo inlFi(Pfile);
 		QString ext = inlFi.suffix();
-		tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_XXXXXX." + ext);
-		tempImageFile->open();
-		QString fileName = getLongPathName(tempImageFile->fileName());
-		tempImageFile->close();
+		QTemporaryFile *tempFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_XXXXXX." + ext);
+		tempFile->setAutoRemove(false);
+		tempFile->open();
+		QString fileName = getLongPathName(tempFile->fileName());
+		tempFile->close();
 		copyFile(Pfile, fileName);
 		Pfile = fileName;
+		delete tempFile;
 		isInlineImage = true;
+		isTempFile = true;
 	}
 	else
 	{
-		tempImageFile = NULL;
 		isInlineImage = false;
+		isTempFile = false;
 	}
 	Parent = NULL;
 	unWeld();
@@ -397,8 +406,8 @@ PageItem::PageItem(ScribusDoc *pa, ItemType newType, double x, double y, double 
 	gXpos = oldXpos = m_xPos = x;
 	gYpos = oldYpos = m_yPos = y;
 	//CB Surely we can remove some of these?
-	OldB2 = OldB = oldWidth = Width = w;
-	OldH2 = OldH = oldHeight = Height = h;
+	OldB2 = OldB = oldWidth = m_width = w;
+	OldH2 = OldH = oldHeight = m_height = h;
 	BoundingX = x;
 	BoundingY = y;
 	BoundingW = w;
@@ -760,27 +769,27 @@ PageItem::PageItem(ScribusDoc *pa, ItemType newType, double x, double y, double 
 	mgP.color = qcol;
 	mgList.append(mgP);
 	patch.TL = mgP;
-	mgP.resetTo(FPoint(Width / 2.0, 0.0));
+	mgP.resetTo(FPoint(m_width / 2.0, 0.0));
 	mgList.append(mgP);
-	mgP.resetTo(FPoint(Width, 0.0));
+	mgP.resetTo(FPoint(m_width, 0.0));
 	mgList.append(mgP);
 	patch.TR = mgP;
 	meshGradientArray.append(mgList);
 	mgList.clear();
-	mgP.resetTo(FPoint(0.0, Height / 2.0));
+	mgP.resetTo(FPoint(0.0, m_height / 2.0));
 	mgList.append(mgP);
-	mgP.resetTo(FPoint(Width / 2.0, Height / 2.0));
+	mgP.resetTo(FPoint(m_width / 2.0, m_height / 2.0));
 	mgList.append(mgP);
-	mgP.resetTo(FPoint(Width, Height / 2.0));
+	mgP.resetTo(FPoint(m_width, m_height / 2.0));
 	mgList.append(mgP);
 	meshGradientArray.append(mgList);
 	mgList.clear();
-	mgP.resetTo(FPoint(0.0, Height));
+	mgP.resetTo(FPoint(0.0, m_height));
 	mgList.append(mgP);
 	patch.BL = mgP;
-	mgP.resetTo(FPoint(Width / 2.0, Height));
+	mgP.resetTo(FPoint(m_width / 2.0, m_height));
 	mgList.append(mgP);
-	mgP.resetTo(FPoint(Width, Height));
+	mgP.resetTo(FPoint(m_width, m_height));
 	mgList.append(mgP);
 	patch.BR = mgP;
 	meshGradientArray.append(mgList);
@@ -822,14 +831,24 @@ PageItem::PageItem(ScribusDoc *pa, ItemType newType, double x, double y, double 
 			)
 			pageItemAttributes.append(*objAttrIt);
 	}
-	tempImageFile = NULL;
 	isInlineImage = false;
+	isTempFile = false;
+
+	m_hasSoftShadow = false;
+	m_softShadowColor = "Black";
+	m_softShadowShade = 100;
+	m_softShadowBlurRadius = 5.0;
+	m_softShadowXOffset = 5.0;
+	m_softShadowYOffset = 5.0;
+	m_softShadowOpacity = 0.0;
+	m_softShadowBlendMode = 0;
+	m_groupClips = true;
 }
 
 PageItem::~PageItem()
 {
-	if (tempImageFile != NULL)
-		delete tempImageFile;
+	if ((isTempFile) && (!Pfile.isEmpty()))
+		QFile::remove(Pfile);
 	//remove marks
 
 	if (isTextFrame())
@@ -838,9 +857,9 @@ PageItem::~PageItem()
 		{
 			for (int pos=0; pos < itemText.length(); ++pos)
 			{
-				if (itemText.item(pos)->hasMark())
+                if (itemText.hasMark(pos))
 				{
-					Mark* mrk = itemText.item(pos)->mark;
+                    Mark* mrk = itemText.mark(pos);
 					if (!mrk->isType(MARKBullNumType))
 						m_Doc->eraseMark(mrk);
 				}
@@ -878,18 +897,19 @@ void PageItem::setXYPos(const double newXPos, const double newYPos, bool drawing
 	checkChanges();
 }
 
-int PageItem::level()
+int PageItem::level() const
 {
+	PageItem* thisItem = const_cast<PageItem*>(this);
 	if (Parent == NULL)
 	{
 		if (m_Doc)
 		{
 			QList<PageItem*>* items = OnMasterPage.isEmpty() ? &m_Doc->DocItems : &m_Doc->MasterItems;
-			return (items->indexOf(this) + 1);
+			return (items->indexOf(thisItem) + 1);
 		}
 		return 0;
 	}
-	return (Parent->asGroupFrame()->groupItemList.indexOf(this) + 1);
+	return (Parent->asGroupFrame()->groupItemList.indexOf(thisItem) + 1);
 }
 
 void PageItem::moveBy(const double dX, const double dY, bool drawingOnly)
@@ -915,7 +935,7 @@ void PageItem::moveBy(const double dX, const double dY, bool drawingOnly)
 
 void PageItem::setWidth(const double newWidth)
 {
-	Width = newWidth;
+	m_width = newWidth;
 	updateConstants();
 	if (m_Doc->isLoading())
 		return;
@@ -924,7 +944,7 @@ void PageItem::setWidth(const double newWidth)
 
 void PageItem::setHeight(const double newHeight)
 {
-	Height = newHeight;
+	m_height = newHeight;
 	updateConstants();
 	if (m_Doc->isLoading())
 		return;
@@ -933,8 +953,8 @@ void PageItem::setHeight(const double newHeight)
 
 void PageItem::setWidthHeight(const double newWidth, const double newHeight, bool drawingOnly)
 {
-	Width = newWidth;
-	Height = newHeight;
+	m_width = newWidth;
+	m_height = newHeight;
 	updateConstants();
 	if (drawingOnly)
 		return;
@@ -943,8 +963,8 @@ void PageItem::setWidthHeight(const double newWidth, const double newHeight, boo
 
 void PageItem::setWidthHeight(const double newWidth, const double newHeight)
 {
-	Width = newWidth;
-	Height = newHeight;
+	m_width = newWidth;
+	m_height = newHeight;
 	updateConstants();
 	if (m_Doc->isLoading())
 		return;
@@ -956,9 +976,9 @@ void PageItem::resizeBy(const double dH, const double dW)
 	if (dH==0.0 && dW==0.0)
 		return;
 	if (dH!=0.0)
-		Width+=dH;
+		m_width+=dH;
 	if (dW!=0.0)
-		Height+=dW;
+		m_height+=dW;
 	updateConstants();
 	if (m_Doc->isLoading())
 		return;
@@ -1107,7 +1127,6 @@ PageItem * PageItem::frameTextEnd()
 /// returns true if text overflows
 bool PageItem::frameOverflows() const
 {
-#ifndef NLS_PROTO
 	// Fix #6991 : "Text overflow" warning when there is a text underflow in fact
 	/*return NextBox == NULL && itemText.length() > static_cast<int>(MaxChars);*/
 	return ( NextBox == NULL )
@@ -1116,9 +1135,6 @@ bool PageItem::frameOverflows() const
 	       /*&& ( firstChar < MaxChars )*/
 		   && ( firstChar <= MaxChars )
 	       && ( itemText.length() > static_cast<int> ( MaxChars ) );
-#else
-	return false; // FIXME:NLS
-#endif
 }
 
 int PageItem::frameOverflowCount() const
@@ -1148,9 +1164,9 @@ void PageItem::drawOverflowMarker(ScPainter *p)
 {
 	qreal sideLength = 10 / qMax(p->zoomFactor(), 1.0);
 	qreal offset = 1 / qMax(p->zoomFactor(), 1.0);
-	qreal left = Width - sideLength-offset;// / 2;
+	qreal left = m_width - sideLength-offset;// / 2;
 	qreal right = left + sideLength;
-	qreal top = Height - sideLength-offset;// * 1.5;
+	qreal top = m_height - sideLength-offset;// * 1.5;
 	qreal bottom = top + sideLength;
 
 	QColor color(PrefsManager::instance()->appPrefs.displayPrefs.frameNormColor);
@@ -1183,18 +1199,14 @@ int PageItem::firstInFrame() const
 }
 int PageItem::lastInFrame() const
 {
-#ifndef NLS_PROTO
 	return qMin(signed(MaxChars), itemText.length()) - 1;
-#else
-	return itemText.length() - 1;
-#endif
 }
 
 bool PageItem::testLinkCandidate(PageItem* nxt)
 {
 	if (this->nextInChain() )
 		return false;
-	if (nxt->prevInChain() )
+	if (!nxt || nxt->prevInChain() )
 		return false;
 	for (PageItem* ff=nxt; ff; ff=ff->nextInChain())
 	{
@@ -1414,11 +1426,7 @@ void PageItem::unlinkWithText(bool cutText)
 /// tests if a character is displayed by this frame
 bool PageItem::frameDisplays(int textpos) const
 {
-#ifndef NLS_PROTO
 	return 0 <= textpos && textpos < signed(MaxChars) &&  textpos < itemText.length();
-#else
-	return true; // FIXME:NLS
-#endif
 }
 
 
@@ -1626,12 +1634,16 @@ void PageItem::DrawObj(ScPainter *p, QRectF cullingArea)
 void PageItem::DrawObj_Pre(ScPainter *p)
 {
 	p->save();
+	double lwCorr = m_lineWidth;
+	double sc = p->zoomFactor();
+	if ((m_lineWidth * sc) < 1)
+		lwCorr = 0;
 	if (!isEmbedded)
 		p->translate(m_xPos, m_yPos);
 	p->rotate(m_rotation);
 	if (m_Doc->layerOutline(LayerID))
 	{
-		p->setPen(m_Doc->layerMarker(LayerID), 1, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
+		p->setPen(m_Doc->layerMarker(LayerID), 0, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
 		p->setFillMode(ScPainter::None);
 		p->setBrushOpacity(1.0);
 		p->setPenOpacity(1.0);
@@ -1640,13 +1652,10 @@ void PageItem::DrawObj_Pre(ScPainter *p)
 	{
 		if (!isGroup())
 		{
-	#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4))
+			if (hasSoftShadow())
+				DrawSoftShadow(p);
 			p->setBlendModeFill(fillBlendmode());
-	#else
-			if (fillBlendmode() != 0)
-				p->beginLayer(1.0 - fillTransparency(), fillBlendmode());
-	#endif
-			p->setLineWidth(m_lineWidth);
+			p->setLineWidth(lwCorr);
 			if (GrType != 0)
 			{
 				if (GrType == 8)
@@ -1758,21 +1767,14 @@ void PageItem::DrawObj_Pre(ScPainter *p)
 			}
 			if ((lineColor() != CommonStrings::None) || (!patternStrokeVal.isEmpty()) || (GrTypeStroke > 0))
 			{
-				p->setPen(strokeQColor, m_lineWidth, PLineArt, PLineEnd, PLineJoin);
+				p->setPen(strokeQColor, lwCorr, PLineArt, PLineEnd, PLineJoin);
 				if (DashValues.count() != 0)
 					p->setDash(DashValues, DashOffset);
 			}
 			else
 				p->setLineWidth(0);
-	#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4))
 			p->setBrushOpacity(1.0 - fillTransparency());
 			p->setPenOpacity(1.0 - lineTransparency());
-	#else
-			if (fillBlendmode() == 0)
-				p->setBrushOpacity(1.0 - fillTransparency());
-			if (lineBlendmode() == 0)
-				p->setPenOpacity(1.0 - lineTransparency());
-	#endif
 			p->setFillRule(fillRule);
 			if ((GrMask == 1) || (GrMask == 2) || (GrMask == 4) || (GrMask == 5))
 			{
@@ -1816,11 +1818,15 @@ void PageItem::DrawObj_Pre(ScPainter *p)
 void PageItem::DrawObj_Post(ScPainter *p)
 {
 	bool doStroke=true;
+	double lwCorr = m_lineWidth;
+	double sc = p->zoomFactor();
+	if ((m_lineWidth * sc) < 1)
+		lwCorr = 0;
 	if (m_Doc->layerOutline(LayerID))
 	{
 		if (itemType()!=Line)
 		{
-			p->setPen(m_Doc->layerMarker(LayerID), 1, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
+			p->setPen(m_Doc->layerMarker(LayerID), 0, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
 			p->setFillMode(ScPainter::None);
 			p->setBrushOpacity(1.0);
 			p->setPenOpacity(1.0);
@@ -1851,28 +1857,18 @@ void PageItem::DrawObj_Post(ScPainter *p)
 	{
 		if (!isGroup())
 		{
-#if (CAIRO_VERSION < CAIRO_VERSION_ENCODE(1, 9, 4))
-			if (fillBlendmode() != 0)
-				p->endLayer();
-#else
 			p->setBlendModeFill(0);
-#endif
 			p->setMaskMode(0);
 			// TODO: Investigate whether itemType()==Table should really be here. I got artifacts without it so keeping it here for now. /estan
 			if (itemType()==PathText || itemType()==PolyLine || itemType()==Spiral || itemType()==Line || itemType()==Symbol || itemType()==Group || itemType()==Table)
 				doStroke=false;
 			if ((doStroke) && (!m_Doc->RePos))
 			{
-#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4))
 				p->setBlendModeStroke(lineBlendmode());
 				p->setPenOpacity(1.0 - lineTransparency());
-#else
-				if (lineBlendmode() != 0)
-					p->beginLayer(1.0 - lineTransparency(), lineBlendmode());
-#endif
 				if ((lineColor() != CommonStrings::None) || (!patternStrokeVal.isEmpty()) || (GrTypeStroke > 0))
 				{
-					p->setPen(strokeQColor, m_lineWidth, PLineArt, PLineEnd, PLineJoin);
+					p->setPen(strokeQColor, lwCorr, PLineArt, PLineEnd, PLineJoin);
 					if (DashValues.count() != 0)
 						p->setDash(DashValues, DashOffset);
 				}
@@ -1929,12 +1925,14 @@ void PageItem::DrawObj_Post(ScPainter *p)
 					else if (lineColor() != CommonStrings::None)
 					{
 						p->setStrokeMode(ScPainter::Solid);
-						p->setPen(strokeQColor, m_lineWidth, PLineArt, PLineEnd, PLineJoin);
+						p->setPen(strokeQColor, lwCorr, PLineArt, PLineEnd, PLineJoin);
 						if (DashValues.count() != 0)
 							p->setDash(DashValues, DashOffset);
 						p->strokePath();
 					}
 					else
+						no_stroke = true;
+					if (lineTransparency() > 0.9)
 						no_stroke = true;
 				}
 				else
@@ -1954,12 +1952,7 @@ void PageItem::DrawObj_Post(ScPainter *p)
 						}
 					}
 				}
-#if (CAIRO_VERSION < CAIRO_VERSION_ENCODE(1, 9, 4))
-				if (lineBlendmode() != 0)
-					p->endLayer();
-#else
 				p->setBlendModeStroke(0);
-#endif
 			}
 		}
 	}
@@ -1973,6 +1966,7 @@ void PageItem::DrawObj_Post(ScPainter *p)
 void PageItem::DrawObj_Decoration(ScPainter *p)
 {
 	p->save();
+	p->setAntialiasing(false);
 	if (!isEmbedded)
 		p->translate(m_xPos, m_yPos);
 	p->rotate(m_rotation);
@@ -2011,24 +2005,14 @@ void PageItem::DrawObj_Decoration(ScPainter *p)
 					}
 				}
 				else
-// Ugly Hack to fix rendering problems with cairo >=1.5.10 && <1.8.0 follows
-	#if ((CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 5, 10)) && (CAIRO_VERSION < CAIRO_VERSION_ENCODE(1, 8, 0)))
-					p->setupSharpPolygon(&PoLine, false);
-	#else
 					p->setupSharpPolygon(&PoLine);
-	#endif
 				p->strokePath();
 			}
 		}
 		if ((m_Doc->guidesPrefs().framesShown) && textFlowUsesContourLine() && (ContourLine.size() != 0))
 		{
 			p->setPen(Qt::darkGray, 0, Qt::DotLine, Qt::FlatCap, Qt::MiterJoin);
-// Ugly Hack to fix rendering problems with cairo >=1.5.10 && <1.8.0 follows
-	#if ((CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 5, 10)) && (CAIRO_VERSION < CAIRO_VERSION_ENCODE(1, 8, 0)))
-			p->setupSharpPolygon(&ContourLine, false);
-	#else
 			p->setupSharpPolygon(&ContourLine);
-	#endif
 			p->strokePath();
 		}
 		if (itemType()==ImageFrame)
@@ -2042,8 +2026,8 @@ void PageItem::DrawObj_Decoration(ScPainter *p)
 				|| ((72.0 / imageYScale()) > maxres)) 
 				&& (isRaster) && (checkres) && (!m_Doc->drawAsPreview) && (PrefsManager::instance()->appPrefs.displayPrefs.showVerifierWarningsOnCanvas))
 			{
-				double ofx = Width - 22.0;
-				double ofy = Height - 22.0;
+				double ofx = m_width - 22.0;
+				double ofy = m_height - 22.0;
 				p->save();
 				p->translate(ofx, ofy);
 				QImage ico = loadIcon("22/dialog-warning.png").toImage();
@@ -2059,8 +2043,8 @@ void PageItem::DrawObj_Decoration(ScPainter *p)
 			p->setBrushOpacity(1.0);
 			p->setFillMode(ScPainter::Solid);
 			double ofwh = 10;
-			double ofx = Width - ofwh/2;
-			double ofy = Height - ofwh*3;
+			double ofx = m_width - ofwh/2;
+			double ofy = m_height - ofwh*3;
 			p->drawSharpRect(ofx, ofy, ofwh, ofwh);
 		}
 		if (no_fill && no_stroke && m_Doc->guidesPrefs().framesShown)
@@ -2069,7 +2053,7 @@ void PageItem::DrawObj_Decoration(ScPainter *p)
 			if (m_Locked)
 				p->setPen(PrefsManager::instance()->appPrefs.displayPrefs.frameLockColor, scpInv, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
 			p->setFillMode(ScPainter::None);
-			p->drawSharpRect(0, 0, Width, Height);
+			p->drawSharpRect(0, 0, m_width, m_height);
 			no_fill = false;
 			no_stroke = false;
 		}
@@ -2078,6 +2062,7 @@ void PageItem::DrawObj_Decoration(ScPainter *p)
 		//	drawLockedMarker(p);
 	}
 	FrameOnly = false;
+	p->setAntialiasing(true);
 	p->restore();
 }
 
@@ -2143,13 +2128,13 @@ void PageItem::DrawObj_Embedded(ScPainter *p, QRectF cullingArea, const CharStyl
 	if (m_Doc->guidesPrefs().framesShown)
 	{
 		p->save();
-		p->translate(0, -(cembedded->Height * (style.scaleV() / 1000.0)));
+		p->translate(0, -(cembedded->m_height * (style.scaleV() / 1000.0)));
 		if (style.baselineOffset() != 0)
-			p->translate(0, -cembedded->Height * (style.baselineOffset() / 1000.0));
+			p->translate(0, -cembedded->m_height * (style.baselineOffset() / 1000.0));
 		p->scale(style.scaleH() / 1000.0, style.scaleV() / 1000.0);
 		p->setPen(PrefsManager::instance()->appPrefs.displayPrefs.frameNormColor, 0, Qt::DotLine, Qt::FlatCap, Qt::MiterJoin);
 		p->setFillMode(ScPainter::None);
-		p->drawSharpRect(0, 0, cembedded->Width, cembedded->Height);
+		p->drawSharpRect(0, 0, cembedded->m_width, cembedded->m_height);
 		p->restore();
 	}
 }
@@ -2164,12 +2149,10 @@ void PageItem::DrawStrokePattern(ScPainter *p, QPainterPath &path)
 	{
 		double currPerc = path.percentAtLength(xpos);
 		double currAngle = path.angleAtPercent(currPerc);
-#if QT_VERSION  >= 0x040400
 		if (currAngle <= 180.0)
 			currAngle *= -1.0;
 		else
 			currAngle = 360.0 - currAngle;
-#endif
 		QPointF currPoint = path.pointAtPercent(currPerc);
 		p->save();
 		p->translate(currPoint.x(), currPoint.y());
@@ -2211,6 +2194,39 @@ void PageItem::DrawStrokePattern(ScPainter *p, QPainterPath &path)
 	p->newPath();
 }
 
+void PageItem::DrawSoftShadow(ScPainter *p)
+{
+	if (m_softShadowColor == CommonStrings::None)
+		return;
+	if ((itemType() == PathText) || (itemType() == Symbol) || (itemType() == Group) || (itemType() == Line) || (itemType() == PolyLine) || (itemType() == Spiral))
+		return;
+	double lwCorr = m_lineWidth;
+	double sc = p->zoomFactor();
+	if ((m_lineWidth * sc) < 1)
+		lwCorr = 0;
+	const ScColor& col = m_Doc->PageColors[m_softShadowColor];
+	QColor tmp = ScColorEngine::getShadeColorProof(col, m_Doc, m_softShadowShade);
+	if (m_Doc->viewAsPreview)
+	{
+		VisionDefectColor defect;
+		tmp = defect.convertDefect(tmp, m_Doc->previewVisual);
+	}
+	p->save();
+	FPointArray sh = PoLine.copy();
+	sh.translate(m_softShadowXOffset, m_softShadowYOffset);
+	p->beginLayer(1.0 - m_softShadowOpacity, m_softShadowBlendMode);
+	p->setupPolygon(&sh);
+	p->setBrush(tmp);
+	p->setFillMode(ScPainter::Solid);
+	p->setStrokeMode(ScPainter::Solid);
+	p->setPen(tmp, lwCorr, PLineArt, PLineEnd, PLineJoin);
+	p->fillPath();
+	p->strokePath();
+	p->blur(m_softShadowBlurRadius);
+	p->endLayer();
+	p->restore();
+}
+
 QImage PageItem::DrawObj_toImage(double maxSize)
 {
 	bool isEmbedded_Old = isEmbedded;
@@ -2231,7 +2247,7 @@ QImage PageItem::DrawObj_toImage(double maxSize)
 	double sc = maxSize / qMax(igWidth, igHeight);
 	bool savedFlag = m_Doc->guidesPrefs().framesShown;
 	m_Doc->guidesPrefs().framesShown = false;
-	QImage retImg = QImage(qRound(igWidth * sc), qRound(igHeight * sc), QImage::Format_ARGB32_Premultiplied);
+	QImage retImg = QImage(qMax(qRound(igWidth * sc), 1), qMax(qRound(igHeight * sc), 1), QImage::Format_ARGB32_Premultiplied);
 	retImg.fill( qRgba(0, 0, 0, 0) );
 	ScPainter *painter = new ScPainter(&retImg, retImg.width(), retImg.height(), 1, 0);
 	painter->setZoomFactor(sc);
@@ -2312,9 +2328,9 @@ QString PageItem::ExpandToken(uint base)
 	//check for marks
 	else if (ch == SpecialChars::OBJECT)
 	{
-		ScText* hl = itemText.item(base);
-		if ((hl->mark != NULL) && !hl->mark->isType(MARKAnchorType) && !hl->mark->isType(MARKIndexType))
-			chstr = hl->mark->getString();
+        Mark* mark = itemText.mark(base);
+        if ((mark != NULL) && !mark->isType(MARKAnchorType) && !mark->isType(MARKIndexType))
+            chstr = mark->getString();
 	}
 	return chstr;
 }
@@ -2364,7 +2380,7 @@ double PageItem::layoutGlyphs(const CharStyle& style, const QString& chars, Glyp
 		layout.glyph = font.char2CMap(chars[0].unicode());
 	}
 	double tracking = 0.0;
-	if ( (style.effects() & ScStyle_StartOfLine) == 0)
+	if ( (style.effects() & ScLayout_StartOfLine) == 0)
 		tracking = style.fontSize() * style.tracking() / 10000.0;
 
 	layout.xoffset = tracking;
@@ -2520,7 +2536,7 @@ void PageItem::drawGlyphs(ScPainter *p, const CharStyle& style, GlyphLayout& gly
 		points.map(chma * chma4);
 		p->setupPolygon(&points, true);
 		QColor oldBrush = p->brush();
-		p->setBrush( (style.effects() & ScStyle_SuppressSpace) ? Qt::green
+		p->setBrush( (style.effects() & ScLayout_SuppressSpace) ? Qt::green
 					: PrefsManager::instance()->appPrefs.displayPrefs.controlCharColor);
 		if (stroke)
 		{
@@ -2549,7 +2565,7 @@ void PageItem::drawGlyphs(ScPainter *p, const CharStyle& style, GlyphLayout& gly
 	else if (glyph == (ScFace::CONTROL_GLYPHS + SpecialChars::NBHYPHEN.unicode()))
 		glyph = font.char2CMap(QChar('-'));
 	
-	if (glyph >= ScFace::CONTROL_GLYPHS || (style.effects() & ScStyle_SuppressSpace)) {
+	if (glyph >= ScFace::CONTROL_GLYPHS || (style.effects() & ScLayout_SuppressSpace)) {
 //		qDebug("drawGlyphs: skipping %d", glyph);
 		// all those are empty
 		if (glyphs.more)
@@ -3333,8 +3349,8 @@ void PageItem::createGradientMesh(int rows, int cols)
 		undoManager->action(this,is);
 	}
 	meshGradientArray.clear();
-	double xoffs = Width / static_cast<double>(cols);
-	double yoffs = Height / static_cast<double>(rows);
+	double xoffs = m_width / static_cast<double>(cols);
+	double yoffs = m_height / static_cast<double>(rows);
 	for (int x = 0; x < rows + 1; x++)
 	{
 		QList<meshPoint> mgList;
@@ -3363,8 +3379,8 @@ void PageItem::resetGradientMesh()
 		is->setItem(meshGradientArray);
 		undoManager->action(this,is);
 	}
-	double xoffs = Width / static_cast<double>(cols-1);
-	double yoffs = Height / static_cast<double>(rows-1);
+	double xoffs = m_width / static_cast<double>(cols-1);
+	double yoffs = m_height / static_cast<double>(rows-1);
 	for (int x = 0; x < rows; x++)
 		for (int y = 0; y < cols; y++)
 			meshGradientArray[x][y].resetTo(FPoint(y * xoffs, x * yoffs));
@@ -4606,9 +4622,11 @@ void PageItem::setLayer(int newLayerID)
 
 void PageItem::checkChanges(bool force)
 {
+	if (m_Doc->view() == NULL)
+		return;
 	bool spreadChanges(false);
 	// has the item been resized
-	if (force || ((oldWidth != Width || oldHeight != Height) && shouldCheck()))
+	if (force || ((oldWidth != m_width || oldHeight != m_height) && shouldCheck()))
 	{
 		resizeUndoAction();
 		spreadChanges = (textFlowMode() != TextFlowDisabled );
@@ -4677,28 +4695,28 @@ void PageItem::moveUndoAction()
 
 void PageItem::resizeUndoAction()
 {
-	if (oldHeight == Height && oldWidth == Width)
+	if (oldHeight == m_height && oldWidth == m_width)
 		return;
 	bool doUndo = true;
 	if (isNoteFrame()
 		&& ((asNoteFrame()->isAutoHeight() && asNoteFrame()->isAutoWidth())
-			|| ((oldHeight == Height) && asNoteFrame()->isAutoWidth())
-			|| ((oldWidth == Width) && asNoteFrame()->isAutoHeight())))
+			|| ((oldHeight == m_height) && asNoteFrame()->isAutoWidth())
+			|| ((oldWidth == m_width) && asNoteFrame()->isAutoHeight())))
 		doUndo = false;
 	if (doUndo && UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::Resize,
-                           QString(Um::ResizeFromTo).arg(oldWidth).arg(oldHeight).arg(Width).arg(Height),
+						   QString(Um::ResizeFromTo).arg(oldWidth).arg(oldHeight).arg(m_width).arg(m_height),
                                           Um::IResize);
 		if (!isNoteFrame() || !asNoteFrame()->isAutoWidth())
 		{
 		ss->set("OLD_WIDTH", oldWidth);
-		ss->set("NEW_WIDTH", Width);
+		ss->set("NEW_WIDTH", m_width);
 		}
 		if (!isNoteFrame() || !asNoteFrame()->isAutoHeight())
 		{
 			ss->set("OLD_HEIGHT", oldHeight);
-		ss->set("NEW_HEIGHT", Height);
+		ss->set("NEW_HEIGHT", m_height);
 		}
 		if (!isNoteFrame() || !asNoteFrame()->isAutoWelded())
 		{
@@ -4712,9 +4730,9 @@ void PageItem::resizeUndoAction()
 		undoManager->action(this, ss);
 	}
 	if (!isNoteFrame() || !asNoteFrame()->isAutoWidth())
-		oldWidth = Width;
+		oldWidth = m_width;
 	if (!isNoteFrame() || !asNoteFrame()->isAutoHeight())
-		oldHeight = Height;
+		oldHeight = m_height;
 	if (!isNoteFrame() || !asNoteFrame()->isAutoWelded())
 	{
 		oldXpos = m_xPos;
@@ -4745,11 +4763,11 @@ void PageItem::rotateUndoAction()
 		if (!isNoteFrame() || !asNoteFrame()->isAutoHeight())
 		{
 		ss->set("OLD_RHEIGHT", oldHeight);
-		ss->set("NEW_RHEIGHT", Height);
+		ss->set("NEW_RHEIGHT", m_height);
 		}
 		if (!isNoteFrame() || !asNoteFrame()->isAutoWidth())
 		{
-			ss->set("NEW_RWIDTH", Width);
+			ss->set("NEW_RWIDTH", m_width);
 			ss->set("OLD_RWIDTH", oldWidth);
 		}
 		undoManager->action(this, ss);
@@ -4758,8 +4776,8 @@ void PageItem::rotateUndoAction()
 	oldXpos = m_xPos;
 	oldYpos = m_yPos;
 	oldOwnPage = OwnPage;
-	oldWidth = Width;
-	oldHeight = Height;
+	oldWidth = m_width;
+	oldHeight = m_height;
 }
 
 void PageItem::changeImageOffsetUndoAction()
@@ -5119,13 +5137,13 @@ void PageItem::restoreWeldItems(SimpleState *state, bool isUndo)
 void PageItem::restoreMarkString(SimpleState *state, bool isUndo)
 {
 	ScItemState< QPair<int,QString> > *is = dynamic_cast<ScItemState< QPair<int,QString> >*>(state);
-	ScText * hl = itemText.item(is->getItem().first);
-	if (!hl->hasMark())
+    Mark * mark = itemText.mark(is->getItem().first);
+    if (!itemText.hasMark(is->getItem().first))
 		return;
 	if (isUndo)
-		hl->mark->setString(is->getItem().second);
+        mark->setString(is->getItem().second);
 	else
-		hl->mark->setString(QString());
+        mark->setString(QString());
 }
 
 bool PageItem::checkGradientUndoRedo(SimpleState *ss, bool isUndo)
@@ -6506,8 +6524,8 @@ void PageItem::restoreResize(SimpleState *state, bool isUndo)
 		m_Doc->MoveItem(mx, my, this, false);
 		m_Doc->RotateItem(rt, this);
 	}
-	oldWidth = Width;
-	oldHeight = Height;
+	oldWidth = m_width;
+	oldHeight = m_height;
 	oldXpos = m_xPos;
 	oldYpos = m_yPos;
 	oldOwnPage = OwnPage;
@@ -6544,8 +6562,8 @@ void PageItem::restoreRotate(SimpleState *state, bool isUndo)
 	oldXpos = m_xPos;
 	oldYpos = m_yPos;
 	oldOwnPage = OwnPage;
-	oldWidth = Width;
-	oldHeight = Height;
+	oldWidth = m_width;
+	oldHeight = m_height;
 }
 
 void PageItem::restoreShowImage(SimpleState *state, bool isUndo)
@@ -7623,7 +7641,7 @@ void PageItem::setGradientShade1(int val)
 
 void PageItem::setGradientShade2(int val)
 {
-	if(GrCol1Shade==val)
+	if(GrCol2Shade==val)
 		return;
 	if(UndoManager::undoEnabled())
 	{
@@ -7638,7 +7656,7 @@ void PageItem::setGradientShade2(int val)
 
 void PageItem::setGradientShade3(int val)
 {
-	if(GrCol1Shade==val)
+	if(GrCol3Shade==val)
 		return;
 	if(UndoManager::undoEnabled())
 	{
@@ -7653,7 +7671,7 @@ void PageItem::setGradientShade3(int val)
 
 void PageItem::setGradientShade4(int val)
 {
-	if(GrCol1Shade==val)
+	if(GrCol4Shade==val)
 		return;
 	if(UndoManager::undoEnabled())
 	{
@@ -8203,6 +8221,8 @@ void PageItem::getNamedResources(ResourceCollection& lists) const
 		lists.collectColor(fillColor());
 	else if ((GrType < 8) || (GrType == 10))
 	{
+		if ((!gradientVal.isEmpty()) && (m_Doc->docGradients.contains(gradientVal)))
+			lists.collectGradient(gradientVal);
 		QList<VColorStop*> cstops = fill_gradient.colorStops();
 		for (uint cst = 0; cst < fill_gradient.Stops(); ++cst)
 		{
@@ -8241,6 +8261,8 @@ void PageItem::getNamedResources(ResourceCollection& lists) const
 		lists.collectColor(lineColor());
 	else if (GrTypeStroke < 8)
 	{
+		if ((!gradientStrokeVal.isEmpty()) && (m_Doc->docGradients.contains(gradientStrokeVal)))
+			lists.collectGradient(gradientStrokeVal);
 		QList<VColorStop*> cstops = stroke_gradient.colorStops();
 		for (uint cst = 0; cst < stroke_gradient.Stops(); ++cst)
 		{
@@ -8295,10 +8317,10 @@ void PageItem::SetFrameShape(int count, double *vals)
 			PoLine.setMarker();
 			continue;
 		}
-		double x1 = Width * vals[a] / 100.0;
-		double y1 = Height * vals[a+1] / 100.0;
-		double x2 = Width * vals[a+2] / 100.0;
-		double y2 = Height * vals[a+3] / 100.0;
+		double x1 = m_width * vals[a] / 100.0;
+		double y1 = m_height * vals[a+1] / 100.0;
+		double x2 = m_width * vals[a+2] / 100.0;
+		double y2 = m_height * vals[a+3] / 100.0;
 		PoLine.addPoint(x1, y1);
 		PoLine.addPoint(x2, y2);
 	}
@@ -8338,27 +8360,27 @@ void PageItem::SetOvalFrame()
 
 void PageItem::SetFrameRound()
 {
-	setCornerRadius(qMin(m_roundedCorderRadius, qMin(Width,Height)/2));
+	setCornerRadius(qMin(m_roundedCorderRadius, qMin(m_width, m_height)/2));
 	PoLine.resize(0);
 	double rr = fabs(m_roundedCorderRadius);
 	if (m_roundedCorderRadius > 0.0)
 	{
 		QPainterPath path;
-		path.addRoundedRect(0, 0, Width, Height, rr, rr);
+		path.addRoundedRect(0, 0, m_width, m_height, rr, rr);
 		PoLine.fromQPainterPath(path);
 	}
 	else
 	{
 		double bezierFactor = 0.552284749; //Bezier Control Point Factor: 8/3*(sin(45)-0.5)
 		double rrxBezierFactor = rr*bezierFactor;
-		double Width_rr = Width-rr;
-		double Height_rr = Height-rr;
+		double Width_rr = m_width-rr;
+		double Height_rr = m_height-rr;
 		PoLine.addQuadPoint(rr, 0, rr, 0, Width_rr, 0, Width_rr, 0);
-		PoLine.addQuadPoint(Width_rr, 0, Width_rr, rrxBezierFactor, Width, rr, Width-rrxBezierFactor, rr);
-		PoLine.addQuadPoint(Width, rr, Width, rr, Width, Height_rr, Width, Height_rr);
-		PoLine.addQuadPoint(Width, Height_rr, Width-rrxBezierFactor, Height_rr, Width_rr, Height, Width_rr, Height-rrxBezierFactor);
-		PoLine.addQuadPoint(Width_rr, Height, Width_rr, Height, rr, Height, rr, Height);
-		PoLine.addQuadPoint(rr, Height, rr, Height-rrxBezierFactor, 0, Height_rr, rrxBezierFactor, Height_rr);
+		PoLine.addQuadPoint(Width_rr, 0, Width_rr, rrxBezierFactor, m_width, rr, m_width-rrxBezierFactor, rr);
+		PoLine.addQuadPoint(m_width, rr, m_width, rr, m_width, Height_rr, m_width, Height_rr);
+		PoLine.addQuadPoint(m_width, Height_rr, m_width-rrxBezierFactor, Height_rr, Width_rr, m_height, Width_rr, m_height-rrxBezierFactor);
+		PoLine.addQuadPoint(Width_rr, m_height, Width_rr, m_height, rr, m_height, rr, m_height);
+		PoLine.addQuadPoint(rr, m_height, rr, m_height-rrxBezierFactor, 0, Height_rr, rrxBezierFactor, Height_rr);
 		PoLine.addQuadPoint(0, Height_rr, 0, Height_rr, 0, rr, 0, rr);
 		PoLine.addQuadPoint(0, rr, rrxBezierFactor, rr, rr, 0, rr, rr*bezierFactor);
 	}
@@ -8486,9 +8508,9 @@ void PageItem::getBoundingRect(double *x1, double *y1, double *x2, double *y2) c
 		FPointArray pb;
 		pb.resize(0);
 		pb.addPoint(FPoint(m_xPos, m_yPos));
-		pb.addPoint(FPoint(Width,    0.0, m_xPos, m_yPos, m_rotation, 1.0, 1.0));
-		pb.addPoint(FPoint(Width, Height, m_xPos, m_yPos, m_rotation, 1.0, 1.0));
-		pb.addPoint(FPoint(  0.0, Height, m_xPos, m_yPos, m_rotation, 1.0, 1.0));
+		pb.addPoint(FPoint(m_width,    0.0, m_xPos, m_yPos, m_rotation, 1.0, 1.0));
+		pb.addPoint(FPoint(m_width, m_height, m_xPos, m_yPos, m_rotation, 1.0, 1.0));
+		pb.addPoint(FPoint(  0.0, m_height, m_xPos, m_yPos, m_rotation, 1.0, 1.0));
 		for (uint pc = 0; pc < 4; ++pc)
 		{
 			minx = qMin(minx, pb.point(pc).x());
@@ -8505,8 +8527,8 @@ void PageItem::getBoundingRect(double *x1, double *y1, double *x2, double *y2) c
 	{
 		*x1 = m_xPos;
 		*y1 = m_yPos;
-		*x2 = m_xPos + qMax(1.0, qMax(Width, m_lineWidth));
-		*y2 = m_yPos + qMax(1.0, qMax(Height, m_lineWidth));
+		*x2 = m_xPos + qMax(1.0, qMax(m_width, m_lineWidth));
+		*y2 = m_yPos + qMax(1.0, qMax(m_height, m_lineWidth));
 	}
 	QRectF totalRect = QRectF(QPointF(*x1, *y1), QPointF(*x2, *y2));
 	if (m_startArrowIndex != 0)
@@ -8536,7 +8558,7 @@ void PageItem::getBoundingRect(double *x1, double *y1, double *x2, double *y2) c
 		else
 		{
 			FPoint Start = PoLine.point(0);
-			for (uint xx = 1; xx < PoLine.size(); xx += 2)
+			for (int xx = 1; xx < PoLine.size(); xx += 2)
 			{
 				FPoint Vector = PoLine.point(xx);
 				if ((Start.x() != Vector.x()) || (Start.y() != Vector.y()))
@@ -8572,7 +8594,7 @@ void PageItem::getBoundingRect(double *x1, double *y1, double *x2, double *y2) c
 		arrowTrans.rotate(m_rotation);
 		if (itemType() == Line)
 		{
-			arrowTrans.translate(Width, 0);
+			arrowTrans.translate(m_width, 0);
 			arrowTrans.scale(m_endArrowScale / 100.0, m_endArrowScale / 100.0);
 			if (NamedLStyle.isEmpty())
 			{
@@ -8710,7 +8732,7 @@ void PageItem::getVisualBoundingRect(double * x1, double * y1, double * x2, doub
 		else
 		{
 			FPoint Start = PoLine.point(0);
-			for (uint xx = 1; xx < PoLine.size(); xx += 2)
+			for (int xx = 1; xx < PoLine.size(); xx += 2)
 			{
 				FPoint Vector = PoLine.point(xx);
 				if ((Start.x() != Vector.x()) || (Start.y() != Vector.y()))
@@ -8746,7 +8768,7 @@ void PageItem::getVisualBoundingRect(double * x1, double * y1, double * x2, doub
 		arrowTrans.rotate(m_rotation);
 		if (itemType() == Line)
 		{
-			arrowTrans.translate(Width, 0);
+			arrowTrans.translate(m_width, 0);
 			arrowTrans.scale(m_endArrowScale / 100.0, m_endArrowScale / 100.0);
 			if (NamedLStyle.isEmpty())
 			{
@@ -8894,8 +8916,8 @@ double PageItem::visualWidth() const
 		}
 	}
 	if (isPathText())
-		return qMax(QRectF(Clip.boundingRect()).width(), Width + extraSpace);
-	return Width + extraSpace;
+		return qMax(QRectF(Clip.boundingRect()).width(), m_width + extraSpace);
+	return m_width + extraSpace;
 }
 
 double PageItem::visualHeight() const
@@ -8924,8 +8946,8 @@ double PageItem::visualHeight() const
 			extraSpace = sl.Width;
 	}
 	if (isPathText())
-		return qMax(QRectF(Clip.boundingRect()).height(), Height + extraSpace);
-	return isLine() ? extraSpace : Height + extraSpace;
+		return qMax(QRectF(Clip.boundingRect()).height(), m_height + extraSpace);
+	return isLine() ? extraSpace : m_height + extraSpace;
 }
 
 double PageItem::visualLineWidth()
@@ -9144,7 +9166,7 @@ bool PageItem::loadImage(const QString& filename, const bool reload, const int g
 				FPointArray Vals = pixm.imgInfo.duotoneColors[0].Curve;
 				tmp.setNum(Vals.size());
 				efVal += " "+tmp;
-				for (uint p = 0; p < Vals.size(); p++)
+				for (int p = 0; p < Vals.size(); p++)
 				{
 					FPoint pv = Vals.point(p);
 					efVal += QString(" %1 %2").arg(pv.x()).arg(pv.y());
@@ -9153,7 +9175,7 @@ bool PageItem::loadImage(const QString& filename, const bool reload, const int g
 				Vals = pixm.imgInfo.duotoneColors[1].Curve;
 				tmp.setNum(Vals.size());
 				efVal += " "+tmp;
-				for (uint p = 0; p < Vals.size(); p++)
+				for (int p = 0; p < Vals.size(); p++)
 				{
 					FPoint pv = Vals.point(p);
 					efVal += QString(" %1 %2").arg(pv.x()).arg(pv.y());
@@ -9169,7 +9191,7 @@ bool PageItem::loadImage(const QString& filename, const bool reload, const int g
 				FPointArray Vals = pixm.imgInfo.duotoneColors[0].Curve;
 				tmp.setNum(Vals.size());
 				efVal += " "+tmp;
-				for (uint p = 0; p < Vals.size(); p++)
+				for (int p = 0; p < Vals.size(); p++)
 				{
 					FPoint pv = Vals.point(p);
 					efVal += QString(" %1 %2").arg(pv.x()).arg(pv.y());
@@ -9178,7 +9200,7 @@ bool PageItem::loadImage(const QString& filename, const bool reload, const int g
 				Vals = pixm.imgInfo.duotoneColors[1].Curve;
 				tmp.setNum(Vals.size());
 				efVal += " "+tmp;
-				for (uint p = 0; p < Vals.size(); p++)
+				for (int p = 0; p < Vals.size(); p++)
 				{
 					FPoint pv = Vals.point(p);
 					efVal += QString(" %1 %2").arg(pv.x()).arg(pv.y());
@@ -9187,7 +9209,7 @@ bool PageItem::loadImage(const QString& filename, const bool reload, const int g
 				Vals = pixm.imgInfo.duotoneColors[2].Curve;
 				tmp.setNum(Vals.size());
 				efVal += " "+tmp;
-				for (uint p = 0; p < Vals.size(); p++)
+				for (int p = 0; p < Vals.size(); p++)
 				{
 					FPoint pv = Vals.point(p);
 					efVal += QString(" %1 %2").arg(pv.x()).arg(pv.y());
@@ -9203,7 +9225,7 @@ bool PageItem::loadImage(const QString& filename, const bool reload, const int g
 				FPointArray Vals = pixm.imgInfo.duotoneColors[0].Curve;
 				tmp.setNum(Vals.size());
 				efVal += " "+tmp;
-				for (uint p = 0; p < Vals.size(); p++)
+				for (int p = 0; p < Vals.size(); p++)
 				{
 					FPoint pv = Vals.point(p);
 					efVal += QString(" %1 %2").arg(pv.x()).arg(pv.y());
@@ -9212,7 +9234,7 @@ bool PageItem::loadImage(const QString& filename, const bool reload, const int g
 				Vals = pixm.imgInfo.duotoneColors[1].Curve;
 				tmp.setNum(Vals.size());
 				efVal += " "+tmp;
-				for (uint p = 0; p < Vals.size(); p++)
+				for (int p = 0; p < Vals.size(); p++)
 				{
 					FPoint pv = Vals.point(p);
 					efVal += QString(" %1 %2").arg(pv.x()).arg(pv.y());
@@ -9221,7 +9243,7 @@ bool PageItem::loadImage(const QString& filename, const bool reload, const int g
 				Vals = pixm.imgInfo.duotoneColors[2].Curve;
 				tmp.setNum(Vals.size());
 				efVal += " "+tmp;
-				for (uint p = 0; p < Vals.size(); p++)
+				for (int p = 0; p < Vals.size(); p++)
 				{
 					FPoint pv = Vals.point(p);
 					efVal += QString(" %1 %2").arg(pv.x()).arg(pv.y());
@@ -9230,7 +9252,7 @@ bool PageItem::loadImage(const QString& filename, const bool reload, const int g
 				Vals = pixm.imgInfo.duotoneColors[3].Curve;
 				tmp.setNum(Vals.size());
 				efVal += " "+tmp;
-				for (uint p = 0; p < Vals.size(); p++)
+				for (int p = 0; p < Vals.size(); p++)
 				{
 					FPoint pv = Vals.point(p);
 					efVal += QString(" %1 %2").arg(pv.x()).arg(pv.y());
@@ -9302,8 +9324,8 @@ void PageItem::drawLockedMarker(ScPainter *p)
 	//TODO: CB clean
 	double scp1 = p->zoomFactor() ;// / ScMW->view->scale();
 	double ofwh = 6 * scp1;
-	double ofx = Width - ofwh/2;
-	double ofy = Height - ofwh*1.5;
+	double ofx = m_width - ofwh/2;
+	double ofy = m_height - ofwh*1.5;
 	double bx1= ofx+ scp1;
 	double by1= ofy+3 * scp1;
 	double bw= 4*scp1;
@@ -9422,19 +9444,19 @@ void PageItem::AdjustPictScale()
 		return;
 	if (OrigW == 0 || OrigH == 0)
 		return;
-//	LocalX = 0;
-//	LocalY = 0;
-//	LocalRot = 0;
-	double xs = Width / static_cast<double>(OrigW);
-	double ys = Height / static_cast<double>(OrigH);
-	if (m_imageRotation != 0.0)
+	double xs = m_width / static_cast<double>(OrigW);
+	double ys = m_height / static_cast<double>(OrigH);
+	double imgXOffs = m_imageXOffset;
+	double imgYOffs = m_imageYOffset; 
+	double imageRot = fmod(m_imageRotation, 360);
+	if (imageRot != 0.0)
 	{
 		QRectF br = QRectF(0, 0, OrigW, OrigH);
 		QTransform m;
 		m.rotate(m_imageRotation);
 		br = m.mapRect(br);
-		xs = Width / br.width();
-		ys = Height / br.height();
+		xs = m_width / br.width();
+		ys = m_height / br.height();
 		QLineF wL = QLineF(0, 0, OrigW, 0);
 		wL.setAngle(-m_imageRotation);
 		QLineF hL = QLineF(0, 0, 0, OrigH);
@@ -9482,6 +9504,11 @@ void PageItem::AdjustPictScale()
 			LocalY = (Height - static_cast<double>(OrigH) * LocalScY) / LocalScY;
 			break;
 	}*/
+	if (m_Doc && m_Doc->isLoading())
+	{
+		m_imageXOffset = imgXOffs;
+		m_imageYOffset = imgYOffs;
+	}
 	if (imageClip.size() != 0)
 	{
 		imageClip = pixm.imgInfo.PDSpathData[pixm.imgInfo.usedPath].copy();
@@ -9577,40 +9604,40 @@ void PageItem::updateGradientVectors()
 		case 0:
 		case 1:
 			setGradientStartX(0);
-			setGradientStartY(Height / 2.0);
-			setGradientEndX(Width);
-			setGradientEndY(Height / 2.0);
+			setGradientStartY(m_height / 2.0);
+			setGradientEndX(m_width);
+			setGradientEndY(m_height / 2.0);
 			break;
 		case 2:
-			setGradientStartX(Width / 2.0);
+			setGradientStartX(m_width / 2.0);
 			setGradientStartY(0);
-			setGradientEndX(Width / 2.0);
-			setGradientEndY(Height);
+			setGradientEndX(m_width / 2.0);
+			setGradientEndY(m_height);
 			break;
 		case 3:
 			setGradientStartX(0);
 			setGradientStartY(0);
-			setGradientEndX(Width);
-			setGradientEndY(Height);
+			setGradientEndX(m_width);
+			setGradientEndY(m_height);
 			break;
 		case 4:
 			setGradientStartX(0);
-			setGradientStartY(Height);
-			setGradientEndX(Width);
+			setGradientStartY(m_height);
+			setGradientEndX(m_width);
 			setGradientEndY(0);
 			break;
 		case 5:
-			setGradientStartX(Width / 2.0);
-			setGradientStartY(Height / 2.0);
-			if (Width >= Height)
+			setGradientStartX(m_width / 2.0);
+			setGradientStartY(m_height / 2.0);
+			if (m_width >= m_height)
 			{
-				setGradientEndX(Width);
-				setGradientEndY(Height / 2.0);
+				setGradientEndX(m_width);
+				setGradientEndY(m_height / 2.0);
 			}
 			else
 			{
-				setGradientEndX(Width / 2.0);
-				setGradientEndY(Height);
+				setGradientEndX(m_width / 2.0);
+				setGradientEndY(m_height);
 			}
 			break;
 		default:
@@ -9706,27 +9733,10 @@ bool PageItem::connectToGUI()
 		return false;
 	if (!m_Doc->m_Selection->primarySelectionIs(this))
 		return false;
-	//unused PropertiesPalette* pp=m_Doc->scMW()->propertiesPalette;
-	//connect(this, SIGNAL(myself(PageItem *)), pp, SLOT(setCurrentItem(PageItem *)));
+
 	connect(this, SIGNAL(frameType(int)), m_Doc->scMW(), SLOT(HaveNewSel(int)));
 	connect(this, SIGNAL(frameType(int)), m_Doc, SLOT(selectionChanged()));
-	//connect(this, SIGNAL(frameType(int)), pp, SLOT(handleSelectionChanged()));
-	//connect(this, SIGNAL(frameLocked(bool)), pp, SLOT(setLocked(bool)));
-	//connect(this, SIGNAL(frameSizeLocked(bool)), pp, SLOT(setSizeLocked(bool)));
-	//Shape signals
-	//connect(this, SIGNAL(cornerRadius(double)), pp, SLOT(setRR(double)));
-	//	connect(view, SIGNAL(ItemTextCols(int, double)), propertiesPalette, SLOT(setCols(int, double)));
-	//Line signals
-	//connect(this, SIGNAL(lineWidth(double)), pp, SLOT(setLineWidth(double)));
-	//connect(this, SIGNAL(lineStyleCapJoin(Qt::PenStyle, Qt::PenCapStyle, Qt::PenJoinStyle)), pp, SLOT( setLIvalue(Qt::PenStyle, Qt::PenCapStyle, Qt::PenJoinStyle)));
-	//Frame text signals
-	//connect(this, SIGNAL(lineSpacing(double)), pp, SLOT(setLsp(double)));
-	//connect(this, SIGNAL(textToFrameDistances(double, double, double, double)), pp, SLOT(setTextToFrameDistances(double, double, double, double)));
-	//connect(this, SIGNAL(textKerning(double)), pp, SLOT(setExtra(double)));
-	//connect(this, SIGNAL(textStyle(int)), pp, SLOT(setStil(int)));
 	connect(this, SIGNAL(textStyle(int)), m_Doc->scMW(), SLOT(setStyleEffects(int)));
-	//connect(this, SIGNAL(textFont(const QString&)), pp, SLOT(setFontFace(const QString&)));
-	//connect(this, SIGNAL(textSize(double)), pp, SLOT(setSize(double)));
 
 	return true;
 }
@@ -9838,8 +9848,8 @@ void PageItem::updateConstants()
 		m_Doc->constants().insert("margintop", m_Doc->Pages->at(OwnPage)->Margins.Top);
 		m_Doc->constants().insert("marginbottom", m_Doc->Pages->at(OwnPage)->height() - m_Doc->Pages->at(OwnPage)->Margins.Bottom);
 	}
-	m_Doc->constants().insert("width", Width);
-	m_Doc->constants().insert("height", Height);
+	m_Doc->constants().insert("width", m_width);
+	m_Doc->constants().insert("height", m_height);
 }
 
 //CB Old ScribusView MoveItemI
@@ -10218,10 +10228,11 @@ void PageItem::setInlineData(QString data)
 	inlineImageData.append(data);
 	if (inlineImageData.size() > 0)
 	{
-		tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_XXXXXX." + inlineExt);
-		tempImageFile->open();
-		QString fileName = getLongPathName(tempImageFile->fileName());
-		tempImageFile->close();
+		QTemporaryFile *tempFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_XXXXXX." + inlineExt);
+		tempFile->setAutoRemove(false);
+		tempFile->open();
+		QString fileName = getLongPathName(tempFile->fileName());
+		tempFile->close();
 		inlineImageData = qUncompress(QByteArray::fromBase64(inlineImageData));
 		QFile outFil(fileName);
 		if (outFil.open(QIODevice::WriteOnly))
@@ -10229,7 +10240,9 @@ void PageItem::setInlineData(QString data)
 			outFil.write(inlineImageData);
 			outFil.close();
 			isInlineImage = true;
+			isTempFile = true;
 			Pfile = fileName;
+			delete tempFile;
 		}
 	}
 }
@@ -10238,24 +10251,28 @@ void PageItem::makeImageInline()
 {
 	QFileInfo fi(Pfile);
 	QString ext = fi.suffix();
-	tempImageFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_XXXXXX." + ext);
-	tempImageFile->open();
-	QString fileName = getLongPathName(tempImageFile->fileName());
-	tempImageFile->close();
+	QTemporaryFile *tempFile = new QTemporaryFile(QDir::tempPath() + "/scribus_temp_XXXXXX." + ext);
+	tempFile->setAutoRemove(false);
+	tempFile->open();
+	QString fileName = getLongPathName(tempFile->fileName());
+	tempFile->close();
 	isInlineImage = true;
+	isTempFile = true;
 	copyFile(Pfile, fileName);
 	Pfile = fileName;
+	delete tempFile;
 }
 
 void PageItem::makeImageExternal(QString path)
 {
-	if ((tempImageFile) && (isInlineImage) && (!path.isEmpty()))
+	if ((isTempFile) && (isInlineImage) && (!path.isEmpty()))
 	{
+		QString oldF = Pfile;
 		copyFile(Pfile, path);
 		Pfile = path;
+		QFile::remove(oldF);
 		isInlineImage = false;
-		delete tempImageFile;
-		tempImageFile = NULL;
+		isTempFile = false;
 	}
 }
 
@@ -10464,4 +10481,9 @@ QString PageItem::getItemTextSaxed(int selStart, int selLength)
 	return QString(xml.c_str());
 }
 
-
+bool compareItemLevel(const PageItem* item1, const PageItem* item2)
+{
+	int level1 = item1->level();
+	int level2 = item2->level();
+	return (level1 < level2);
+}

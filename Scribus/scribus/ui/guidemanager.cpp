@@ -573,17 +573,6 @@ void GuideManager::deleteAllGuides_clicked()
 	m_Doc->changed();
 }
 
-void GuideManager::windowActivationChange(bool oldActive)
-{
-	if (m_Doc)
-	{
-		bool enable = !m_Doc->m_Selection->isEmpty();
-		horizontalSelectionAutoButton->setEnabled(enable);
-		verticalSelectionAutoButton->setEnabled(enable);
-	}
-	QDialog::windowActivationChange( oldActive );
-}
-
 Guides GuideManager::getAutoVerticals(ScPage * page)
 {
 	GuideManagerCore guides;

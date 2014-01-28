@@ -101,8 +101,9 @@ void CharTableModel::setDoc(ScribusDoc *doc)
 	// repaint only when doc differs
 	if (doc != m_doc)
 	{
+		beginResetModel();
 		m_doc = doc;
-		reset();
+		endResetModel();
 	}
 }
 
@@ -113,6 +114,7 @@ ScFace CharTableModel::fontFace()
 
 void CharTableModel::setCharacters(CharClassDef ch)
 {
+	beginResetModel();
 	m_characters.clear();
 	m_fonts.clear();
 	m_characters = ch;
@@ -120,16 +122,17 @@ void CharTableModel::setCharacters(CharClassDef ch)
 	{
 		m_fonts.append(m_fontInUse);
 	}
-	reset();
+	endResetModel();
 }
 
 void CharTableModel::setCharactersAndFonts(CharClassDef ch, QStringList fonts)
 {
+	beginResetModel();
 	m_characters.clear();
 	m_fonts.clear();
 	m_characters = ch;
 	m_fonts = fonts;
-	reset();
+	endResetModel();
 }
 
 void CharTableModel::addCharacter(QString ch)
@@ -142,9 +145,10 @@ void CharTableModel::addCharacter(QString ch)
 	int val = si.toInt(&ok, 10);
 	if (!ok)
 		return;
+	beginResetModel();
 	m_characters.append(val);
 	m_fonts.append(sf);
-	reset();
+	endResetModel();
 	if (orig < rowCount())
 		emit rowAppended();
 }
@@ -153,8 +157,9 @@ void CharTableModel::setFontInUse(QString font)
 {
 	if (font != m_fontInUse)
 	{
+		beginResetModel();
 		m_fontInUse = font;
-		reset();
+		endResetModel();
 	}
 }
 
@@ -173,9 +178,10 @@ void CharTableModel::appendUnicode(const QString & s, uint base)
 
 	if ((!m_characters.contains(val)) || (!m_fonts.contains(sf)))
 	{
+		beginResetModel();
 		m_characters.append(val);
 		m_fonts.append(sf);
-		reset();
+		endResetModel();
 	}
 	else
 	{
@@ -195,9 +201,10 @@ bool CharTableModel::removeCharacter(int index)
 {
 	if (index >= 0 && index < m_characters.size())
 	{
+		beginResetModel();
 		m_characters.removeAt(index);
 		m_fonts.removeAt(index);
-		reset();
+		endResetModel();
 		return true;
 	}
 //	qDebug("CharTable::deleteOwnCharacter: no char deleted - logical error probably");

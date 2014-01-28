@@ -53,7 +53,7 @@ void SeList::mouseReleaseEvent(QMouseEvent *m)
 	if (m->button() == Qt::RightButton)
 	{
 		QMenu *pmen = new QMenu();
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+//		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
         QAction *px = pmen->addAction( tr("Show Page Previews"), this, SLOT(toggleThumbnail()));
 		px->setCheckable(true);
 		if (Thumb)
@@ -486,6 +486,23 @@ int SeView::GetPage(int r, int c, bool *last)
 	}
 	*last = true;
 	return ret;
+}
+
+SeItem* SeView::GetPageItem(int pageIndex)
+{
+	int rows = this->rowCount();
+	int columns = this->columnCount();
+	for (int i = 0; i < rows; ++i)
+	{
+		for (int j = 0; j < columns; ++j)
+		{
+			QTableWidgetItem* tbItem = item(i, j);
+			SeItem* pageItem = dynamic_cast<SeItem*>(tbItem);
+			if (pageItem && pageItem->pageNumber == static_cast<uint>(pageIndex))
+				return pageItem;
+		}
+	}
+	return 0;
 }
 
 /* Der Muelleimer */

@@ -397,7 +397,7 @@ void StyleManager::slotImport()
 				if (dia2->clashRename())
 					styName = lstyle->getUniqueName(aStyle);
 
-				lstyle->tmpLines[styName] = sty;
+				lstyle->m_tmpLines[styName] = sty;
 //#7315 				selected << QPair<QString, QString>(lstyle->typeName(), styName);
 
 				for (int i = 0; i < sty.count(); ++i)
@@ -993,6 +993,12 @@ void StyleManager::insertShortcutPage(QTabWidget *twidget)
 
 void StyleManager::slotNameChanged(const QString& name)
 {
+	if (m_item && name.isEmpty())
+	{
+		okButton->setEnabled(false);
+		applyButton->setEnabled(false);
+		return;
+	}
 	if (m_item && !nameIsUnique(name))
 	{
 		uniqueLabel->show();
@@ -1006,7 +1012,6 @@ void StyleManager::slotNameChanged(const QString& name)
 		okButton->setEnabled(true);
 		applyButton->setEnabled(true);
 	}
-
 
 	if (m_item)
 	{
@@ -1385,4 +1390,10 @@ StyleManager::~StyleManager()
 	m_prefs->set("InitY", y());
 	storeVisibility(this->isVisible());
 	storePosition();
+
+	while (m_items.count() > 0)
+	{
+		StyleItem* styleItem = m_items.takeAt(0);
+		delete styleItem;
+	}
 }

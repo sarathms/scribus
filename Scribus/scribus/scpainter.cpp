@@ -48,6 +48,7 @@ ScPainter::ScPainter( QImage *target, unsigned int w, unsigned int h, double tra
 	svgMode = false;
 	m_image = target;
 	m_matrix = QTransform();
+	zoomStack.clear();
 	cairo_surface_t *img = cairo_image_surface_create_for_data(m_image->bits(), CAIRO_FORMAT_ARGB32, w, h, w*4);
 	m_cr = cairo_create(img);
 	cairo_save( m_cr );
@@ -99,7 +100,6 @@ void ScPainter::beginLayer(double transparency, int blendmode, FPointArray *clip
 	Layers.push(la);
 }
 
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 void ScPainter::endLayer()
 {
 	layerProp la;
@@ -154,266 +154,6 @@ void ScPainter::endLayer()
 	m_blendMode = la.blendmode;
 	maskMode = 0;
 }
-#else
-void ScPainter::endLayer()
-{
-	layerProp la;
-	if (Layers.count() == 0)
-		return;
-	la = Layers.top();
-	maskMode = la.maskMode;
-	mask_patternScaleX = la.mask_patternScaleX;
-	mask_patternScaleY = la.mask_patternScaleY;
-	mask_patternOffsetX = la.mask_patternOffsetX;
-	mask_patternOffsetY = la.mask_patternOffsetY;
-	mask_patternRotation = la.mask_patternRotation;
-	mask_patternSkewX = la.mask_patternSkewX;
-	mask_patternSkewY = la.mask_patternSkewY;
-	mask_patternMirrorX = la.mask_patternMirrorX;
-	mask_patternMirrorY = la.mask_patternMirrorY;
-	mask_gradientScale = la.mask_gradientScale;
-	mask_gradientSkew = la.mask_gradientSkew;
-	mask_gradient = la.mask_gradient;
-	m_maskPattern = la.maskPattern;
-	m_fillRule = la.fillRule;
-	if (la.pushed)
-	{
-		if ((m_blendMode != 0) && (Layers.count() != 0))
-		{
-			cairo_surface_t *tmp = cairo_get_group_target(m_cr);
-			cairo_surface_t *tmpB = Layers.top().data;
-			if ((tmp != NULL) && (tmpB != NULL))
-			{
-				if ((cairo_surface_get_type(tmp) == CAIRO_SURFACE_TYPE_IMAGE) && (cairo_surface_get_type(tmpB) == CAIRO_SURFACE_TYPE_IMAGE))
-				{
-					cairo_surface_flush(tmp);
-					int stride = cairo_image_surface_get_stride(tmp);
-					unsigned char *s = cairo_image_surface_get_data(tmp);
-					unsigned char *d = cairo_image_surface_get_data(tmpB);
-					int h = cairo_image_surface_get_height(tmp);
-					int w = cairo_image_surface_get_width(tmp);
-					uint oldDst = 1;
-					uint oldSrc = 2;
-					uint newResult = 0;
-					bool first = true;
-					QRgb *src;
-					QRgb *dst;
-					uchar src_a, src_r, src_g, src_b, dst_a, dst_r, dst_g, dst_b, new_r, new_g, new_b;
-					for( int yi=0; yi < h; ++yi )
-					{
-						dst = (QRgb*)d;
-						src = (QRgb*)s;
-						for( int xi=0; xi < w; ++xi )
-						{
-							src_r = qRed(*src);
-							src_g = qGreen(*src);
-							src_b = qBlue(*src);
-							src_a = qAlpha(*src);
-							dst_r = qRed(*dst);
-							dst_g = qGreen(*dst);
-							dst_b = qBlue(*dst);
-							dst_a = qAlpha(*dst);
-							if ((src_a > 0) && (dst_a > 0))
-							{
-								if (((*dst) != oldDst) || ((*src) != oldSrc) || (first))
-								{
-									if (m_blendMode == 1)
-									{
-										src_r = dst_r  < src_r ? dst_r  : src_r;
-										src_g = dst_g < src_g ? dst_g : src_g;
-										src_b = dst_b < src_b ? dst_b : src_b;
-									}
-									else if (m_blendMode == 2)
-									{
-										src_r = dst_r  < src_r ? src_r : dst_r;
-										src_g = dst_g < src_g ? src_g : dst_g;
-										src_b = dst_b < src_b ? src_b : dst_b;
-									}
-									else if (m_blendMode == 3)
-									{
-										src_r = INT_MULT(src_r, dst_r);
-										src_g = INT_MULT(src_g, dst_g);
-										src_b = INT_MULT(src_b, dst_b);
-									}
-									else if (m_blendMode == 4)
-									{
-										src_r = 255 - ((255-src_r) * (255-dst_r) / 255);
-										src_g = 255 - ((255-src_g) * (255-dst_g) / 255);
-										src_b = 255 - ((255-src_b) * (255-dst_b) / 255);
-									}
-									else if (m_blendMode == 5)
-									{
-										src_r = dst_r < 128 ? src_r * dst_r / 128 : 255 - ((255-src_r) * (255-dst_r) / 128);
-										src_g = dst_g < 128 ? src_g * dst_g / 128 : 255 - ((255-src_g) * (255-dst_g) / 128);
-										src_b = dst_b < 128 ? src_b * dst_b / 128 : 255 - ((255-src_b) * (255-dst_b) / 128);
-									}
-									else if (m_blendMode == 6)
-									{
-										src_r = src_r < 128 ? src_r * dst_r / 128 : 255 - ((255-src_r) * (255-dst_r) / 128);
-										src_g = src_g < 128 ? src_g * dst_g / 128 : 255 - ((255-src_g) * (255-dst_g) / 128);
-										src_b = src_b < 128 ? src_b * dst_b / 128 : 255 - ((255-src_b) * (255-dst_b) / 128);
-									}
-									else if (m_blendMode == 7)
-									{
-										float s_r = (255 - src_r) / 255.0;
-										float s_g = (255 - src_g) / 255.0;
-										float s_b = (255 - src_b) / 255.0;
-										float d_r = (255 - dst_r) / 255.0;
-										float d_g = (255 - dst_g) / 255.0;
-										float d_b = (255 - dst_b) / 255.0;
-										float dzr = d_r > 0.25 ? sqrt(d_r) : ((16 * d_r - 12) * d_r + 4) * d_r;
-										float dzg = d_g > 0.25 ? sqrt(d_g) : ((16 * d_g - 12) * d_g + 4) * d_g;
-										float dzb = d_b > 0.25 ? sqrt(d_b) : ((16 * d_b - 12) * d_b + 4) * d_b;
-										s_r = s_r <= 0.5 ? d_r - (1 - 2 * s_r) * d_r * (1 - d_r) : d_r + (2 * s_r - 1) * (dzr  - d_r);
-										s_g = s_g <= 0.5 ? d_g - (1 - 2 * s_g) * d_g * (1 - d_g) : d_g + (2 * s_g - 1) * (dzg  - d_g);
-										s_b = s_b <= 0.5 ? d_b - (1 - 2 * s_b) * d_b * (1 - d_b) : d_b + (2 * s_b - 1) * (dzb  - d_b);
-										src_r = 255 - qRound(s_r * 255);
-										src_g = 255 - qRound(s_g * 255);
-										src_b = 255 - qRound(s_b * 255);
-									}
-									else if (m_blendMode == 8)
-									{
-										src_r = dst_r > src_r ? dst_r - src_r : src_r - dst_r;
-										src_g = dst_g > src_g ? dst_g - src_g : src_g - dst_g;
-										src_b = dst_b > src_b ? dst_b - src_b : src_b - dst_b;
-									}
-									else if (m_blendMode == 9)
-									{
-										src_r = dst_r + src_r - src_r * dst_r / 128;
-										src_g = dst_g + src_g - src_g * dst_g / 128;
-										src_b = dst_b + src_b - src_b * dst_b / 128;
-									}
-									else if (m_blendMode == 10)
-									{
-										src_r = src_r == 255 ? qMin(255, dst_r * 256) : qMin(255, ((dst_r * 256) / (255-src_r)));
-										src_g = src_g == 255 ? qMin(255, dst_g * 256) : qMin(255, ((dst_g * 256) / (255-src_g)));
-										src_b = src_b == 255 ? qMin(255, dst_b * 256) : qMin(255, ((dst_b * 256) / (255-src_b)));
-									}
-									else if (m_blendMode == 11)
-									{
-										src_r = qMax<uchar>(1, src_r);
-										src_g = qMax<uchar>(1, src_g);
-										src_b = qMax<uchar>(1, src_b);
-										src_r = static_cast<int>(255 - (((255-dst_r) * 256) / src_r)) < 0 ? 0 : 255 - (((255-dst_r) * 256) / src_r);
-										src_g = static_cast<int>(255 - (((255-dst_g) * 256) / src_g)) < 0 ? 0 : 255 - (((255-dst_g) * 256) / src_g);
-										src_b = static_cast<int>(255 - (((255-dst_b) * 256) / src_b)) < 0 ? 0 : 255 - (((255-dst_b) * 256) / src_b);
-									}
-									else if (m_blendMode == 12)
-									{
-										new_r = dst_r;
-										new_g = dst_g;
-										new_b = dst_b;
-										RGBTOHLS(src_r, src_g, src_b);
-										RGBTOHLS(new_r, new_g, new_b);
-										new_r = src_r;
-										HLSTORGB(new_r, new_g, new_b);
-										src_r = new_r;
-										src_g = new_g;
-										src_b = new_b;
-									}
-									else if (m_blendMode == 13)
-									{
-										new_r = dst_r;
-										new_g = dst_g;
-										new_b = dst_b;
-										RGBTOHLS(src_r, src_g, src_b);
-										RGBTOHLS(new_r, new_g, new_b);
-										new_b = src_b;
-										HLSTORGB(new_r, new_g, new_b);
-										src_r = new_r;
-										src_g = new_g;
-										src_b = new_b;
-									}
-									else if (m_blendMode == 14)
-									{
-										new_r = src_r;
-										new_g = src_g;
-										new_b = src_b;
-										setLum(new_r, new_g, new_b, Lum(dst_r, dst_g, dst_b));
-										src_r = new_r;
-										src_g = new_g;
-										src_b = new_b;
-									}
-									else if (m_blendMode == 15)
-									{
-										new_r = dst_r;
-										new_g = dst_g;
-										new_b = dst_b;
-										setLum(new_r, new_g, new_b, Lum(src_r, src_g, src_b));
-										src_r = new_r;
-										src_g = new_g;
-										src_b = new_b;
-									}
-									newResult = qRgba(src_r, src_g, src_b, src_a);
-									oldDst = (*dst);
-									oldSrc = (*src);
-									first = false;
-								}
-								(*src) = newResult;
-							}
-							src++;
-							dst++;
-						}
-						s += stride;
-						d += stride;
-					}
-					cairo_surface_mark_dirty(tmp);
-				}
-			}
-		}
-	}
-	la = Layers.pop();
-	if (la.pushed)
-	{
-		cairo_pop_group_to_source (m_cr);
-		if (la.groupClip.size() != 0)
-		{
-			if( m_fillRule )
-				cairo_set_fill_rule (m_cr, CAIRO_FILL_RULE_EVEN_ODD);
-			else
-				cairo_set_fill_rule (m_cr, CAIRO_FILL_RULE_WINDING);
-			setupPolygon(&la.groupClip);
-			setClipPath();
-		}
-		if (m_blendMode == 0)
-		{
-			cairo_set_operator(m_cr, CAIRO_OPERATOR_OVER);
-			if (maskMode == 1)
-			{
-				cairo_pattern_t *patM = getMaskPattern();
-				cairo_mask(m_cr, patM);
-				if ((maskMode == 2) || (maskMode == 4) || (maskMode == 5) || (maskMode == 6))
-					cairo_surface_destroy(imageMask);
-				cairo_pattern_destroy(patM);
-			}
-			else
-				cairo_paint_with_alpha (m_cr, m_layerTransparency);
-		}
-		else
-		{
-			if (maskMode == 1)
-			{
-				cairo_pattern_t *patM = getMaskPattern();
-				cairo_mask(m_cr, patM);
-				if ((maskMode == 2) || (maskMode == 4) || (maskMode == 5) || (maskMode == 6))
-					cairo_surface_destroy(imageMask);
-				cairo_pattern_destroy(patM);
-			}
-			else
-			{
-				cairo_set_operator(m_cr, CAIRO_OPERATOR_DEST_OUT);
-				cairo_paint_with_alpha (m_cr, m_layerTransparency);
-				cairo_set_operator(m_cr, CAIRO_OPERATOR_ADD);
-				cairo_paint_with_alpha (m_cr, m_layerTransparency);
-			}
-		}
-		cairo_set_operator(m_cr, CAIRO_OPERATOR_OVER);
-	}
-	m_layerTransparency = la.tranparency;
-	m_blendMode = la.blendmode;
-	maskMode = 0;
-}
-#endif
 
 void ScPainter::begin()
 {
@@ -491,6 +231,7 @@ void ScPainter::rotate( double r )
 void ScPainter::scale( double x, double y )
 {
 	cairo_scale (m_cr, x, y);
+	m_zoomFactor = qMax(x, y);
 }
 
 void ScPainter::moveTo( const double &x, const double &y )
@@ -735,16 +476,18 @@ QFont ScPainter::font()
 void ScPainter::save()
 {
 	cairo_save( m_cr );
+	zoomStack.push(m_zoomFactor);
 }
 
 void ScPainter::restore()
 {
 	cairo_restore( m_cr );
+	if (!zoomStack.isEmpty())
+		m_zoomFactor = zoomStack.pop();
 }
 
 void ScPainter::setRasterOp(int blendMode)
 {
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 	if (blendMode == 0)
 		cairo_set_operator(m_cr, CAIRO_OPERATOR_OVER);
 	else if (blendMode == 1)
@@ -779,7 +522,6 @@ void ScPainter::setRasterOp(int blendMode)
 		cairo_set_operator(m_cr, CAIRO_OPERATOR_HSL_LUMINOSITY);
 	else
 		cairo_set_operator(m_cr, CAIRO_OPERATOR_OVER);
-#endif
 }
 
 void ScPainter::setBlendModeFill( int blendMode )
@@ -827,12 +569,6 @@ cairo_pattern_t * ScPainter::getMaskPattern()
 		for( int offset = 0 ; offset < colorStops.count() ; offset++ )
 		{
 			qStopColor = colorStops[ offset ]->color;
-			int h, s, v, sneu, vneu;
-			int shad = colorStops[offset]->shade;
-			qStopColor.getHsv(&h, &s, &v);
-			sneu = s * shad / 100;
-			vneu = 255 - ((255 - v) * shad / 100);
-			qStopColor.setHsv(h, sneu, vneu);
 			double a = colorStops[offset]->opacity;
 			double r, g, b;
 			qStopColor.getRgbF(&r, &g, &b);
@@ -935,9 +671,7 @@ void ScPainter::fillPathHelper()
 		{
 			cairo_pattern_t *pat = getMaskPattern();
 			cairo_set_source_rgb( m_cr, r, g, b );
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 			setRasterOp(m_blendModeFill);
-#endif
 			cairo_clip_preserve(m_cr);
 			cairo_mask(m_cr, pat);
 			if ((maskMode == 2) || (maskMode == 4) || (maskMode == 5) || (maskMode == 6))
@@ -947,9 +681,7 @@ void ScPainter::fillPathHelper()
 		else
 		{
 			cairo_set_source_rgba( m_cr, r, g, b, fill_trans );
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 			setRasterOp(m_blendModeFill);
-#endif
 			cairo_fill_preserve(m_cr);
 		}
 	}
@@ -958,14 +690,12 @@ void ScPainter::fillPathHelper()
 		cairo_pattern_t *pat = NULL;
 		cairo_surface_t *img = NULL;
 		cairo_t *cr = NULL;
-// #ifdef HAVE_PRIVATE_CAIRO
-#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2)  || HAVE_PRIVATE_CAIRO)
+#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2))
 		cairo_pattern_t *mpat = NULL;
 #endif
 		if (fill_gradient.type() == VGradient::fourcolor)
 		{
-//#ifdef HAVE_PRIVATE_CAIRO
-#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2) || HAVE_PRIVATE_CAIRO)
+#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2))
 			double p1x = gradPatchP1.x();
 			double p1y = gradPatchP1.y();
 			double p2x = gradPatchP2.x();
@@ -1059,8 +789,7 @@ void ScPainter::fillPathHelper()
 		}
 		else if (fill_gradient.type() == VGradient::diamond)
 		{
-// #ifdef HAVE_PRIVATE_CAIRO
-#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2) || HAVE_PRIVATE_CAIRO)
+#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2))
 			double p1x = gradControlP1.x();
 			double p1y = gradControlP1.y();
 			double p2x = gradControlP2.x();
@@ -1081,12 +810,6 @@ void ScPainter::fillPathHelper()
 			for( int offset = 0 ; offset < colorStops.count() ; offset++ )
 			{
 				qStopColor = colorStops[ offset ]->color;
-				int h, s, v, sneu, vneu;
-				int shad = colorStops[offset]->shade;
-				qStopColor.getHsv(&h, &s, &v);
-				sneu = s * shad / 100;
-				vneu = 255 - ((255 - v) * shad / 100);
-				qStopColor.setHsv(h, sneu, vneu);
 				qStopColor.setAlphaF(colorStops[offset]->opacity);
 				qStopColors.append(qStopColor);
 			}
@@ -1362,8 +1085,7 @@ void ScPainter::fillPathHelper()
 		}
 		else if (fill_gradient.type() == VGradient::mesh)
 		{
-// #ifdef HAVE_PRIVATE_CAIRO
-#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2) || HAVE_PRIVATE_CAIRO)
+#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2))
 			double p3x = gradPatchP3.x();
 			double p3y = gradPatchP3.y();
 			img = cairo_surface_create_similar(cairo_get_target(m_cr), CAIRO_CONTENT_COLOR_ALPHA, p3x, p3y);
@@ -1489,8 +1211,7 @@ void ScPainter::fillPathHelper()
 		}
 		else if (fill_gradient.type() == VGradient::freemesh)
 		{
-// #ifdef HAVE_PRIVATE_CAIRO
-#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2) || HAVE_PRIVATE_CAIRO)
+#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2))
 			double p3x = gradPatchP3.x();
 			double p3y = gradPatchP3.y();
 			img = cairo_surface_create_similar(cairo_get_target(m_cr), CAIRO_CONTENT_COLOR_ALPHA, p3x, p3y);
@@ -1627,23 +1348,15 @@ void ScPainter::fillPathHelper()
 			cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
 			cairo_pattern_set_filter(pat, CAIRO_FILTER_GOOD);
 			QList<VColorStop*> colorStops = fill_gradient.colorStops();
-			QColor qStopColor;
 			for( int offset = 0 ; offset < colorStops.count() ; offset++ )
 			{
-				qStopColor = colorStops[ offset ]->color;
 				rampPoint  = colorStops[ offset ]->rampPoint;
 				if ((lastPoint == rampPoint) && (!isFirst))
 					continue;
 				isFirst = false;
-				int h, s, v, sneu, vneu;
-				int shad = colorStops[offset]->shade;
-				qStopColor.getHsv(&h, &s, &v);
-				sneu = s * shad / 100;
-				vneu = 255 - ((255 - v) * shad / 100);
-				qStopColor.setHsv(h, sneu, vneu);
 				double a = colorStops[offset]->opacity;
 				double r, g, b;
-				qStopColor.getRgbF(&r, &g, &b);
+				colorStops[ offset ]->color.getRgbF(&r, &g, &b);
 				cairo_pattern_add_color_stop_rgba (pat, colorStops[ offset ]->rampPoint, r, g, b, a);
 				lastPoint = rampPoint;
 			}
@@ -1674,9 +1387,7 @@ void ScPainter::fillPathHelper()
 		if (maskMode > 0)
 		{
 			cairo_pattern_t *patM = getMaskPattern();
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 			setRasterOp(m_blendModeFill);
-#endif
 			cairo_mask(m_cr, patM);
 			if ((maskMode == 2) || (maskMode == 4) || (maskMode == 5) || (maskMode == 6))
 				cairo_surface_destroy(imageMask);
@@ -1684,14 +1395,11 @@ void ScPainter::fillPathHelper()
 		}
 		else
 		{
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 			setRasterOp(m_blendModeFill);
-#endif
 			cairo_paint_with_alpha (m_cr, fill_trans);
 		}
 		cairo_pattern_destroy (pat);
-// #ifdef HAVE_PRIVATE_CAIRO
-#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2)  || HAVE_PRIVATE_CAIRO)
+#if (CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 11, 2))
 		if ((fill_gradient.type() == VGradient::fourcolor) || (fill_gradient.type() == VGradient::diamond) || (fill_gradient.type() == VGradient::mesh) || (fill_gradient.type() == VGradient::freemesh))
 		{
 			cairo_surface_destroy(img);
@@ -1732,9 +1440,7 @@ void ScPainter::fillPathHelper()
 		if (maskMode > 0)
 		{
 			cairo_pattern_t *patM = getMaskPattern();
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 			setRasterOp(m_blendModeFill);
-#endif
 			cairo_mask(m_cr, patM);
 			if ((maskMode == 2) || (maskMode == 4) || (maskMode == 5) || (maskMode == 6))
 				cairo_surface_destroy(imageMask);
@@ -1742,9 +1448,7 @@ void ScPainter::fillPathHelper()
 		}
 		else
 		{
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 			setRasterOp(m_blendModeFill);
-#endif
 			cairo_paint_with_alpha (m_cr, fill_trans);
 		}
 		cairo_pattern_destroy (m_pat);
@@ -1809,9 +1513,7 @@ void ScPainter::strokePathHelper()
 		cairo_surface_destroy (image2);
 		cairo_set_antialias(m_cr, CAIRO_ANTIALIAS_DEFAULT);
 		cairo_pop_group_to_source (m_cr);
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 		setRasterOp(m_blendModeStroke);
-#endif
 		cairo_paint_with_alpha (m_cr, stroke_trans);
 	}
 	else if (strokeMode == 2)
@@ -1833,23 +1535,15 @@ void ScPainter::strokePathHelper()
 		cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
 		cairo_pattern_set_filter(pat, CAIRO_FILTER_GOOD);
 		QList<VColorStop*> colorStops = stroke_gradient.colorStops();
-		QColor qStopColor;
 		for( int offset = 0 ; offset < colorStops.count() ; offset++ )
 		{
-			qStopColor = colorStops[ offset ]->color;
 			rampPoint  = colorStops[ offset ]->rampPoint;
 			if ((lastPoint == rampPoint) && (!isFirst))
 				continue;
 			isFirst = false;
-			int h, s, v, sneu, vneu;
-			int shad = colorStops[offset]->shade;
-			qStopColor.getHsv(&h, &s, &v);
-			sneu = s * shad / 100;
-			vneu = 255 - ((255 - v) * shad / 100);
-			qStopColor.setHsv(h, sneu, vneu);
 			double a = colorStops[offset]->opacity;
 			double r, g, b;
-			qStopColor.getRgbF(&r, &g, &b);
+			colorStops[ offset ]->color.getRgbF(&r, &g, &b);
 			cairo_pattern_add_color_stop_rgba (pat, rampPoint, r, g, b, a);
 			lastPoint = rampPoint;
 		}
@@ -1878,9 +1572,7 @@ void ScPainter::strokePathHelper()
 		cairo_stroke_preserve( m_cr );
 		cairo_pattern_destroy (pat);
 		cairo_pop_group_to_source (m_cr);
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 		setRasterOp(m_blendModeStroke);
-#endif
 		cairo_paint_with_alpha (m_cr, stroke_trans);
 	}
 	else
@@ -1888,9 +1580,7 @@ void ScPainter::strokePathHelper()
 		double r, g, b;
 		m_stroke.getRgbF(&r, &g, &b);
 		cairo_set_source_rgba( m_cr, r, g, b, stroke_trans );
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
 		setRasterOp(m_blendModeStroke);
-#endif
 		cairo_stroke_preserve( m_cr );
 	}
 	cairo_restore( m_cr );
@@ -1904,7 +1594,7 @@ void ScPainter::setClipPath()
 
 void ScPainter::drawImage( QImage *image)
 {
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 2, 6)
+	cairo_set_antialias(m_cr, CAIRO_ANTIALIAS_NONE);
 /*
 	cairo_surface_t *image3 = cairo_image_surface_create_for_data ((uchar*)image->bits(), CAIRO_FORMAT_ARGB32, image->width(), image->height(), image->width()*4);
 	cairo_set_source_surface (m_cr, image3, 0, 0);
@@ -1919,16 +1609,17 @@ void ScPainter::drawImage( QImage *image)
 	cairo_surface_t *image2  = cairo_image_surface_create_for_data ((uchar*)image->bits(), CAIRO_FORMAT_RGB24, image->width(), image->height(), image->width()*4);
 	cairo_surface_t *image3 = cairo_image_surface_create_for_data ((uchar*)image->bits(), CAIRO_FORMAT_ARGB32, image->width(), image->height(), image->width()*4);
 	cairo_set_source_surface (m_cr, image2, 0, 0);
+	cairo_pattern_set_filter(cairo_get_source(m_cr), CAIRO_FILTER_FAST);
     cairo_mask_surface (m_cr, image3, 0, 0);
 	cairo_surface_destroy (image2);
 	cairo_surface_destroy (image3);
 	cairo_pop_group_to_source (m_cr);
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 4)
+	cairo_pattern_set_filter(cairo_get_source(m_cr), CAIRO_FILTER_FAST);
 	setRasterOp(m_blendModeFill);
-#endif
 	if (maskMode > 0)
 	{
 		cairo_pattern_t *patM = getMaskPattern();
+		cairo_pattern_set_filter(patM, CAIRO_FILTER_FAST);
 		cairo_mask(m_cr, patM);
 		if ((maskMode == 2) || (maskMode == 4) || (maskMode == 5) || (maskMode == 6))
 			cairo_surface_destroy(imageMask);
@@ -1937,38 +1628,7 @@ void ScPainter::drawImage( QImage *image)
 	else
 		cairo_paint_with_alpha (m_cr, fill_trans);
 	cairo_set_operator(m_cr, CAIRO_OPERATOR_OVER);
-#else
-/* Working code, sadly we need to create an additional mask image with the same size as the image to be painted */
-	cairo_surface_t *image3;
-	QImage mask;
-	cairo_set_fill_rule(m_cr, cairo_get_fill_rule(m_cr));
-	cairo_surface_t *image2  = cairo_image_surface_create_for_data ((uchar*)image->bits(), CAIRO_FORMAT_RGB24, image->width(), image->height(), image->width()*4);
-	if (fill_trans != 1.0)
-	{
-		mask = QImage(image->width(), image->height(), QImage::Format_Mono);
-		for( int yi = 0; yi < image->height(); ++yi )
-		{
-			QRgb * s = (QRgb*)(image->scanLine( yi ));
-			unsigned char *d = (unsigned char *)(mask.scanLine( yi ));
-			for( int xi=0; xi < image->width(); ++xi )
-			{
-				*d++ = static_cast<unsigned char>(qAlpha(*s++) * fill_trans);
-			}
-		}
-		int adj;
-		if (image->width() % 4 == 0)
-			adj = 0;
-		else
-			adj = 4 - (image->width() % 4);
-		image3 = cairo_image_surface_create_for_data ((uchar*)mask.bits(), CAIRO_FORMAT_A8, image->width(), image->height(), image->width() + adj);
-	}
-	else
-		image3 = cairo_image_surface_create_for_data ((uchar*)image->bits(), CAIRO_FORMAT_ARGB32, image->width(), image->height(), image->width()*4);
-	cairo_set_source_surface (m_cr, image2, 0, 0);
-	cairo_mask_surface (m_cr, image3, 0, 0);
-	cairo_surface_destroy (image2);
-	cairo_surface_destroy (image3);
-#endif
+	cairo_set_antialias(m_cr, CAIRO_ANTIALIAS_DEFAULT);
 }
 
 void ScPainter::setupPolygon(FPointArray *points, bool closed)
@@ -1981,7 +1641,7 @@ void ScPainter::setupPolygon(FPointArray *points, bool closed)
 		return;
 
 	newPath();
-	for (uint poi=0; poi<points->size()-3; poi += 4)
+	for (int poi=0; poi<points->size()-3; poi += 4)
 	{
 		if (points->point(poi).x() > 900000)
 		{
@@ -2003,11 +1663,9 @@ void ScPainter::setupPolygon(FPointArray *points, bool closed)
 		np3 = points->point(poi + 2);
 		if (np4 == np3)
 			continue;
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 6)
 		if ((np == np1) && (np2 == np3))
 			cairo_line_to( m_cr, np3.x(), np3.y());
 		else
-#endif
 			cairo_curve_to(m_cr, np1.x(), np1.y(), np2.x(), np2.y(), np3.x(), np3.y());
 		np4 = np3;
 	}
@@ -2025,7 +1683,7 @@ void ScPainter::setupSharpPolygon(FPointArray *points, bool closed)
 		return;
 
 	newPath();
-	for (uint poi=0; poi<points->size()-3; poi += 4)
+	for (int poi=0; poi<points->size()-3; poi += 4)
 	{
 		if (points->point(poi).x() > 900000)
 		{
@@ -2048,14 +1706,12 @@ void ScPainter::setupSharpPolygon(FPointArray *points, bool closed)
 		np3 = points->point(poi + 2);
 		if (np4 == np3)
 			continue;
-#if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 9, 6)
 		if ((np == np1) && (np2 == np3))
 		{
 			sharpLineHelper(np3);
 			cairo_line_to( m_cr, np3.x(), np3.y());
 		}
 		else
-#endif
 			cairo_curve_to(m_cr, np1.x(), np1.y(), np2.x(), np2.y(), np3.x(), np3.y());
 		np4 = np3;
 	}
@@ -2297,45 +1953,345 @@ void ScPainter::drawShadePanel(const QRectF &r, const QColor color, bool sunken,
 	closePath();
 	setBrush(light);
 	fillPath();
+}
 
-/*
-	setStrokeMode(1);
-	setLineWidth(1.2);
-	if (sunken)
-		setPen(shade, 1.2, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
-	else
-		setPen(light, 1.2, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
-	int x1, y1, x2, y2, x3, y3;
-	x1 = r.x();
-	x2 = r.x();
-	x3 = r.x() + r.width();
-	y1 = r.y() + r.height();
-	y2 = r.y();
-	y3 = r.y();
-	for (int i = 0; i < lineWidth; i++)
+void ScPainter::blurAlpha(int radius)
+{
+	if (radius < 1)
+		return;
+	cairo_surface_t *data = cairo_get_group_target(m_cr);
+	QRgb *pix = (QRgb*)cairo_image_surface_get_data(data);
+	int w   = cairo_image_surface_get_width(data);
+	int h   = cairo_image_surface_get_height(data);
+	int wm  = w-1;
+	int hm  = h-1;
+	int wh  = w*h;
+	int div = radius+radius+1;
+	int *a = new int[wh];
+	int asum, x, y, i, yp, yi, yw;
+	QRgb p;
+	int *vmin = new int[qMax(w,h)];
+	int divsum = (div+1)>>1;
+	divsum *= divsum;
+	int *dv = new int[256*divsum];
+	for (i=0; i < 256*divsum; ++i)
 	{
-		newPath();
-		moveTo(x1++, y1--);
-		lineTo(x2++, y2++);
-		lineTo(x3--, y3++);
-		strokePath();
+		dv[i] = (i/divsum);
 	}
-	if (sunken)
-		setPen(light, 1.2, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
-	else
-		setPen(shade, 1.2, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
-	x1 = r.x();
-	x2 = r.x() + r.width();
-	x3 = r.x() + r.width();
-	y1 = r.y() + r.height();
-	y2 = r.y() + r.height();
-	y3 = r.y();
-	for (int i = 0; i < lineWidth; i++)
+	yw = yi = 0;
+	int **stack = new int*[div];
+	for(int i = 0; i < div; ++i)
 	{
-		newPath();
-		moveTo(x1++, y1--);
-		lineTo(x2--, y2--);
-		lineTo(x3--, y3++);
-		strokePath();
-	} */
+		stack[i] = new int[1];
+	}
+	int stackpointer;
+	int stackstart;
+	int *sir;
+	int rbs;
+	int r1 = radius+1;
+	int aoutsum;
+	int ainsum;
+	for (y = 0; y < h; ++y)
+	{
+		ainsum = aoutsum = asum = 0;
+		for(i =- radius; i <= radius; ++i)
+		{
+			p = pix[yi+qMin(wm,qMax(i,0))];
+			sir = stack[i+radius];
+			sir[0] = qAlpha(p);
+			rbs = r1-abs(i);
+			asum += sir[0]*rbs;
+			if (i > 0)
+				ainsum += sir[0];
+			else
+				aoutsum += sir[0];
+		}
+		stackpointer = radius;
+		for (x=0; x < w; ++x)
+		{
+			a[yi] = dv[asum];
+			asum -= aoutsum;
+			stackstart = stackpointer-radius+div;
+			sir = stack[stackstart%div];
+			aoutsum -= sir[0];
+			if (y == 0)
+				vmin[x] = qMin(x+radius+1,wm);
+			p = pix[yw+vmin[x]];
+			sir[0] = qAlpha(p);
+			ainsum += sir[0];
+			asum += ainsum;
+			stackpointer = (stackpointer+1)%div;
+			sir = stack[(stackpointer)%div];
+			aoutsum += sir[0];
+			ainsum -= sir[0];
+			++yi;
+		}
+		yw += w;
+	}
+	for (x=0; x < w; ++x)
+	{
+		ainsum = aoutsum = asum = 0;
+		yp =- radius * w;
+		for(i=-radius; i <= radius; ++i)
+		{
+			yi=qMax(0,yp)+x;
+			sir = stack[i+radius];
+			sir[0] = a[yi];
+			rbs = r1-abs(i);
+			asum += a[yi]*rbs;
+			if (i > 0)
+				ainsum += sir[0];
+			else
+				aoutsum += sir[0];
+			if (i < hm)
+			{
+				yp += w;
+			}
+		}
+		yi = x;
+		stackpointer = radius;
+		for (y=0; y < h; ++y)
+		{
+			pix[yi] = qRgba(qRed(pix[yi]), qGreen(pix[yi]), qBlue(pix[yi]), dv[asum]);
+			asum -= aoutsum;
+			stackstart = stackpointer-radius+div;
+			sir = stack[stackstart%div];
+			aoutsum -= sir[0];
+			if (x==0)
+			{
+				vmin[y] = qMin(y+r1,hm)*w;
+			}
+			p = x+vmin[y];
+			sir[0] = a[p];
+			ainsum += sir[0];
+			asum += ainsum;
+			stackpointer = (stackpointer+1)%div;
+			sir = stack[stackpointer];
+			aoutsum += sir[0];
+			ainsum -= sir[0];
+			yi += w;
+		}
+	}
+	delete [] a;
+	delete [] vmin;
+	delete [] dv;
+	for(int i = 0; i < div; ++i)
+	{
+		delete [] stack[i];
+	}
+	delete [] stack;
+	cairo_surface_mark_dirty(data);
+}
+
+void ScPainter::blur(int radius)
+{
+	if (radius < 1)
+		return;
+	cairo_surface_t *data = cairo_get_group_target(m_cr);
+	QRgb *pix = (QRgb*)cairo_image_surface_get_data(data);
+	int w   = cairo_image_surface_get_width(data);
+	int h   = cairo_image_surface_get_height(data);
+	int wm  = w-1;
+	int hm  = h-1;
+	int wh  = w*h;
+	int div = radius+radius+1;
+	int *r = new int[wh];
+	int *g = new int[wh];
+	int *b = new int[wh];
+	int *a = new int[wh];
+	int rsum, gsum, bsum, asum, x, y, i, yp, yi, yw;
+	QRgb p;
+	int *vmin = new int[qMax(w,h)];
+	int divsum = (div+1)>>1;
+	divsum *= divsum;
+	int *dv = new int[256*divsum];
+	for (i=0; i < 256*divsum; ++i)
+	{
+		dv[i] = (i/divsum);
+	}
+	yw = yi = 0;
+	int **stack = new int*[div];
+	for(int i = 0; i < div; ++i)
+	{
+		stack[i] = new int[4];
+	}
+	int stackpointer;
+	int stackstart;
+	int *sir;
+	int rbs;
+	int r1 = radius+1;
+	int routsum, goutsum, boutsum, aoutsum;
+	int rinsum, ginsum, binsum, ainsum;
+	for (y = 0; y < h; ++y)
+	{
+		rinsum = ginsum = binsum = ainsum = routsum = goutsum = boutsum = aoutsum = rsum = gsum = bsum = asum = 0;
+		for(i =- radius; i <= radius; ++i)
+		{
+			p = pix[yi+qMin(wm,qMax(i,0))];
+			sir = stack[i+radius];
+			sir[0] = qRed(p);
+			sir[1] = qGreen(p);
+			sir[2] = qBlue(p);
+			sir[3] = qAlpha(p);
+			rbs = r1-abs(i);
+			rsum += sir[0]*rbs;
+			gsum += sir[1]*rbs;
+			bsum += sir[2]*rbs;
+			asum += sir[3]*rbs;
+			if (i > 0)
+			{
+				rinsum += sir[0];
+				ginsum += sir[1];
+				binsum += sir[2];
+				ainsum += sir[3];
+			}
+			else
+			{
+				routsum += sir[0];
+				goutsum += sir[1];
+				boutsum += sir[2];
+				aoutsum += sir[3];
+			}
+		}
+		stackpointer = radius;
+		for (x=0; x < w; ++x)
+		{
+			r[yi] = dv[rsum];
+			g[yi] = dv[gsum];
+			b[yi] = dv[bsum];
+			a[yi] = dv[asum];
+			rsum -= routsum;
+			gsum -= goutsum;
+			bsum -= boutsum;
+			asum -= aoutsum;
+			stackstart = stackpointer-radius+div;
+			sir = stack[stackstart%div];
+			routsum -= sir[0];
+			goutsum -= sir[1];
+			boutsum -= sir[2];
+			aoutsum -= sir[3];
+			if (y == 0)
+			{
+				vmin[x] = qMin(x+radius+1,wm);
+			}
+			p = pix[yw+vmin[x]];
+			sir[0] = qRed(p);
+			sir[1] = qGreen(p);
+			sir[2] = qBlue(p);
+			sir[3] = qAlpha(p);
+			rinsum += sir[0];
+			ginsum += sir[1];
+			binsum += sir[2];
+			ainsum += sir[3];
+			rsum += rinsum;
+			gsum += ginsum;
+			bsum += binsum;
+			asum += ainsum;
+			stackpointer = (stackpointer+1)%div;
+			sir = stack[(stackpointer)%div];
+			routsum += sir[0];
+			goutsum += sir[1];
+			boutsum += sir[2];
+			aoutsum += sir[3];
+			rinsum -= sir[0];
+			ginsum -= sir[1];
+			binsum -= sir[2];
+			ainsum -= sir[3];
+			++yi;
+		}
+		yw += w;
+	}
+	for (x=0; x < w; ++x)
+	{
+		rinsum = ginsum = binsum = ainsum = routsum = goutsum = boutsum = aoutsum = rsum = gsum = bsum = asum = 0;
+		yp =- radius * w;
+		for(i=-radius; i <= radius; ++i)
+		{
+			yi=qMax(0,yp)+x;
+			sir = stack[i+radius];
+			sir[0] = r[yi];
+			sir[1] = g[yi];
+			sir[2] = b[yi];
+			sir[3] = a[yi];
+			rbs = r1-abs(i);
+			rsum += r[yi]*rbs;
+			gsum += g[yi]*rbs;
+			bsum += b[yi]*rbs;
+			asum += a[yi]*rbs;
+			if (i > 0)
+			{
+				rinsum += sir[0];
+				ginsum += sir[1];
+				binsum += sir[2];
+				ainsum += sir[3];
+			}
+			else
+			{
+				routsum += sir[0];
+				goutsum += sir[1];
+				boutsum += sir[2];
+				aoutsum += sir[3];
+			}
+			if (i < hm)
+			{
+				yp += w;
+			}
+		}
+		yi = x;
+		stackpointer = radius;
+		for (y=0; y < h; ++y)
+		{
+			pix[yi] = qRgba(dv[rsum], dv[gsum], dv[bsum], dv[asum]);
+			rsum -= routsum;
+			gsum -= goutsum;
+			bsum -= boutsum;
+			asum -= aoutsum;
+			stackstart = stackpointer-radius+div;
+			sir = stack[stackstart%div];
+			routsum -= sir[0];
+			goutsum -= sir[1];
+			boutsum -= sir[2];
+			aoutsum -= sir[3];
+			if (x==0)
+			{
+				vmin[y] = qMin(y+r1,hm)*w;
+			}
+			p = x+vmin[y];
+			sir[0] = r[p];
+			sir[1] = g[p];
+			sir[2] = b[p];
+			sir[3] = a[p];
+			rinsum += sir[0];
+			ginsum += sir[1];
+			binsum += sir[2];
+			ainsum += sir[3];
+			rsum += rinsum;
+			gsum += ginsum;
+			bsum += binsum;
+			asum += ainsum;
+			stackpointer = (stackpointer+1)%div;
+			sir = stack[stackpointer];
+			routsum += sir[0];
+			goutsum += sir[1];
+			boutsum += sir[2];
+			aoutsum += sir[3];
+			rinsum -= sir[0];
+			ginsum -= sir[1];
+			binsum -= sir[2];
+			ainsum -= sir[3];
+			yi += w;
+		}
+	}
+	delete [] r;
+	delete [] g;
+	delete [] b;
+	delete [] a;
+	delete [] vmin;
+	delete [] dv;
+	for(int i = 0; i < div; ++i)
+	{
+		delete [] stack[i];
+	}
+	delete [] stack;
+	cairo_surface_mark_dirty(data);
 }

@@ -73,6 +73,7 @@ class SCRIBUS_API LoadSavePlugin : public ScPlugin
 		// Get the highest priority format of a given id, or 0 if
 		// not found / not available.
 		static const FileFormat * getFormatById(const int id);
+		static FileFormat * getFormatByID(int id);
 		static FileFormat* getFormatByExt(const QString ext);
 
 		virtual bool loadElements(const QString & data, QString fileDir, int toLayer, double Xp_in, double Yp_in, bool loc);
@@ -231,7 +232,7 @@ class SCRIBUS_API FileFormat
 		// select for this format.
 		QString filter;
 		// Regexp to match filenames for this format
-		QRegExp nameMatch;
+	//	QRegExp nameMatch;
 		// MIME type(s) that should be matched by this format.
 		QStringList mimeTypes;
 		// Extension list supported by format

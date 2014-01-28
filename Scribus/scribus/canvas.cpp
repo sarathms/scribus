@@ -454,7 +454,7 @@ PageItem* Canvas::itemUnderCursor(QPoint globalPos, PageItem* itemAbove, bool al
 					if (currItem->isGroup() && allowInGroup)
 					{
 						currItem->asGroupFrame()->adjustXYPosition();
-						PageItem* ret = itemInGroup(currItem, itemPos, mouseArea);
+						PageItem* ret = itemInGroup(currItem, mouseArea);
 						if (ret != NULL)
 							return ret;
 					}
@@ -498,7 +498,7 @@ PageItem* Canvas::itemUnderCursor(QPoint globalPos, PageItem* itemAbove, bool al
 				if (currItem->isGroup() && allowInGroup)
 				{
 					currItem->asGroupFrame()->adjustXYPosition();
-					PageItem* ret = itemInGroup(currItem, itemPos, mouseArea);
+					PageItem* ret = itemInGroup(currItem, mouseArea);
 					if (ret != NULL)
 					{
 						if ((m_doc->drawAsPreview && !m_doc->editOnPreview) && !ret->isAnnotation())
@@ -535,31 +535,27 @@ bool Canvas::cursorOverFrameControl(QPoint globalPos, QRectF targetRect, PageIte
 	return tg.contains(QPointF(mp.x(), mp.y()));
 }
 
-PageItem* Canvas::itemInGroup(PageItem* group, QTransform itemPos, QRectF mouseArea) const
+PageItem* Canvas::itemInGroup(PageItem* group, QRectF mouseArea) const
 {
 	int currNr = group->groupItemList.count() - 1;
 	while (currNr >= 0)
 	{
 		PageItem* embedded = group->groupItemList.at(currNr);
-		QPainterPath currPath(itemPos.map(QPointF(0, 0)));
-		currPath.lineTo(itemPos.map(QPointF(embedded->width(), 0)));
-		currPath.lineTo(itemPos.map(QPointF(embedded->width(), embedded->height())));
-		currPath.lineTo(itemPos.map(QPointF(0, embedded->height())));
+		QTransform itemPosN = embedded->getTransform();
+		QPainterPath currPath(itemPosN.map(QPointF(0, 0)));
+		currPath.lineTo(itemPosN.map(QPointF(embedded->width(), 0)));
+		currPath.lineTo(itemPosN.map(QPointF(embedded->width(), embedded->height())));
+		currPath.lineTo(itemPosN.map(QPointF(0, embedded->height())));
 		currPath.closeSubpath();
-		currPath.translate(embedded->gXpos, embedded->gYpos);
 		QPainterPath currClip;
-		currClip.addPolygon(itemPos.map(QPolygonF(embedded->Clip)));
+		currClip.addPolygon(itemPosN.map(QPolygonF(embedded->Clip)));
 		currClip.closeSubpath();
 		currClip.translate(embedded->gXpos, embedded->gYpos);
 		if (currPath.intersects(mouseArea) || currClip.intersects(mouseArea))
 		{
 			if (embedded->isGroup())
 			{
-				QTransform itemPosG = itemPos;
-				QTransform eTrans = embedded->getGroupTransform();
-				itemPosG *= eTrans;
-				itemPosG.scale(group->width() / group->groupWidth, group->height() / group->groupHeight);
-				PageItem* ret = itemInGroup(embedded, itemPosG, mouseArea);
+				PageItem* ret = itemInGroup(embedded, mouseArea);
 				if (ret != NULL)
 					return ret;
 			}
@@ -1492,9 +1488,9 @@ void Canvas::DrawPageItems(ScPainter *painter, ScLayer& layer, QRect clip, bool 
 	//then we must be sure that text frames are valid and all notes frames are created before we start drawing
 	if (!notesFramesPass && !m_doc->notesList().isEmpty())
 	{
-	for (int it = 0; it < m_doc->Items->count(); ++it)
-	{
-		currItem = m_doc->Items->at(it);
+		for (int it = 0; it < m_doc->Items->count(); ++it)
+		{
+			currItem = m_doc->Items->at(it);
 			if ( !currItem->isTextFrame()
 				|| currItem->isNoteFrame()
 				|| !currItem->invalid
@@ -1530,9 +1526,9 @@ void Canvas::DrawPageItems(ScPainter *painter, ScLayer& layer, QRect clip, bool 
 		}
 		if (cullingArea.intersects(currItem->getBoundingRect().adjusted(0.0, 0.0, 1.0, 1.0)))
 		{
-//FIXME						if (!evSpon || forceRedraw) 
-//					currItem->invalid = true;
-//						if ((!m_MouseButtonPressed) || (m_doc->appMode == modeEditClip))
+//FIXME		if (!evSpon || forceRedraw) 
+//				currItem->invalid = true;
+//			if ((!m_MouseButtonPressed) || (m_doc->appMode == modeEditClip))
 			if (((m_viewMode.operItemMoving || m_viewMode.drawSelectedItemsWithControls) && currItem->isSelected()))
 			{
 //					qDebug() << "skipping pageitem (move/resizeEdit/selected)" << m_viewMode.operItemMoving << currItem->isSelected();
@@ -1547,12 +1543,12 @@ void Canvas::DrawPageItems(ScPainter *painter, ScLayer& layer, QRect clip, bool 
 			{
 				// I comment it because the "view" should not
 				// alter the "data". And it really prevents optimisation - pm
-// 							if (m_viewMode.forceRedraw)
-// 								currItem->invalidateLayout();
+// 				if (m_viewMode.forceRedraw)
+// 					currItem->invalidateLayout();
 				currItem->DrawObj(painter, cullingArea);
 				currItem->DrawObj_Decoration(painter);
 			}
-//						currItem->Redrawn = true;
+//			currItem->Redrawn = true;
 			if ((currItem->asTextFrame()) && ((currItem->nextInChain() != 0) || (currItem->prevInChain() != 0)))
 			{
 				PageItem *nextItem = currItem;
@@ -1571,7 +1567,6 @@ void Canvas::DrawPageItems(ScPainter *painter, ScLayer& layer, QRect clip, bool 
 			*/
 			if ((m_doc->appMode == modeEdit) && (currItem->isSelected()) && (currItem->itemType() == PageItem::TextFrame))
 			{
-			
 				setupEditHRuler(currItem);
 			}
 		}
@@ -2238,7 +2233,7 @@ void Canvas::PaintSizeRect(QRect newRect)
 	if (!newRect.isNull())
 	{
 		if (!oldRect.isNull())
-			newRect.unite(oldRect);
+			newRect.united(oldRect);
 		repaint(newRect.adjusted(-10, -10, 20, 20));
 	}
 	oldRect = newRect;
@@ -2253,7 +2248,7 @@ void Canvas::PaintSizeRect(QPolygon newRect)
 	if (!newR.isNull())
 	{
 		if (!oldRect.isNull())
-			newR.unite(oldRect);
+			newRect.united(oldRect);
 //		newR.moveBy(qRound(-m_doc->minCanvasCoordinate.x() * m_viewMode.scale), qRound(-m_doc->minCanvasCoordinate.y() * m_viewMode.scale));
 		m_viewMode.redrawPolygon = newRect;
 //		m_viewMode.redrawPolygon.translate(qRound(-m_doc->minCanvasCoordinate.x() * m_viewMode.scale), qRound(-m_doc->minCanvasCoordinate.y() * m_viewMode.scale));

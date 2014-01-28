@@ -491,7 +491,7 @@ double getCurveYValue(FPointArray &curve, double x, bool linear)
     p = curve.point(curve.size()-1);
     if(x >= p.x())
         return p.y();
-	uint cc = 0;
+	int cc = 0;
     // Find the four control points (two on each side of x)    
     p = curve.point(0);
     while(x >= p.x())
@@ -731,10 +731,11 @@ bool importColorsFromFile(QString fileName, ColorList &EditColors, QHash<QString
 						{
 							EditColors.tryAddColor(it.key(), it.value());
 						}
+						return (EditColors.count() != oldCount);
 					}
 				}
 			}
-			else if (ext == "acb")			// Adobe color book format
+			if (ext == "acb")			// Adobe color book format
 			{
 				QFile fiC(fileName);
 				if (fiC.open(QIODevice::ReadOnly))

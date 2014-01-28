@@ -96,6 +96,8 @@ public:
 	virtual void drawText(QRectF area, QString text, bool filled = true, int align = 0);
 	virtual void drawShadeCircle(const QRectF &re, const QColor color, bool sunken, int lineWidth);
 	virtual void drawShadePanel(const QRectF &r, const QColor color, bool sunken, int lineWidth);
+	virtual void blurAlpha(int radius);
+	virtual void blur(int radius);
 
 	// pen + brush
 	virtual QColor pen();
@@ -159,6 +161,7 @@ private:
 	QImage imageQ;
 
 	QStack<layerProp> Layers;
+	QStack<double> zoomStack;
 	QImage *m_image;
 	double  m_layerTransparency;
 	int  m_blendMode;

@@ -67,7 +67,7 @@ void ActionManager::init(ScribusMainWindow *mw)
 	unicodeCharActionNames=new QStringList();
 	undoManager = UndoManager::instance();
 
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
 	noIcon = loadIcon("noicon.xpm");
 #endif
 
@@ -912,10 +912,12 @@ void ActionManager::initExtrasMenuActions()
 	scrActions->insert(name, new ScrAction("", defaultKey(name), mainWindow));
 	name="extrasUpdateDocument";
 	scrActions->insert(name, new ScrAction("", defaultKey(name), mainWindow));
-
+	name="extrasTestQTQuick2_1";
+	scrActions->insert(name, new ScrAction("", defaultKey(name), mainWindow));
 	connect( (*scrActions)["extrasManageImages"], SIGNAL(triggered()), mainWindow, SLOT(StatusPic()) );
 	connect( (*scrActions)["extrasGenerateTableOfContents"], SIGNAL(triggered()), mainWindow, SLOT(generateTableOfContents()) );
 	connect( (*scrActions)["extrasUpdateDocument"], SIGNAL(triggered()), mainWindow, SLOT(updateDocument()) );
+	connect( (*scrActions)["extrasTestQTQuick2_1"], SIGNAL(triggered()), mainWindow, SLOT(testQTQuick2_1()) );
 }
 
 
@@ -1295,7 +1297,7 @@ void ActionManager::saveActionShortcutsPreEditMode()
 	{
 		(*scrActions)[*it]->setShortcutContext(Qt::WidgetShortcut);  // in theory, this should be enough, but...
 		(*scrActions)[*it]->saveShortcut();
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
 		if ((*scrActions)[*it]->menu() != NULL)
 			(*scrActions)[*it]->setEnabled(false);
 #endif		
@@ -1313,7 +1315,7 @@ void ActionManager::restoreActionShortcutsPostEditMode()
 	{
 		(*scrActions)[*it]->setShortcutContext(Qt::WindowShortcut);  // see above
 		(*scrActions)[*it]->restoreShortcut();
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
 		(*scrActions)[*it]->setEnabled(true);
 #endif		
 	}
@@ -1457,7 +1459,7 @@ void ActionManager::languageChange()
 	(*scrActions)["editSearchReplace"]->setTexts( tr("&Search/Replace..."));
 	(*scrActions)["editEditWithImageEditor"]->setTexts( tr("Edit Image..."));
 	(*scrActions)["editEditRenderSource"]->setTexts( tr("Edit Source..."));
-	(*scrActions)["editColors"]->setTexts( tr("Fills..."));
+	(*scrActions)["editColors"]->setTexts( tr("Colors and Fills..."));
 	(*scrActions)["editReplaceColors"]->setTexts( tr("Replace Colors..."));
 	(*scrActions)["editStyles"]->setTexts( tr("S&tyles..."));
 	(*scrActions)["editMarks"]->setTexts( tr("Marks..."));
@@ -1510,8 +1512,8 @@ void ActionManager::languageChange()
 	(*scrActions)["itemRaiseToTop"]->setTexts( tr("Raise to &Top"));
 	(*scrActions)["itemLower"]->setTexts( tr("&Lower"));
 	(*scrActions)["itemRaise"]->setTexts( tr("&Raise"));
-	(*scrActions)["itemSendToPattern"]->setTexts( tr("Send to Patterns"));
-	(*scrActions)["itemSendToInline"]->setTexts( tr("Send to Inline Items"));
+	(*scrActions)["itemSendToPattern"]->setTexts( tr("Patterns"));
+	(*scrActions)["itemSendToInline"]->setTexts( tr("Inline Items"));
 	(*scrActions)["itemAttributes"]->setTexts( tr("&Attributes..."));
 	(*scrActions)["itemImageInfo"]->setTexts( tr("More Info..."));
 	(*scrActions)["itemImageIsVisible"]->setTexts( tr("I&mage Visible"));
@@ -1551,9 +1553,9 @@ void ActionManager::languageChange()
 	(*scrActions)["itemConvertToPolygon"]->setTexts( tr("&Polygon"));
 	(*scrActions)["itemConvertToTextFrame"]->setTexts( tr("&Text Frame"));
 	(*scrActions)["itemConvertToSymbolFrame"]->setTexts( tr("&Symbol"));
-	(*scrActions)["itemsUnWeld"]->setTexts( tr("Unweld items"));
-	(*scrActions)["itemWeld"]->setTexts( tr("Weld items"));
-	(*scrActions)["itemEditWeld"]->setTexts( tr("Edit weld item"));
+	(*scrActions)["itemsUnWeld"]->setTexts( tr("Unweld Items"));
+	(*scrActions)["itemWeld"]->setTexts( tr("Weld Items"));
+	(*scrActions)["itemEditWeld"]->setTexts( tr("Edit Welded Item"));
 
 	//Insert Menu
 	(*scrActions)["insertFrame"]->setTexts( tr("&Frames..."));
@@ -1671,7 +1673,7 @@ void ActionManager::languageChange()
 	(*scrActions)["extrasDeHyphenateText"]->setTexts( tr("Dehyphenate Text"));
 	(*scrActions)["extrasGenerateTableOfContents"]->setTexts( tr("&Generate Table Of Contents"));
 	(*scrActions)["extrasUpdateDocument"]->setTexts( tr("&Update Document"));
-
+	(*scrActions)["extrasTestQTQuick2_1"]->setTexts( tr("Test Qt Quick"));
 	//Windows Menu
 	(*scrActions)["windowsCascade"]->setText( tr("&Cascade"));
 	(*scrActions)["windowsTile"]->setText( tr("&Tile"));
@@ -1693,6 +1695,56 @@ void ActionManager::languageChange()
 	(*scrActions)["specialToggleAllPalettes"]->setTexts( tr("Toggle Palettes"));
 	(*scrActions)["specialToggleAllGuides"]->setTexts( tr("Toggle Guides"));
 	(*scrActions)["specialUnicodeSequenceBegin"]->setTexts( tr("Insert Unicode Character Begin Sequence"));
+
+
+	//Status texts for toolbar items
+	(*scrActions)["editCopy"]->setStatusTextAndShortcut( tr("Copy"));
+	(*scrActions)["editCut"]->setStatusTextAndShortcut( tr("Cut"));
+	(*scrActions)["editPaste"]->setStatusTextAndShortcut( tr("Paste"));
+	(*scrActions)["editRedoAction"]->setStatusTextAndShortcut( tr("Redo"));
+	(*scrActions)["editUndoAction"]->setStatusTextAndShortcut( tr("Undo"));
+	(*scrActions)["fileClose"]->setStatusTextAndShortcut( tr("Close the current document"));
+	(*scrActions)["fileExportAsPDF"]->setStatusTextAndShortcut( tr("Export the document to PDF"));
+	(*scrActions)["fileNew"]->setStatusTextAndShortcut( tr("Create a new document"));
+	(*scrActions)["fileOpen"]->setStatusTextAndShortcut( tr("Open an existing document"));
+	(*scrActions)["filePrint"]->setStatusTextAndShortcut( tr("Print the document"));
+	(*scrActions)["fileSave"]->setStatusTextAndShortcut( tr("Save the current document"));
+	(*scrActions)["toolsCopyProperties"]->setStatusTextAndShortcut( tr("Copy item properties"));
+	(*scrActions)["toolsEditContents"]->setStatusTextAndShortcut( tr("Edit contents of a frame"));
+	(*scrActions)["toolsEditWithStoryEditor"]->setText( tr("Edit text in the Story Editor"));
+	(*scrActions)["toolsEyeDropper"]->setStatusTextAndShortcut( tr("Eye Dropper"));
+	(*scrActions)["toolsInsertArc"]->setStatusTextAndShortcut( tr("Insert an arc"));
+	(*scrActions)["toolsInsertBezier"]->setStatusTextAndShortcut( tr("Insert a bezier curve"));
+	(*scrActions)["toolsInsertCalligraphicLine"]->setStatusTextAndShortcut( tr("Insert a calligraphic line"));
+	(*scrActions)["toolsInsertFreehandLine"]->setStatusTextAndShortcut( tr("Insert a freehand line"));
+	(*scrActions)["toolsInsertImageFrame"]->setStatusTextAndShortcut( tr("Insert an image frame"));
+	(*scrActions)["toolsInsertLine"]->setStatusTextAndShortcut( tr("Insert a line"));
+	(*scrActions)["toolsInsertPolygon"]->setStatusTextAndShortcut( tr("Insert a polygon"));
+	(*scrActions)["toolsInsertRenderFrame"]->setStatusTextAndShortcut( tr("Insert a render frame"));
+	(*scrActions)["toolsInsertShape"]->setStatusTextAndShortcut( tr("Insert a shape"));
+	(*scrActions)["toolsInsertSpiral"]->setStatusTextAndShortcut( tr("Insert a spiral"));
+	(*scrActions)["toolsInsertTable"]->setStatusTextAndShortcut( tr("Insert a table"));
+	(*scrActions)["toolsInsertTextFrame"]->setStatusTextAndShortcut( tr("Insert a text frame"));
+	(*scrActions)["toolsLinkTextFrame"]->setStatusTextAndShortcut( tr("Link text frames"));
+	(*scrActions)["toolsMeasurements"]->setStatusTextAndShortcut( tr("Measurements"));
+	(*scrActions)["toolsPDFAnnotLink"]->setStatusTextAndShortcut( tr("Insert link annotation"));
+	(*scrActions)["toolsPDFAnnotText"]->setStatusTextAndShortcut( tr("Insert text annotation"));
+	(*scrActions)["toolsPDFCheckBox"]->setStatusTextAndShortcut( tr("Insert PDF check box"));
+	(*scrActions)["toolsPDFComboBox"]->setStatusTextAndShortcut( tr("Insert PDF combo box"));
+	(*scrActions)["toolsPDFListBox"]->setStatusTextAndShortcut( tr("Insert PDF list box"));
+	(*scrActions)["toolsPDFPushButton"]->setStatusTextAndShortcut( tr("Insert PDF push button"));
+	(*scrActions)["toolsPDFRadioButton"]->setStatusTextAndShortcut( tr("Insert PDF radio button"));
+	(*scrActions)["toolsPDFTextField"]->setStatusTextAndShortcut( tr("Insert PDF text field"));
+	(*scrActions)["toolsPreflightVerifier"]->setStatusTextAndShortcut( tr("Analyse the document for issues prior to exporting to PDF"));
+	(*scrActions)["toolsRotate"]->setStatusTextAndShortcut( tr("Rotate an item"));
+	(*scrActions)["toolsSelect"]->setStatusTextAndShortcut( tr("Select an item"));
+	(*scrActions)["toolsUnlinkTextFrame"]->setStatusTextAndShortcut( tr("Unlink text frames"));
+	(*scrActions)["toolsZoom"]->setStatusTextAndShortcut( tr("Zoom in or out"));
+#ifdef HAVE_OSG
+	(*scrActions)["toolsPDFAnnot3D"]->setStatusTextAndShortcut( tr("Insert 3D annotation"));
+#endif
+
+	//////
 	languageChangeUnicodeActions(scrActions);
 	languageChangeActions();
 }
@@ -1873,6 +1925,7 @@ void ActionManager::createDefaultMenuNames()
 	defMenuNames.append(QPair<QString, QStringList>("Insert", QStringList()));
 	defMenuNames.append(QPair<QString, QStringList>("Page", QStringList()));
 	defMenuNames.append(QPair<QString, QStringList>("View", QStringList()));
+	defMenuNames.append(QPair<QString, QStringList>("Table", QStringList()));
 	defMenuNames.append(QPair<QString, QStringList>("Extras", QStringList()));
 	defMenuNames.append(QPair<QString, QStringList>("Windows", QStringList()));
 	defMenuNames.append(QPair<QString, QStringList>("Help", QStringList()));
@@ -1891,6 +1944,8 @@ void ActionManager::createDefaultMenuNames()
 	itMenuNames->second << tr("Page") << "&Page" << tr("&Page");
 	++itMenuNames;
 	itMenuNames->second << tr("View") << "&View" << tr("&View");
+	++itMenuNames;
+	itMenuNames->second << tr("Table") << "&Table" << tr("&Table");
 	++itMenuNames;
 	itMenuNames->second << tr("Extras") << "E&xtras" << tr("E&xtras");
 	++itMenuNames;
@@ -2007,19 +2062,7 @@ void ActionManager::createDefaultMenus()
 		<< "itemLock" 
 		<< "itemLockSize" 
 		<< "itemImageIsVisible" 
-		<< "itemUpdateImage" 
-		<< "tableInsertRows"
-		<< "tableInsertColumns"
-		<< "tableDeleteRows"
-		<< "tableDeleteColumns"
-		<< "tableMergeCells"
-		<< "tableSplitCells"
-		<< "tableSetRowHeights"
-		<< "tableSetColumnWidths"
-		<< "tableDistributeRowsEvenly"
-		<< "tableDistributeColumnsEvenly"
-		<< "tableAdjustFrameToTable"
-		<< "tableAdjustTableToFrame"
+		<< "itemUpdateImage"
 		<< "itemAdjustFrameHeightToText"
 		<< "itemAdjustFrameToImage" 
 		<< "itemAdjustImageToFrame" 
@@ -2193,6 +2236,20 @@ void ActionManager::createDefaultMenus()
 		<< "viewShowRulers"
 		<< "viewRulerMode"
 		<< "showMouseCoordinates";
+	++itmenu;
+	itmenu->second
+		<< "tableInsertRows"
+		<< "tableInsertColumns"
+		<< "tableDeleteRows"
+		<< "tableDeleteColumns"
+		<< "tableMergeCells"
+		<< "tableSplitCells"
+		<< "tableSetRowHeights"
+		<< "tableSetColumnWidths"
+		<< "tableDistributeRowsEvenly"
+		<< "tableDistributeColumnsEvenly"
+		<< "tableAdjustFrameToTable"
+		<< "tableAdjustTableToFrame";
 	//Extras
 	++itmenu;
 	itmenu->second
@@ -2405,3 +2462,134 @@ QString ActionManager::defaultMenuNameEntryTranslated(const QString& index)
 	}
 	return QString::null;
 }
+
+void ActionManager::setStartupActionsEnabled(bool enabled)
+{
+	(*scrActions)["fileDocSetup150"]->setEnabled(false);
+	(*scrActions)["filePrint"]->setEnabled(false);
+	(*scrActions)["fileSave"]->setEnabled(false);
+	(*scrActions)["fileSaveAs"]->setEnabled(false);
+	(*scrActions)["fileRevert"]->setEnabled(false);
+	(*scrActions)["fileCollect"]->setEnabled(false);
+	(*scrActions)["fileClose"]->setEnabled(false);
+	(*scrActions)["PrintPreview"]->setEnabled(false);
+	(*scrActions)["SaveAsDocumentTemplate"]->setEnabled(false);
+//	scrMenuMgr->setMenuEnabled("FileImport", false);
+//	scrMenuMgr->setMenuEnabled("FileExport", false);
+	(*scrActions)["fileExportAsPDF"]->setEnabled(false);
+	(*scrActions)["fileExportText"]->setEnabled(false);
+	(*scrActions)["fileExportAsEPS"]->setEnabled(false);
+	(*scrActions)["fileImportText"]->setEnabled(false);
+	(*scrActions)["fileImportText2"]->setEnabled(false);
+	(*scrActions)["fileImportImage"]->setEnabled(false);
+	(*scrActions)["fileImportAppendText"]->setEnabled(false);
+	(*scrActions)["pageInsert"]->setEnabled(false);
+	(*scrActions)["pageImport"]->setEnabled(false);
+	(*scrActions)["pageDelete"]->setEnabled(false);
+	(*scrActions)["pageImport"]->setEnabled(false);
+	(*scrActions)["pageMove"]->setEnabled(false);
+	(*scrActions)["pageCopy"]->setEnabled(false);
+	(*scrActions)["pageApplyMasterPage"]->setEnabled(false);
+	(*scrActions)["pageCopyToMasterPage"]->setEnabled(false);
+	(*scrActions)["pageManageGuides"]->setEnabled(false);
+	(*scrActions)["pageManageMargins"]->setEnabled(false);
+	(*scrActions)["editUndoAction"]->setEnabled(false);
+	(*scrActions)["editRedoAction"]->setEnabled(false);
+	(*scrActions)["editCut"]->setEnabled(false);
+	(*scrActions)["editCopy"]->setEnabled(false);
+	(*scrActions)["editPaste"]->setEnabled(false);
+//	scrMenuMgr->setMenuEnabled("EditPasteRecent", false);
+	(*scrActions)["editClearContents"]->setEnabled(false);
+	(*scrActions)["editSelectAll"]->setEnabled(false);
+	(*scrActions)["editSelectAllOnLayer"]->setEnabled(false);
+	(*scrActions)["editDeselectAll"]->setEnabled(false);
+	(*scrActions)["editReplaceColors"]->setEnabled(false);
+	(*scrActions)["editStyles"]->setEnabled(false);
+	(*scrActions)["editMarks"]->setEnabled(false);
+	(*scrActions)["editNotesStyles"]->setEnabled(false);
+	(*scrActions)["editSearchReplace"]->setEnabled(false);
+	(*scrActions)["editMasterPages"]->setEnabled(false);
+	(*scrActions)["editJavascripts"]->setEnabled(false);
+	(*scrActions)["editEditWithImageEditor"]->setEnabled(false);
+	(*scrActions)["editEditRenderSource"]->setEnabled(false);
+	(*scrActions)["toolsPreflightVerifier"]->setEnabled(false);
+	(*scrActions)["extrasHyphenateText"]->setEnabled(false);
+	(*scrActions)["extrasDeHyphenateText"]->setEnabled(false);
+	(*scrActions)["viewFitInWindow"]->setEnabled(false);
+	(*scrActions)["viewFitWidth"]->setEnabled(false);
+	(*scrActions)["viewFit50"]->setEnabled(false);
+	(*scrActions)["viewFit75"]->setEnabled(false);
+	(*scrActions)["viewFit100"]->setEnabled(false);
+	(*scrActions)["viewFit200"]->setEnabled(false);
+	(*scrActions)["viewFit400"]->setEnabled(false);
+	(*scrActions)["viewSnapToGuides"]->setChecked(false);
+	(*scrActions)["viewSnapToElements"]->setChecked(false);
+	(*scrActions)["viewSnapToGrid"]->setChecked(false);
+	(*scrActions)["viewShowRulers"]->setEnabled(false);
+//	scrMenuMgr->setMenuEnabled("Insert", false);
+	(*scrActions)["insertFrame"]->setEnabled(false);
+	(*scrActions)["insertSampleText"]->setEnabled(false);
+	(*scrActions)["itemDuplicate"]->setEnabled(false);
+	(*scrActions)["itemMulDuplicate"]->setEnabled(false);
+	(*scrActions)["itemTransform"]->setEnabled(false);
+	(*scrActions)["itemDelete"]->setEnabled(false);
+	(*scrActions)["itemRaise"]->setEnabled(false);
+	(*scrActions)["itemLower"]->setEnabled(false);
+	(*scrActions)["itemRaiseToTop"]->setEnabled(false);
+	(*scrActions)["itemLowerToBottom"]->setEnabled(false);
+//	scrMenuMgr->setMenuEnabled("itemSendToScrapbook", false);
+	(*scrActions)["itemSendToPattern"]->setEnabled(false);
+	(*scrActions)["itemSendToInline"]->setEnabled(false);
+	(*scrActions)["itemAdjustFrameToImage"]->setEnabled(false);
+	(*scrActions)["itemAdjustImageToFrame"]->setEnabled(false);
+	(*scrActions)["itemExtendedImageProperties"]->setEnabled(false);
+	(*scrActions)["itemUpdateImage"]->setEnabled(false);
+	(*scrActions)["itemPreviewLow"]->setEnabled(false);
+	(*scrActions)["itemPreviewNormal"]->setEnabled(false);
+	(*scrActions)["itemPreviewFull"]->setEnabled(false);
+	(*scrActions)["itemAttributes"]->setEnabled(false);
+	(*scrActions)["itemPDFAnnotationProps"]->setEnabled(false);
+	(*scrActions)["itemPDFFieldProps"]->setEnabled(false);
+	(*scrActions)["itemConvertToBezierCurve"]->setEnabled(false);
+	(*scrActions)["itemConvertToImageFrame"]->setEnabled(false);
+	(*scrActions)["itemConvertToOutlines"]->setEnabled(false);
+	(*scrActions)["itemConvertToPolygon"]->setEnabled(false);
+	(*scrActions)["itemConvertToTextFrame"]->setEnabled(false);
+	(*scrActions)["itemConvertToSymbolFrame"]->setEnabled(false);
+	(*scrActions)["toolsSelect"]->setEnabled(false);
+	(*scrActions)["toolsRotate"]->setEnabled(false);
+	(*scrActions)["toolsEditContents"]->setEnabled(false);
+	(*scrActions)["toolsEditWithStoryEditor"]->setEnabled(false);
+	(*scrActions)["toolsZoom"]->setEnabled(false);
+	(*scrActions)["toolsInsertTextFrame"]->setEnabled(false);
+	(*scrActions)["toolsInsertImageFrame"]->setEnabled(false);
+	(*scrActions)["toolsInsertShape"]->setEnabled(false);
+	(*scrActions)["toolsInsertLine"]->setEnabled(false);
+	(*scrActions)["toolsInsertBezier"]->setEnabled(false);
+	(*scrActions)["toolsInsertFreehandLine"]->setEnabled(false);
+	(*scrActions)["toolsInsertCalligraphicLine"]->setEnabled(false);
+	(*scrActions)["toolsInsertPolygon"]->setEnabled(false);
+	(*scrActions)["toolsInsertArc"]->setEnabled(false);
+	(*scrActions)["toolsInsertSpiral"]->setEnabled(false);
+	(*scrActions)["toolsInsertRenderFrame"]->setEnabled(false);
+	(*scrActions)["toolsInsertTable"]->setEnabled(false);
+	(*scrActions)["toolsLinkTextFrame"]->setEnabled(false);
+	(*scrActions)["toolsUnlinkTextFrame"]->setEnabled(false);
+	(*scrActions)["toolsUnlinkTextFrameWithTextCopy"]->setEnabled(false);
+	(*scrActions)["toolsUnlinkTextFrameWithTextCut"]->setEnabled(false);
+	(*scrActions)["toolsMeasurements"]->setEnabled(false);
+	(*scrActions)["toolsCopyProperties"]->setEnabled(false);
+	(*scrActions)["toolsEyeDropper"]->setEnabled(false);
+	(*scrActions)["toolsPDFPushButton"]->setEnabled(false);
+	(*scrActions)["toolsPDFRadioButton"]->setEnabled(false);
+	(*scrActions)["toolsPDFTextField"]->setEnabled(false);
+	(*scrActions)["toolsPDFCheckBox"]->setEnabled(false);
+	(*scrActions)["toolsPDFComboBox"]->setEnabled(false);
+	(*scrActions)["toolsPDFListBox"]->setEnabled(false);
+	(*scrActions)["toolsPDFAnnotText"]->setEnabled(false);
+	(*scrActions)["toolsPDFAnnotLink"]->setEnabled(false);
+#ifdef HAVE_OSG
+	(*scrActions)["toolsPDFAnnot3D"]->setEnabled(false);
+#endif
+}
+

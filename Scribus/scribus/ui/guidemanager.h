@@ -99,11 +99,6 @@ private:
 	\param page A reference to the page to store values. */
 	void storePageValues(ScPage * page);
 
-	/*! \brief Overriden QDialog method to operate selection related widgets.
-	Auto guides tab. It disables the "selection" radio buttons when there
-	is no selection on current page. */
-	void windowActivationChange(bool oldActive);
-
 	/*! \brief Create automatic horizontal guides.
 	Calculates positions of the guides.
 	\param p a Page for what should be calculation performed

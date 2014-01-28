@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
  *   You should have received a copy of the GNU General Public License     *
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
- *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
  ***************************************************************************/
 #include <QCheckBox>
 #include <QDebug>
@@ -37,15 +37,14 @@ for which a new license (GPL+exception) is in place.
 #include "scraction.h"
 #include "util_icon.h"
 
-UndoGui::UndoGui(QWidget* parent, const char* name, Qt::WFlags f) : ScDockPalette(parent, name, f)
+UndoGui::UndoGui(QWidget* parent, const char* name, Qt::WindowFlags f) : ScDockPalette(parent, name, f)
 {
 	setWindowTitle( tr("Action History"));
 }
 
 /*** UndoWidget ***************************************************************/
 
-UndoWidget::UndoWidget(QWidget* parent, const char* name)
-: UndoGui(parent, name)
+UndoWidget::UndoWidget(QWidget* parent, const char* name) : UndoGui(parent, name)
 {
 	/* BnF standard toolbar buttons
 	QHBoxLayout* layout = new QHBoxLayout(this, 0, 0, "layout");
@@ -76,8 +75,10 @@ UndoWidget::UndoWidget(QWidget* parent, const char* name)
 	parent->addAction(ScCore->primaryMainWindow()->scrActions["editRedoAction"]);
 	ScCore->primaryMainWindow()->scrMenuMgr->createMenu("undoButtonMenu", "undoButtonMenu");
 	ScCore->primaryMainWindow()->scrMenuMgr->createMenu("redoButtonMenu", "redoButtonMenu");
-	undoMenu=ScCore->primaryMainWindow()->scrMenuMgr->getLocalPopupMenu("undoButtonMenu");
-	redoMenu=ScCore->primaryMainWindow()->scrMenuMgr->getLocalPopupMenu("redoButtonMenu");
+	//undoMenu=ScCore->primaryMainWindow()->scrMenuMgr->getLocalPopupMenu("undoButtonMenu");
+	//redoMenu=ScCore->primaryMainWindow()->scrMenuMgr->getLocalPopupMenu("redoButtonMenu");
+	undoMenu=ScCore->primaryMainWindow()->scrMenuMgr->undoMenu();
+	redoMenu=ScCore->primaryMainWindow()->scrMenuMgr->redoMenu();
 	ScCore->primaryMainWindow()->scrMenuMgr->addMenuToWidgetOfAction("undoButtonMenu", ScCore->primaryMainWindow()->scrActions["editUndoAction"]);
 	ScCore->primaryMainWindow()->scrMenuMgr->addMenuToWidgetOfAction("redoButton/*Menu*/", ScCore->primaryMainWindow()->scrActions["editRedoAction"]);
 
@@ -225,8 +226,7 @@ UndoWidget::~UndoWidget()
 
 /*** UndoPalette **************************************************************/
 
-UndoPalette::UndoPalette(QWidget* parent, const char* name)
-: UndoGui(parent, name)
+UndoPalette::UndoPalette(QWidget* parent, const char* name) : UndoGui(parent, name)
 {
 	setObjectName(QString::fromLocal8Bit(name));
 	setSizePolicy( QSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum));

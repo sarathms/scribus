@@ -349,37 +349,10 @@ void Prefs_PDFExport::restoreDefaults(struct ApplicationPrefs *prefsData, const 
 		showPagePreviewsCheckBox->setChecked(false);
 		effectsPageListWidget->clear();
 		QString tmp;
-		struct PDFPresentationData ef;
-		if (EffVal.count() != 0)
+		for (int pg = 0; pg < m_doc->Pages->count(); ++pg)
 		{
-			for (int pg2 = 0; pg2 < m_doc->Pages->count(); ++pg2)
-			{
-				effectsPageListWidget->addItem( tr("Page")+" "+tmp.setNum(pg2+1));
-				if (EffVal.count()-1 < pg2)
-				{
-					ef.pageEffectDuration = 1;
-					ef.pageViewDuration = 1;
-					ef.effectType = 0;
-					ef.Dm = 0;
-					ef.M = 0;
-					ef.Di = 0;
-					EffVal.append(ef);
-				}
-			}
-		}
-		else
-		{
-			for (int pg = 0; pg < m_doc->Pages->count(); ++pg)
-			{
-				effectsPageListWidget->addItem( tr("Page")+" "+tmp.setNum(pg+1));
-				ef.pageEffectDuration = 1;
-				ef.pageViewDuration = 1;
-				ef.effectType = 0;
-				ef.Dm = 0;
-				ef.M = 0;
-				ef.Di = 0;
-				EffVal.append(ef);
-			}
+			effectsPageListWidget->addItem( tr("Page")+" "+tmp.setNum(pg+1));
+			EffVal.append(m_doc->Pages->at(pg)->PresentVals);
 		}
 		displayDurationSpinBox->setValue(EffVal[0].pageViewDuration);
 		effectDurationSpinBox->setValue(EffVal[0].pageEffectDuration);
@@ -479,13 +452,12 @@ void Prefs_PDFExport::restoreDefaults(struct ApplicationPrefs *prefsData, const 
 	{
 		solidColorProfileComboBox->addItem(itp.key());
 		if (itp.key() == tp)
-		{
-			if (cmsUse)
-				solidColorProfileComboBox->setCurrentIndex(solidColorProfileComboBox->count()-1);
-		}
+			solidColorProfileComboBox->setCurrentIndex(solidColorProfileComboBox->count()-1);
 	}
-	if (cmsUse)
-		solidColorRenderingIntentComboBox->setCurrentIndex(Opts.Intent);
+	int solidIntent = Opts.Intent;
+	if (Opts.Intent < 0)
+		solidIntent = 1;
+	solidColorRenderingIntentComboBox->setCurrentIndex(solidIntent);
 	QString tp1 = Opts.ImageProf;
 	if (!ScCore->InputProfiles.contains(tp1))
 	{
@@ -501,13 +473,12 @@ void Prefs_PDFExport::restoreDefaults(struct ApplicationPrefs *prefsData, const 
 	{
 		imageProfileComboBox->addItem(itp2.key());
 		if (itp2.key() == tp1)
-		{
-			if (cmsUse)
-				imageProfileComboBox->setCurrentIndex(imageProfileComboBox->count()-1);
-		}
+			imageProfileComboBox->setCurrentIndex(imageProfileComboBox->count()-1);
 	}
-	if (cmsUse)
-		imageRenderingIntentComboBox->setCurrentIndex(Opts.Intent2);
+	int imageIntent = Opts.Intent2;
+	if (imageIntent < 0)
+		imageIntent = 0;
+	imageRenderingIntentComboBox->setCurrentIndex(imageIntent);
 	if (!cmsUse)
 	{
 		//Disabling vis hiding
@@ -670,6 +641,7 @@ void Prefs_PDFExport::saveGuiToPrefs(struct ApplicationPrefs *prefsData) const
 	prefsData->pdfPrefs.Resolution = epsExportResolutionSpinBox->value();
 	prefsData->pdfPrefs.RecalcPic = maxResolutionLimitCheckBox->isChecked();
 	prefsData->pdfPrefs.PicRes = maxExportResolutionSpinBox->value();
+	prefsData->pdfPrefs.embedPDF = embedPDFAndEPSFilesCheckBox->isChecked();
 	prefsData->pdfPrefs.Bookmarks = includeBookmarksCheckBox->isChecked();
 	prefsData->pdfPrefs.Binding = pageBindingComboBox->currentIndex();
 	prefsData->pdfPrefs.MirrorH = pageMirrorHorizontalToolButton->isChecked();
@@ -914,11 +886,11 @@ void Prefs_PDFExport::enableLPI2()
 
 void Prefs_PDFExport::setCustomRenderingWidgetsShown(bool visible)
 {
-	useCustomRenderingCheckBox->setShown(visible);
-	customRenderingColorComboBox->setShown(visible);
-	customRenderingFrequencySpinBox->setShown(visible);
-	customRenderingAngleSpinBox->setShown(visible);
-	customRenderingSpotFunctionComboBox->setShown(visible);
+	useCustomRenderingCheckBox->setVisible(visible);
+	customRenderingColorComboBox->setVisible(visible);
+	customRenderingFrequencySpinBox->setVisible(visible);
+	customRenderingAngleSpinBox->setVisible(visible);
+	customRenderingSpotFunctionComboBox->setVisible(visible);
 }
 
 void Prefs_PDFExport::enableCustomRenderingWidgets(bool enabled)
@@ -931,17 +903,17 @@ void Prefs_PDFExport::enableCustomRenderingWidgets(bool enabled)
 
 void Prefs_PDFExport::setSolidsImagesWidgetsShown(bool visible)
 {
-	solidColorsLabel->setShown(visible);
-	solidColorsLine->setShown(visible);
-	useSolidColorProfileCheckBox->setShown(visible);
-	solidColorProfileComboBox->setShown(visible);
-	solidColorRenderingIntentComboBox->setShown(visible);
-	imagesLabel->setShown(visible);
-	imagesLine->setShown(visible);
-	useImageProfileCheckBox->setShown(visible);
-	doNotUseEmbeddedImageProfileCheckBox->setShown(visible);
-	imageProfileComboBox->setShown(visible);
-	imageRenderingIntentComboBox->setShown(visible);
+	solidColorsLabel->setVisible(visible);
+	solidColorsLine->setVisible(visible);
+	useSolidColorProfileCheckBox->setVisible(visible);
+	solidColorProfileComboBox->setVisible(visible);
+	solidColorRenderingIntentComboBox->setVisible(visible);
+	imagesLabel->setVisible(visible);
+	imagesLine->setVisible(visible);
+	useImageProfileCheckBox->setVisible(visible);
+	doNotUseEmbeddedImageProfileCheckBox->setVisible(visible);
+	imageProfileComboBox->setVisible(visible);
+	imageRenderingIntentComboBox->setVisible(visible);
 }
 
 void Prefs_PDFExport::enableSolidsImagesWidgets(bool enabled)

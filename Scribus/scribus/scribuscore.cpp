@@ -62,7 +62,11 @@ ScribusCore::ScribusCore() : QObject(), defaultEngine(colorMgmtEngineFactory.cre
 
 ScribusCore::~ScribusCore()
 {
-// 	delete m_PaletteParent;
+	while (ScMWList.count() > 0)
+	{
+		ScribusMainWindow *mainWindow = ScMWList.takeAt(0);
+		delete mainWindow;
+	}
 }
 
 #ifndef NDEBUG
@@ -134,8 +138,6 @@ int ScribusCore::startGUI(bool showSplash, bool showFontInfo, bool showProfileIn
 		scribus->slotRaiseOnlineHelp();
 	}
 
-	qApp->setOverrideCursor(QCursor(Qt::ArrowCursor));
-
 	// A hook for plugins and scripts to trigger on. Some plugins and scripts
 	// require the app to be fully set up (in particular, the main window to be
 	// built and shown) before running their setup.
@@ -169,8 +171,8 @@ int ScribusCore::initScribusCore(bool showSplash, bool showFontInfo, bool showPr
 	undoManager = UndoManager::instance();
 	fileWatcher = new FileWatcher(this);
 	pluginManager = new PluginManager();
-	setSplashStatus( tr("Initializing Plugins") );
-	pluginManager->initPlugs();
+//	setSplashStatus( tr("Initializing Plugins") );
+//	pluginManager->initPlugs();
 /* #4428, remove block later if ok
 	bool haveFonts=false;
 #ifdef Q_OS_MAC
@@ -195,6 +197,8 @@ int ScribusCore::initScribusCore(bool showSplash, bool showFontInfo, bool showPr
 	m_HaveGS = testGSAvailability();
 	m_HavePngAlpha = testGSDeviceAvailability("pngalpha");
 	m_HaveTiffSep = testGSDeviceAvailability("tiffsep");
+	setSplashStatus( tr("Initializing Plugins") );
+	pluginManager->initPlugs();
 	
 	ScCore->setSplashStatus( tr("Reading Color Profiles") );
 	m_HaveCMS = false;
@@ -265,7 +269,7 @@ bool ScribusCore::usingGUI() const
 bool ScribusCore::isMacGUI() const
 {
 	// Do it statically for now
-#if defined(Q_WS_MAC)
+#if defined(Q_OS_MAC)
 	return true;
 #else
 	return false;
@@ -290,7 +294,7 @@ bool ScribusCore::reverseDialogButtons() const
 	#if defined(_WIN32)
 		return false;
 	//Mac Aqua - switch
-	#elif defined(Q_WS_MAC)
+	#elif defined(Q_OS_MAC)
 		return true;
 	#else
 	//Gnome - switch

@@ -21,7 +21,7 @@ for which a new license (GPL+exception) is in place.
  *   You should have received a copy of the GNU General Public License     *
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
- *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ *   51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.             *
  ***************************************************************************/
 
 #include "gtparagraphstyle.h"
@@ -250,7 +250,10 @@ QString  gtParagraphStyle::getBullet()
 void gtParagraphStyle::setBullet(bool newBullet, QString str)
 {
 	m_bullet = newBullet;
-	m_bulletStr = str;
+	if (str != "")
+		m_bulletStr = str;
+	else
+		m_bulletStr = QString(QChar(0x2022));
 	flags |= bulletWasSet;
 }
 

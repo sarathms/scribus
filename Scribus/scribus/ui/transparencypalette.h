@@ -58,8 +58,6 @@ class SCRIBUS_API Tpalette : public QWidget, Ui::transparencyPalette
 public:
 	Tpalette(QWidget* parent);
 	~Tpalette() {};
-	
-	virtual void changeEvent(QEvent *e);
 
 	void setDocument(ScribusDoc* doc);
 	void setCurrentItem(PageItem* item);

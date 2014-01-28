@@ -29,6 +29,7 @@
 #include <QTimer>
 #include <QToolTip>
 #include <QWidgetAction>
+#include <QDrag>
 #include <QDebug>
 
 #include "canvas.h"
@@ -113,10 +114,6 @@ void CanvasMode_Normal::enterEvent(QEvent *)
 
 void CanvasMode_Normal::leaveEvent(QEvent *e)
 {
-	if (!m_canvas->m_viewMode.m_MouseButtonPressed)
-	{
-		qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-	}
 }
 
 
@@ -147,7 +144,7 @@ void CanvasMode_Normal::activate(bool fromGesture)
 void CanvasMode_Normal::deactivate(bool forGesture)
 {
 //	qDebug() << "CanvasMode_Normal::deactivate" << forGesture;
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 }
 
 void CanvasMode_Normal::mouseDoubleClickEvent(QMouseEvent *m)
@@ -249,7 +246,6 @@ void CanvasMode_Normal::mouseDoubleClickEvent(QMouseEvent *m)
 			//CB if annotation, open the annotation dialog
 			if (currItem->isAnnotation())
 			{
-				qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 				m_view->requestMode(submodeAnnotProps);
 				//mousePressEvent(m);
 			}
@@ -346,28 +342,25 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 				switch (guideMoveGesture->getMode())
 				{
 					case RulerGesture::HORIZONTAL:
-						qApp->changeOverrideCursor(QCursor(Qt::SplitVCursor));
+						m_view->setCursor(QCursor(Qt::SplitVCursor));
 						break;
 					case RulerGesture::VERTICAL:
-						qApp->changeOverrideCursor(QCursor(Qt::SplitHCursor));
+						m_view->setCursor(QCursor(Qt::SplitHCursor));
 						break;
 					default:
-						qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+						m_view->setCursor(QCursor(Qt::ArrowCursor));
 				}
 				return;
 			}
 			// Here removed a bunch of comments which made reading code difficult,
 			// there is svn for tracking changes after all. pm
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+			m_view->setCursor(QCursor(Qt::ArrowCursor));
 		}
 	}
 	else if (!mouseIsOnPage)
 	{
-		QCursor* cursor = qApp->overrideCursor();
-		if (cursor && ((cursor->shape() == Qt::SplitHCursor) || (cursor->shape() == Qt::SplitVCursor)))
-		{
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-		}
+		if ((m_view->cursor().shape() == Qt::SplitHCursor) || (m_view->cursor().shape() == Qt::SplitVCursor))
+			m_view->setCursor(QCursor(Qt::ArrowCursor));
 	}
 	//<<#10116 Show overflow counter HUD
 	if (!movingOrResizing && mouseIsOnPage)
@@ -398,7 +391,7 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 							toolT = QString( tr("Go to URL %1").arg(hoveredItem->annotation().Extern()));
 						else if ((hoveredItem->annotation().ActionType() == Annotation::Action_GoToR_FileAbs) || (hoveredItem->annotation().ActionType() == Annotation::Action_GoToR_FileRel))
 							toolT = QString( tr("Go to Page %1 in File %2").arg(hoveredItem->annotation().Ziel() + 1).arg(hoveredItem->annotation().Extern()));
-						qApp->changeOverrideCursor(QCursor(Qt::PointingHandCursor));
+						m_view->setCursor(QCursor(Qt::PointingHandCursor));
 					}
 					if (toolT.isEmpty())
 						toolT = hoveredItem->itemText.plainText();
@@ -500,7 +493,7 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 				m_canvas->m_viewMode.m_MouseButtonPressed = false;
 				m_doc->DraggedElem = 0;
 				m_doc->DragElements.clear();
-				qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+				m_view->setCursor(QCursor(Qt::ArrowCursor));
 				m_view->updateContents();
 			}
 			return;
@@ -520,9 +513,9 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 				newY = mousePointDoc.y(); //static_cast<int>(m->y()/sc);
 				m_canvas->m_viewMode.operItemMoving = true;
 				if (!(m_doc->drawAsPreview && !m_doc->editOnPreview))
-					qApp->changeOverrideCursor(Qt::ClosedHandCursor);
+					m_view->setCursor(Qt::ClosedHandCursor);
 				else
-					qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+					m_view->setCursor(QCursor(Qt::ArrowCursor));
 				erf = false;
 				int dX = qRound(newX - m_mousePressPoint.x()), dY = qRound(newY - m_mousePressPoint.y());
 				if (!m_doc->m_Selection->isMultipleSelection())
@@ -551,7 +544,8 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 						}
 						double gx, gy, gh, gw;
 						m_objectDeltaPos.setXY(dX, dY);
-						m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+					//	m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+						m_doc->m_Selection->getVisualGroupRect(&gx, &gy, &gw, &gh);
 						// #10677 : temporary hack : we need to introduce the
 						// concept of item snapping points to handle better
 						// the various types of items
@@ -611,7 +605,7 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 						{
 							m_doc->m_Selection->setGroupRect();
 							double gx, gy, gh, gw, gxo, gyo;
-							m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+							m_doc->m_Selection->getVisualGroupRect(&gx, &gy, &gw, &gh);
 							gx += m_objectDeltaPos.x();
 							gy += m_objectDeltaPos.y();
 							gxo = gx;
@@ -635,7 +629,8 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 				{
 					double gx, gy, gh, gw;
 					m_doc->m_Selection->setGroupRect();
-					m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+				//	m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+					m_doc->m_Selection->getVisualGroupRect(&gx, &gy, &gw, &gh);
 					int dX=qRound(newX - m_mousePressPoint.x()), dY=qRound(newY - m_mousePressPoint.y());
 					erf = true;
 					if (m->modifiers() & Qt::ControlModifier)
@@ -696,7 +691,7 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 					if (m_doc->SnapGrid)
 					{
 						double gx, gy, gh, gw, gxo, gyo;
-						m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+						m_doc->m_Selection->getVisualGroupRect(&gx, &gy, &gw, &gh);
 						gx += m_objectDeltaPos.x();
 						gy += m_objectDeltaPos.y();
 						gxo = gx;
@@ -763,7 +758,7 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 					}
 					else
 					{
-						qApp->changeOverrideCursor(QCursor(Qt::OpenHandCursor));
+						m_view->setCursor(QCursor(Qt::OpenHandCursor));
 					}
 				}
 				else
@@ -786,7 +781,7 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 					QRect tx = p.mapRect(QRect(0, 0, static_cast<int>(currItem->width()), static_cast<int>(currItem->height())));
 					if ((tx.intersects(mpo)) && (!currItem->locked()))
 					{
-						qApp->changeOverrideCursor(QCursor(Qt::OpenHandCursor));
+						m_view->setCursor(QCursor(Qt::OpenHandCursor));
 						if (!currItem->sizeLocked())
 							m_view->HandleCurs(currItem, mpo);
 					}
@@ -802,7 +797,7 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 				if (how > 0)
 				{
 					if(currItem->asLine())
-						qApp->changeOverrideCursor(QCursor(Qt::SizeAllCursor));
+						m_view->setCursor(QCursor(Qt::SizeAllCursor));
 					else if(!currItem->locked() && !currItem->sizeLocked())
 					{
 						if ((!currItem->sizeHLocked() && !currItem->sizeVLocked()) || (currItem->sizeHLocked() && (how == 5 || how == 8))
@@ -813,13 +808,13 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 				else if (how == 0)
 				{
 					if (!(m_doc->drawAsPreview && !m_doc->editOnPreview))
-						qApp->changeOverrideCursor(QCursor(Qt::OpenHandCursor));
+						m_view->setCursor(QCursor(Qt::OpenHandCursor));
 					else
-						qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+						m_view->setCursor(QCursor(Qt::ArrowCursor));
 				}
 				else
 				{
-					qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+					m_view->setCursor(QCursor(Qt::ArrowCursor));
 				}
 			}
 		}
@@ -832,9 +827,8 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 			newY = qRound(mousePointDoc.y()); //m_view->translateToDoc(m->x(), m->y()).y());
 			m_mouseSavedPoint.setXY(newX, newY);
 			QPoint startP = m_canvas->canvasToGlobal(m_mousePressPoint);
-			m_view->redrawMarker->setGeometry(QRect(startP, m->globalPos()).normalized());
-			if (!m_view->redrawMarker->isVisible())
-				m_view->redrawMarker->show();
+			m_view->redrawMarker->setGeometry(QRect(m_view->mapFromGlobal(startP), m_view->mapFromGlobal(m->globalPos())).normalized());
+			m_view->setRedrawMarkerShown(true);
 			m_view->HaveSelRect = true;
 			return;
 		}
@@ -900,9 +894,9 @@ void CanvasMode_Normal::mousePressEvent(QMouseEvent *m)
 //#7928				return;
 		}
 		if (!(m_doc->drawAsPreview && !m_doc->editOnPreview))
-			qApp->changeOverrideCursor(Qt::ClosedHandCursor);
+			m_view->setCursor(Qt::ClosedHandCursor);
 		else
-			qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+			m_view->setCursor(QCursor(Qt::ArrowCursor));
 #if 1				
 		if (m_doc->m_Selection->isMultipleSelection() && (!m_doc->drawAsPreview))
 		{
@@ -967,7 +961,7 @@ void CanvasMode_Normal::mousePressEvent(QMouseEvent *m)
 		{
 			m_mouseCurrentPoint = m_mousePressPoint = m_mouseSavedPoint = mousePointDoc;
 			m_view->redrawMarker->setGeometry(m->globalPos().x(), m->globalPos().y(), 1, 1);
-			m_view->redrawMarker->show();
+			m_view->setRedrawMarkerShown(true);
 		}
 		else
 		{
@@ -1025,7 +1019,7 @@ void CanvasMode_Normal::mouseReleaseEvent(QMouseEvent *m)
 	m_canvas->m_viewMode.m_MouseButtonPressed = false;
 	m_canvas->resetRenderMode();
 	m->accept();
-	m_view->redrawMarker->hide();
+	m_view->setRedrawMarkerShown(false);
 //	m_view->stopDragTimer();
 	//m_canvas->update(); //ugly in a mouseReleaseEvent!!!!!!!
 	if ((!GetItem(&currItem)) && (m->button() == Qt::RightButton) && (!m_doc->DragP) && (!m_doc->drawAsPreview))
@@ -1091,7 +1085,7 @@ void CanvasMode_Normal::mouseReleaseEvent(QMouseEvent *m)
 				m_doc->moveGroup(m_objectDeltaPos.x(), m_objectDeltaPos.y());
 				m_doc->m_Selection->setGroupRect();
 				double gx, gy, gh, gw;
-				m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+				m_doc->m_Selection->getVisualGroupRect(&gx, &gy, &gw, &gh);
 				double nx = gx;
 				double ny = gy;
 				if (!m_doc->ApplyGuides(&nx, &ny) && !m_doc->ApplyGuides(&nx, &ny,true))
@@ -1109,7 +1103,7 @@ void CanvasMode_Normal::mouseReleaseEvent(QMouseEvent *m)
 				}
 				m_doc->moveGroup(nx-gx, ny-gy, false);
 				m_doc->m_Selection->setGroupRect();
-				m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+				m_doc->m_Selection->getVisualGroupRect(&gx, &gy, &gw, &gh);
 				nx = gx+gw;
 				ny = gy+gh;
 				if (m_doc->ApplyGuides(&nx, &ny) && !m_doc->ApplyGuides(&nx, &ny,true))
@@ -1128,7 +1122,7 @@ void CanvasMode_Normal::mouseReleaseEvent(QMouseEvent *m)
 					{
 						m_doc->m_Selection->setGroupRect();
 						double gx, gy, gh, gw, gxo, gyo;
-						m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
+						m_doc->m_Selection->getVisualGroupRect(&gx, &gy, &gw, &gh);
 						gxo = gx;
 						gyo = gy;
 						FPoint npx = m_doc->ApplyGridF(FPoint(gx, gy));
@@ -1334,6 +1328,7 @@ void CanvasMode_Normal::mouseReleaseEvent(QMouseEvent *m)
 
 void CanvasMode_Normal::handleCheckBoxPress(PageItem* currItem)
 {
+	m_view->m_AnnotChanged = true;
 	currItem->annotation().setOnState(true);
 	currItem->update();
 	if (currItem->annotation().ActionType() == Annotation::Action_JavaScript)
@@ -1352,6 +1347,7 @@ void CanvasMode_Normal::handlePushButtonPress(PageItem* currItem)
 
 void CanvasMode_Normal::handleRadioButtonPress(PageItem* currItem)
 {
+	m_view->m_AnnotChanged = true;
 	if (currItem->Parent != NULL)
 	{
 		PageItem *group = currItem->Parent->asGroupFrame();
@@ -1386,6 +1382,7 @@ void CanvasMode_Normal::handleRadioButtonPress(PageItem* currItem)
 
 void CanvasMode_Normal::handleCheckBoxRelease(PageItem* currItem)
 {
+	m_view->m_AnnotChanged = true;
 	currItem->annotation().setOnState(false);
 	currItem->annotation().setCheckState(!currItem->annotation().IsChecked());
 	if (currItem->annotation().ActionType() == Annotation::Action_JavaScript)
@@ -1396,6 +1393,7 @@ void CanvasMode_Normal::handleCheckBoxRelease(PageItem* currItem)
 
 void CanvasMode_Normal::handlePushButtonRelease(PageItem* currItem)
 {
+	m_view->m_AnnotChanged = true;
 	currItem->annotation().setOnState(false);
 	currItem->update();
 	switch (currItem->annotation().ActionType())
@@ -1427,6 +1425,7 @@ void CanvasMode_Normal::handlePushButtonRelease(PageItem* currItem)
 
 void CanvasMode_Normal::handleRadioButtonRelease(PageItem* currItem)
 {
+	m_view->m_AnnotChanged = true;
 	if (currItem->Parent != NULL)
 	{
 		PageItem *group = currItem->Parent->asGroupFrame();
@@ -1744,7 +1743,7 @@ bool CanvasMode_Normal::SeleItem(QMouseEvent *m)
 		}
 		if(pageChanged)
 		{
-			m_canvas->m_viewMode.forceRedraw = true;
+			m_canvas->setForcedRedraw(true);
 			m_canvas->update();
 		}
 		else
@@ -1804,7 +1803,7 @@ bool CanvasMode_Normal::SeleItem(QMouseEvent *m)
 	{
 		if(m_doc->m_Selection->isEmpty())
 		{
-			m_canvas->m_viewMode.forceRedraw = true;
+			m_canvas->setForcedRedraw(true);
 			m_canvas->update();
 		}
 		else
@@ -1820,7 +1819,7 @@ void CanvasMode_Normal::importToPage()
 	QString fileName;
 	QString allFormats = tr("All Supported Formats")+" (";
 	QStringList formats;
-	int fmtCode = FORMATID_ODGIMPORT;
+	int fmtCode = FORMATID_FIRSTUSER;
 	const FileFormat *fmt = LoadSavePlugin::getFormatById(fmtCode);
 	while (fmt != 0)
 	{
@@ -1870,7 +1869,7 @@ void CanvasMode_Normal::importToPage()
 			FileLoader *fileLoader = new FileLoader(fileName);
 			int testResult = fileLoader->testFile();
 			delete fileLoader;
-			if ((testResult != -1) && (testResult >= FORMATID_ODGIMPORT))
+			if ((testResult != -1) && (testResult >= FORMATID_FIRSTUSER))
 			{
 				const FileFormat * fmt = LoadSavePlugin::getFormatById(testResult);
 				if( fmt )
@@ -1883,7 +1882,7 @@ void CanvasMode_Normal::importToPage()
 				double x2, y2, w, h;
 				m_doc->m_Selection->getGroupRect(&x2, &y2, &w, &h);
 				m_doc->moveGroup(pastePoint.x() - x2, pastePoint.y() - y2);
-				m_ScMW->requestUpdate(reqColorsUpdate | reqLineStylesUpdate | reqTextStylesUpdate);
+				m_ScMW->requestUpdate(reqColorsUpdate | reqSymbolsUpdate | reqLineStylesUpdate | reqTextStylesUpdate);
 			}
 			m_doc->dontResize = false;
 		}
@@ -1908,7 +1907,7 @@ void CanvasMode_Normal::importToPage()
 void CanvasMode_Normal::createContextMenu(PageItem* currItem, double mx, double my)
 {
 	ContextMenu* cmen=NULL;
-	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
+//	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
 	m_view->setObjectUndoMode();
 	m_mouseCurrentPoint.setXY(mx, my);
 	if(currItem!=NULL)

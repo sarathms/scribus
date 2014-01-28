@@ -23,6 +23,7 @@ for which a new license (GPL+exception) is in place.
 #include "scpattern.h"
 #include "util_file.h"
 
+#include <QDebug>
 #include <QDir>
 #include <QMap>
 #include <QMessageBox>
@@ -48,11 +49,12 @@ CollectForOutput::CollectForOutput(ScribusDoc* doc, QString outputDirectory, boo
 	dirs = PrefsManager::instance()->prefsFile->getContext("dirs");
 	collectedFiles.clear();
 
+	if (m_withFonts)
+		fontCount = m_Doc->UsedFonts.count();
 	if (m_withProfiles)
 		m_Doc->getUsedProfiles(docProfiles);
-	if (m_withFonts)
-		fontCount=m_Doc->UsedFonts.count();
-	itemCount=m_Doc->MasterItems.count()+m_Doc->DocItems.count()+m_Doc->FrameItems.count();
+	profileCount = m_withProfiles ? docProfiles.count() : 0;
+	itemCount= m_Doc->MasterItems.count()+m_Doc->DocItems.count()+m_Doc->FrameItems.count();
 	patterns = m_Doc->getUsedPatterns();
 	patternCount=patterns.count();
 }
@@ -74,6 +76,12 @@ bool CollectForOutput::newDirDialog()
 		return false;
 	if (!m_outputDirectory.endsWith("/"))
 		m_outputDirectory += "/";
+
+	docProfiles.clear();
+	if (m_withProfiles)
+		m_Doc->getUsedProfiles(docProfiles);
+	fontCount = m_withFonts ? m_Doc->UsedFonts.count() : 0;
+	profileCount = m_withProfiles ? docProfiles.count() : 0;
 
 	QStringList directories;
 	directories.append(m_outputDirectory);
@@ -168,11 +176,11 @@ bool CollectForOutput::collectDocument()
 	{
 		if (!newName.endsWith(".gz"))
 			newName += ".gz";
-		else
-		{
-			if (newName.endsWith(".gz"))
-				newName = newName.remove(".gz");
-		}
+	}
+	else
+	{
+		if (newName.endsWith(".gz"))
+			newName = newName.remove(".gz");
 	}
 
 	if (!overwrite(ScCore->primaryMainWindow(), newName))
@@ -349,7 +357,25 @@ bool CollectForOutput::collectFonts()
 	for (it3 = m_Doc->UsedFonts.begin(); it3 != it3end; ++it3)
 	{
 		QFileInfo itf(prefsManager->appPrefs.fontPrefs.AvailFonts[it3.key()].fontFilePath());
-		copyFileAtomic(prefsManager->appPrefs.fontPrefs.AvailFonts[it3.key()].fontFilePath(), m_outputDirectory + "fonts/" + itf.fileName());
+		QString oldFileITF(prefsManager->appPrefs.fontPrefs.AvailFonts[it3.key()].fontFilePath());
+		QString outFileITF(m_outputDirectory + "fonts/" + itf.fileName());
+		bool success = copyFileAtomic(oldFileITF, outFileITF);
+		if (!success)
+			qDebug()<<"CollectForOutput::collectFile copyFileAtomic failed for"<<oldFileITF<<"to"<<outFileITF;
+#ifndef Q_OS_WIN32
+		else
+		{
+			QFile of(outFileITF);
+			if (of.exists())
+			{
+				bool permsSet=of.setPermissions(QFile::permissions(oldFileITF));
+				if (!permsSet)
+					qDebug()<<"Unable to set permissions successfully while collecting for output on"<<outFileITF;
+			}
+			else
+				qDebug()<<"Unable to set permissions successfully while collecting for output on"<<outFileITF<<"as the file does not exist";
+		}
+#endif
 		if (prefsManager->appPrefs.fontPrefs.AvailFonts[it3.key()].type() == ScFace::TYPE1)
 		{
 			QStringList metrics;
@@ -372,7 +398,24 @@ bool CollectForOutput::collectFonts()
 			{
 				QString origAFM = metrics[a];
 				QFileInfo fi(origAFM);
-				copyFileAtomic(origAFM, m_outputDirectory + "fonts/" + fi.fileName());
+				QString outFileAFM(m_outputDirectory + "fonts/" + fi.fileName());
+				bool success = copyFileAtomic(origAFM, outFileAFM);
+				if (!success)
+					qDebug()<<"CollectForOutput::collectFile copyFileAtomic failed for"<<origAFM<<"to"<<outFileAFM;
+#ifndef Q_OS_WIN32
+				else
+				{
+					QFile of(outFileAFM);
+					if (of.exists())
+					{
+						bool permsSet=of.setPermissions(QFile::permissions(origAFM));
+						if (!permsSet)
+							qDebug()<<"Unable to set permissions successfully while collecting for output on"<<outFileAFM;
+					}
+					else
+						qDebug()<<"Unable to set permissions successfully while collecting for output on"<<outFileAFM<<"as the file does not exist";
+				}
+#endif
 			}
 		}
 		if (uiCollect)
@@ -425,13 +468,30 @@ QStringList CollectForOutput::findFontMetrics(const QString& baseDir, const QStr
 
 bool CollectForOutput::collectProfiles()
 {
+	int c = 0;
 	ProfilesL::Iterator itend = docProfiles.end();
-	int c=0;
 	for (ProfilesL::Iterator it = docProfiles.begin(); it != itend; ++it)
 	{
 		QString profileName(it.key());
-		QString profilePath(it.value());
-		copyFileAtomic(profilePath, m_outputDirectory + "profiles/" + QFileInfo(profilePath).fileName());
+		QString oldFile(it.value());
+		QString outFile(m_outputDirectory + "profiles/" + QFileInfo(oldFile).fileName());
+		bool success = copyFileAtomic(oldFile, outFile);
+		if (!success)
+			qDebug()<<"CollectForOutput::collectFile copyFileAtomic failed for"<<oldFile<<"to"<<outFile;
+#ifndef Q_OS_WIN32
+		else
+		{
+			QFile of(outFile);
+			if (of.exists())
+			{
+				bool permsSet=of.setPermissions(QFile::permissions(oldFile));
+				if (!permsSet)
+					qDebug()<<"Unable to set permissions successfully while collecting for output on"<<outFile;
+			}
+			else
+				qDebug()<<"Unable to set permissions successfully while collecting for output on"<<outFile<<"as the file does not exist";
+		}
+#endif
 		if (uiCollect)
 			emit profilesCollected(c++);
 	}
@@ -458,7 +518,24 @@ QString CollectForOutput::collectFile(QString oldFile, QString newFile)
 	}
 	if (copy)
 	{
-		copyFileAtomic(oldFile, m_outputDirectory + "images/" + newFile);
+		QString outFile(m_outputDirectory + "images/" + newFile);
+		bool success = copyFileAtomic(oldFile, outFile);
+		if (!success)
+			qDebug()<<"CollectForOutput::collectFile copyFileAtomic failed for"<<oldFile<<"to"<<outFile;
+#ifndef Q_OS_WIN32
+		else
+		{
+			QFile of(outFile);
+			if (of.exists())
+			{
+				bool permsSet=of.setPermissions(QFile::permissions(oldFile));
+				if (!permsSet)
+					qDebug()<<"Unable to set permissions successfully while collecting for output on"<<outFile;
+			}
+			else
+				qDebug()<<"Unable to set permissions successfully while collecting for output on"<<outFile<<"as the file does not exist";
+		}
+#endif
 	}
 	collectedFiles[newFile] = oldFile;
 	return m_outputDirectory + "images/" + newFile;
