@@ -29,31 +29,34 @@
 #include <QWidgetAction>
 
 
+#include "appmodes.h"
 #include "canvas.h"
 #include "canvasgesture_resize.h"
 #include "fpoint.h"
 #include "fpointarray.h"
 #include "hyphenator.h"
-#include "ui/insertTable.h"
-#include "ui/oneclick.h"
 #include "pageitem_textframe.h"
-#include "ui/pageselector.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
-#include "ui/propertiespalette.h"
 #include "scraction.h"
-#include "ui/scrapbookpalette.h"
 #include "scribus.h"
+#include "scribusXml.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
-#include "scribusXml.h"
 #include "selection.h"
+#include "ui/insertTable.h"
+#include "ui/oneclick.h"
+#include "ui/pageselector.h"
+#include "ui/propertiespalette.h"
+#include "ui/scrapbookpalette.h"
 #include "undomanager.h"
 #include "units.h"
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
+
+
 
 
 
@@ -88,7 +91,7 @@ void BezierMode::finalizeItem(PageItem* currItem)
 //		emit DelObj(m_doc->currentPage->pageNr(), currItem->ItemNr);
 		m_doc->Items->removeOne(currItem);
 		m_doc->m_Selection->removeFirst();
-		//emit HaveSel(-1);
+		//emit HaveSel();
 	}
 	else
 	{
@@ -427,8 +430,8 @@ void BezierMode::mouseReleaseEvent(QMouseEvent *m)
 //		m_doc->itemAddCommit(m_doc->m_Selection->itemAt(0)->ItemNr);
 //	}
 	//Make sure the Zoom spinbox and page selector dont have focus if we click on the canvas
-	m_view->zoomSpinBox->clearFocus();
-	m_view->pageSelector->clearFocus();
+	m_view->m_ScMW->zoomSpinBox->clearFocus();
+	m_view->m_ScMW->pageSelector->clearFocus();
 	if (m_doc->m_Selection->itemAt(0) != 0) // is there the old clip stored for the undo action
 	{
 		currItem = m_doc->m_Selection->itemAt(0);
@@ -463,7 +466,7 @@ void BezierMode::selectPage(QMouseEvent *m)
 			if (docCurrPageNo != j)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(j));
-				m_view->setMenTxt(j);
+				m_view->m_ScMW->slotSetCurrentPage(j);
 				m_view->DrawNew();
 			}
 		}

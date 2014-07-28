@@ -24,14 +24,15 @@
 #include <QRect>
 #include <QDebug>
 
+#include "appmodes.h"
 #include "canvas.h"
-#include "ui/contextmenu.h"
 #include "fpoint.h"
 #include "scribus.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
 #include "selectionrubberband.h"
+#include "ui/contextmenu.h"
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
@@ -281,7 +282,7 @@ bool CanvasMode_CopyProperties::SeleItem(QMouseEvent *m)
 			if (m_doc->currentPageNumber() != pgNum)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(unsigned(pgNum)));
-				m_view->setMenTxt(unsigned(pgNum));
+				m_view->m_ScMW->slotSetCurrentPage(unsigned(pgNum));
 				m_view->DrawNew();
 			}
 		}

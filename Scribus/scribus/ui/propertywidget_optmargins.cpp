@@ -5,8 +5,10 @@ a copyright and/or license notice that predates the release of Scribus 1.3.2
 for which a new license (GPL+exception) is in place.
 */
 
-#include "pageitem_table.h"
 #include "propertywidget_optmargins.h"
+
+#include "appmodes.h"
+#include "pageitem_table.h"
 #include "scribus.h"
 #include "scribusdoc.h"
 #include "selection.h"
@@ -85,7 +87,7 @@ void PropertyWidget_OptMargins::setCurrentItem(PageItem *item)
 			ParagraphStyle parStyle =  m_item->itemText.defaultStyle();
 			if (m_doc->appMode == modeEdit)
 				m_item->currentTextProps(parStyle);
-			displayOpticalMargins(parStyle);
+			showOpticalMargins(parStyle);
 		}
 
 		connectSignals();
@@ -144,7 +146,7 @@ void PropertyWidget_OptMargins::handleSelectionChanged()
 	repaint();
 }
 
-void PropertyWidget_OptMargins::displayOpticalMargins(const ParagraphStyle & pStyle)
+void PropertyWidget_OptMargins::showOpticalMargins(const ParagraphStyle & pStyle)
 {
 	ParagraphStyle::OpticalMarginType omt(static_cast<ParagraphStyle::OpticalMarginType>(pStyle.opticalMargins()));
 	bool blocked = optMarginRadioBoth->blockSignals(true);
@@ -161,7 +163,7 @@ void PropertyWidget_OptMargins::displayOpticalMargins(const ParagraphStyle & pSt
 
 void PropertyWidget_OptMargins::updateStyle(const ParagraphStyle& newCurrent)
 {
-	displayOpticalMargins(newCurrent);
+	showOpticalMargins(newCurrent);
 }
 
 void PropertyWidget_OptMargins::handleOpticalMargins()

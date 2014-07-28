@@ -1,11 +1,15 @@
-#include <QMessageBox>
 #include "pageitem_noteframe.h"
-#include "pageitem_textframe.h"
+
+
+#include "appmodes.h"
 #include "pageitem.h"
-#include "scribus.h"
+#include "pageitem_textframe.h"
+
 #include "scribusdoc.h"
 #include "undomanager.h"
+#include "util.h"
 #include "util_text.h"
+
 
 #include <cmath>
 

@@ -18,10 +18,10 @@ for which a new license (GPL+exception) is in place.
 #include "pageitem_textframe.h"
 #include "sccolorengine.h"
 #include "sccombobox.h"
-#include "scribus.h"
+
 #include "scribuscore.h"
 #include "scraction.h"
-#include "scribusview.h"
+
 #include "selection.h"
 #include "units.h"
 #include "undomanager.h"
@@ -52,11 +52,11 @@ PropertiesPalette_Line::PropertiesPalette_Line( QWidget* parent) : QWidget(paren
 	startArrowLabel->setBuddy(startArrow);
 	endArrowLabel->setBuddy(endArrow);
 
-	startArrowScale->setMaximum( 300 );
+	startArrowScale->setMaximum( 1000 );
 	startArrowScale->setMinimum( 1 );
 	startArrowScale->setDecimals(0);
 
-	endArrowScale->setMaximum( 300 );
+	endArrowScale->setMaximum( 1000 );
 	endArrowScale->setMinimum( 1 );
 	endArrowScale->setDecimals(0);
 
@@ -332,8 +332,8 @@ void PropertiesPalette_Line::setCurrentItem(PageItem *item)
 
 	m_haveItem = true;
 
-	displayLineWidth(m_item->lineWidth());
-	displayLineValues(m_item->lineStyle(), m_item->lineEnd(), m_item->lineJoin());
+	showLineWidth(m_item->lineWidth());
+	showLineValues(m_item->lineStyle(), m_item->lineEnd(), m_item->lineJoin());
 
 	if (m_item->asOSGFrame())
 	{
@@ -384,7 +384,7 @@ void PropertiesPalette_Line::updateLineStyles(ScribusDoc *dd)
 	lineStyles->blockSignals(false);
 }
 
-void PropertiesPalette_Line::displayLineWidth(double s)
+void PropertiesPalette_Line::showLineWidth(double s)
 {
 	if (!m_ScMW || m_ScMW->scriptIsRunning())
 		return;
@@ -406,7 +406,7 @@ void PropertiesPalette_Line::displayLineWidth(double s)
 	}
 }
 
-void PropertiesPalette_Line::displayLineValues(Qt::PenStyle p, Qt::PenCapStyle pc, Qt::PenJoinStyle pj)
+void PropertiesPalette_Line::showLineValues(Qt::PenStyle p, Qt::PenCapStyle pc, Qt::PenJoinStyle pj)
 {
 	if (!m_ScMW || m_ScMW->scriptIsRunning())
 		return;

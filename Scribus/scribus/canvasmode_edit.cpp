@@ -31,12 +31,12 @@
 #include <QWidgetAction>
 #include <QDebug>
 
-
+#include "appmodes.h"
 #include "canvas.h"
-
 #include "fpoint.h"
 #include "fpointarray.h"
 #include "hyphenator.h"
+#include "pageitem_noteframe.h"
 #include "pageitem_textframe.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
@@ -44,9 +44,9 @@
 #include "sccolorengine.h"
 #include "scmimedata.h"
 #include "scribus.h"
+#include "scribusXml.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
-#include "scribusXml.h"
 #include "selection.h"
 #include "ui/aligndistribute.h"
 #include "ui/contextmenu.h"
@@ -60,7 +60,6 @@
 #include "util_icon.h"
 #include "util_math.h"
 
-
 CanvasMode_Edit::CanvasMode_Edit(ScribusView* view) : CanvasMode(view), m_ScMW(view->m_ScMW) 
 {
 	Mxp = Myp = -1;
@@ -72,6 +71,7 @@ CanvasMode_Edit::CanvasMode_Edit(ScribusView* view) : CanvasMode(view), m_ScMW(v
 	connect(view->horizRuler, SIGNAL(MarkerMoved(double, double)), this, SLOT(rulerPreview(double, double)));
 	mRulerGuide = -1;
 	m_longCursorTime=false;
+	m_keyRepeat = false;
 }
 
 inline bool CanvasMode_Edit::GetItem(PageItem** pi)
@@ -95,31 +95,66 @@ void CanvasMode_Edit::blinkTextCursor()
 
 void CanvasMode_Edit::keyPressEvent(QKeyEvent *e)
 {
-	PageItem* currItem;
-	if (GetItem(&currItem))
+	if (m_keyRepeat)
+		return;
+	m_keyRepeat = true;
+	e->accept();
+
+	if (e->key() == Qt::Key_Escape)
 	{
-		PageItem_TextFrame* textframe = currItem->asTextFrame();
-		if (textframe)
-		{
-			m_cursorVisible=true;
-			int kk = e->key();
-			switch (kk)
-			{
-				case Qt::Key_PageUp:
-				case Qt::Key_PageDown:
-				case Qt::Key_Up:
-				case Qt::Key_Down:
-				case Qt::Key_Home:
-				case Qt::Key_End:
-					m_longCursorTime=true;
-					break;
-				default:
-					m_longCursorTime=false;
-					break;
-			}
-			blinkTextCursor();
-		}
+		// Go back to normal mode.
+		m_view->requestMode(modeNormal);
+		m_keyRepeat = false;
+		return;
 	}
+
+	PageItem* currItem;
+	if (!GetItem(&currItem))
+	{
+		m_keyRepeat = false;
+		return;
+	}
+
+	if (currItem->asImageFrame() && !currItem->locked())
+	{
+		currItem->handleModeEditKey(e, m_keyRepeat);
+	}
+	if (currItem->asTextFrame())
+	{
+		bool oldKeyRepeat = m_keyRepeat;
+
+		m_cursorVisible = true;
+		switch (e->key())
+		{
+			case Qt::Key_PageUp:
+			case Qt::Key_PageDown:
+			case Qt::Key_Up:
+			case Qt::Key_Down:
+			case Qt::Key_Home:
+			case Qt::Key_End:
+				m_longCursorTime=true;
+				break;
+			default:
+				m_longCursorTime=false;
+				break;
+		}
+		blinkTextCursor();
+
+		currItem->handleModeEditKey(e, m_keyRepeat);
+		if (currItem->isAutoNoteFrame() && currItem->asNoteFrame()->notesList().isEmpty())
+		{
+			if (!currItem->asNoteFrame()->isEndNotesFrame())
+			{
+				currItem->asNoteFrame()->masterFrame()->invalidateLayout(false);
+				currItem->asNoteFrame()->masterFrame()->updateLayout();
+			}
+		}
+		m_keyRepeat = oldKeyRepeat;
+		if (!currItem->isTextFrame() || (currItem->isAutoNoteFrame() && currItem->asNoteFrame()->notesList().isEmpty()))
+			m_ScMW->slotDocCh(false);
+		m_doc->regionsChanged()->update(QRectF());
+	}
+	m_keyRepeat = false;
 }
 
 
@@ -174,6 +209,16 @@ void CanvasMode_Edit::drawControls(QPainter* p)
 			p->setPen(pp);
 			p->setBrush(QColor(0,0,255,10));
 			p->setRenderHint(QPainter::Antialiasing);
+			if (currItem->imageFlippedH())
+			{
+				p->translate(currItem->width(), 0);
+				p->scale(-1.0, 1.0);
+			}
+			if (currItem->imageFlippedV())
+			{
+				p->translate(0, currItem->height());
+				p->scale(1.0, -1.0);
+			}
 			p->translate(currItem->imageXOffset()*currItem->imageXScale(), currItem->imageYOffset()*currItem->imageYScale());
 			p->rotate(currItem->imageRotation());
 			p->drawRect(0, 0, currItem->OrigW*currItem->imageXScale(), currItem->OrigH*currItem->imageYScale());
@@ -381,13 +426,10 @@ void CanvasMode_Edit::mouseMoveEvent(QMouseEvent *m)
 				else
 				{
 					m_view->setCursor(QCursor(loadIcon("HandC.xpm")));
-					QTransform ro;
-					ro.rotate(-currItem->rotation());
-					QPointF rota = ro.map(QPointF(newX-Mxp,newY-Myp));
-					QTransform mm = currItem->getTransform();
-					double sx, sy;
-					getScaleFromMatrix(mm, sx, sy);
-					currItem->moveImageInFrame((rota.x() / sx) / currItem->imageXScale(), (rota.y() / sy) / currItem->imageYScale());
+					QTransform mm1 = currItem->getTransform();
+					QTransform mm2 = mm1.inverted();
+					QPointF rota = mm2.map(QPointF(newX, newY)) - mm2.map(QPointF(Mxp, Myp));
+					currItem->moveImageInFrame(rota.x() / currItem->imageXScale(), rota.y() / currItem->imageYScale());
 					m_canvas->displayXYHUD(m->globalPos(), currItem->imageXOffset() * currItem->imageXScale(), currItem->imageYOffset() * currItem->imageYScale());
 				}
 				currItem->update();
@@ -740,13 +782,13 @@ void CanvasMode_Edit::mouseReleaseEvent(QMouseEvent *m)
 					else
 						ny = npx.y();
 				}
-				m_doc->moveGroup(nx-gx, ny-gy, false);
+				m_doc->moveGroup(nx-gx, ny-gy);
 				m_doc->m_Selection->setGroupRect();
 				m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
 				nx = gx+gw;
 				ny = gy+gh;
 				if (m_doc->ApplyGuides(&nx, &ny) || m_doc->ApplyGuides(&nx,&ny,true))
-					m_doc->moveGroup(nx-(gx+gw), ny-(gy+gh), false);
+					m_doc->moveGroup(nx-(gx+gw), ny-(gy+gh));
 				m_doc->m_Selection->setGroupRect();
 			}
 			else
@@ -775,7 +817,7 @@ void CanvasMode_Edit::mouseReleaseEvent(QMouseEvent *m)
 					m_doc->MoveItem(nx-currItem->xPos(), ny-currItem->yPos(), currItem);
 				}
 				else
-					m_doc->MoveItem(0, 0, currItem, false);
+					m_doc->MoveItem(0, 0, currItem);
 			}
 			m_canvas->m_viewMode.operItemMoving = false;
 			if (m_doc->m_Selection->isMultipleSelection())
@@ -791,10 +833,10 @@ void CanvasMode_Edit::mouseReleaseEvent(QMouseEvent *m)
 			if (currItem->OwnPage != -1)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(currItem->OwnPage));
-				m_view->setMenTxt(currItem->OwnPage);
+				m_view->m_ScMW->slotSetCurrentPage(currItem->OwnPage);
 			}
 			//CB done with emitAllToGUI
-			//emit HaveSel(currItem->itemType());
+			//emit HaveSel();
 			//EmitValues(currItem);
 			//CB need this for? a moved item will send its new data with the new xpos/ypos emits
 			//CB TODO And what if we have dragged to a new page. Items X&Y are not updated anyway now
@@ -818,7 +860,7 @@ void CanvasMode_Edit::mouseReleaseEvent(QMouseEvent *m)
 					if (docCurrPageNo != i)
 					{
 						m_doc->setCurrentPage(m_doc->Pages->at(i));
-						m_view->setMenTxt(i);
+						m_view->m_ScMW->slotSetCurrentPage(i);
 					}
 					break;
 				}
@@ -891,8 +933,8 @@ void CanvasMode_Edit::mouseReleaseEvent(QMouseEvent *m)
 		m_doc->itemAddCommit(m_doc->m_Selection->itemAt(0));
 	}
 	//Make sure the Zoom spinbox and page selector dont have focus if we click on the canvas
-	m_view->zoomSpinBox->clearFocus();
-	m_view->pageSelector->clearFocus();
+	m_view->m_ScMW->zoomSpinBox->clearFocus();
+	m_view->m_ScMW->pageSelector->clearFocus();
 	if (m_doc->m_Selection->itemAt(0) != 0) // is there the old clip stored for the undo action
 	{
 		currItem = m_doc->m_Selection->itemAt(0);
@@ -962,7 +1004,7 @@ bool CanvasMode_Edit::SeleItem(QMouseEvent *m)
 			if (m_doc->currentPageNumber() != pgNum)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(unsigned(pgNum)));
-				m_view->setMenTxt(unsigned(pgNum));
+				m_view->m_ScMW->slotSetCurrentPage(unsigned(pgNum));
 				m_view->DrawNew();
 			}
 		}

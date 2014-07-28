@@ -46,6 +46,7 @@ for which a new license (GPL+exception) is in place.
 #include "margins.h"
 #include "sctextstruct.h"
 #include "text/storytext.h"
+#include "text/textlayout.h"
 #include "undoobject.h"
 #include "vgradient.h"
 #include "mesh.h"
@@ -154,6 +155,14 @@ class SCRIBUS_API PageItem : public QObject, public UndoObject, public SaxIO, pu
 
 public:	// Start enumerator definitions
 
+	/** @brief Draw options for DrawObj_toImage()
+	 * 
+	 */
+	enum DrawOption {
+		NoRotation = 1, // Draw as if item was not rotated
+		NoSoftShadow = 2
+	};
+
 	/** @brief Item Type
 	 *
 	 * Soon, item type will probably go away in favour of using
@@ -243,12 +252,15 @@ public: // Start public functions
 	virtual bool isTable()			const { return false; } ///< Return true if Table item, otherwise false
 	virtual bool isTextFrame()		const { return false; } ///< Return true if Text item, otherwise false
 
+	virtual bool isGroupChild() const;
+	virtual bool isTableCell() const;
+
+	PageItem_Group* parentGroup() const { return (Parent ? Parent->asGroupFrame() : NULL); }
+	PageItem_Table* parentTable() const { return (Parent ? Parent->asTable() : NULL); }
 
 	virtual void applicableActions(QStringList& actionList) = 0;
 	virtual QString infoDescription();
 	virtual bool createInfoGroup(QFrame *, QGridLayout *) {return false;}
-
-
 
 	//<< ********* Functions related to drawing the item *********
 
@@ -257,7 +269,7 @@ public: // Start public functions
 	virtual void DrawObj_Post(ScPainter *p);
 	virtual void DrawObj_Decoration(ScPainter *p);
 	virtual void DrawObj_Item(ScPainter *p, QRectF e) = 0;
-	QImage DrawObj_toImage(double maxSize);
+	QImage DrawObj_toImage(double maxSize, int options = 0);
 	QImage DrawObj_toImage(QList<PageItem*> &emG, double scaling);
 	void DrawObj_Embedded(ScPainter *p, QRectF e, const CharStyle& style, PageItem* cembedded);
 	void DrawStrokePattern(ScPainter *p, QPainterPath &path);
@@ -272,11 +284,13 @@ public: // Start public functions
 	//added switch for not updating welded items - used by notes frames with automatic size adjusted
 	void updateClip(bool updateWelded = true);
 	void convertClip();
-	void getBoundingRect(double *x1, double *y1, double *x2, double *y2) const;
-	void getVisualBoundingRect(double *x1, double *y1, double *x2, double *y2) const;
+	
 	QRectF getBoundingRect() const;
 	QRectF getCurrentBoundingRect(double moreSpace = 0.0) const;
 	QRectF getVisualBoundingRect() const;
+
+	virtual void getBoundingRect(double *x1, double *y1, double *x2, double *y2) const;
+	virtual void getVisualBoundingRect(double *x1, double *y1, double *x2, double *y2) const;
 
 
 	//>> ********* Functions related to drawing the item *********
@@ -291,6 +305,7 @@ public: // Start public functions
 	 * The view does when these are called.
 	 */
 	virtual void clearContents() {}
+	virtual void truncateContents() {}
 
 	//>> ********* Functions to work on the contents of the items *********
 
@@ -372,6 +387,7 @@ public: // Start public functions
 	bool frameOverflows() const;
 	bool frameUnderflows() const;
 	int frameOverflowCount() const;
+	int frameOverflowBlankCount() const;
 	/// Draws the overflow marker.
 	void drawOverflowMarker(ScPainter *p);
 	/// returns index of first char displayed in this frame, used to be 0
@@ -387,9 +403,9 @@ public: // Start public functions
 	/// Return current text properties (current char + paragraph properties)
 	void currentTextProps(ParagraphStyle& parStyle) const;
 	// deprecated:
-	double layoutGlyphs(const CharStyle& style, const QString& chars, GlyphLayout& layout);
+	double layoutGlyphs(const CharStyle& style, const QString& chars, LayoutFlags flags, GlyphLayout& layout);
 	void SetQColor(QColor *tmp, QString farbe, double shad);
-	void drawGlyphs(ScPainter *p, const CharStyle& style, GlyphLayout& glyphs );
+	void drawGlyphs(ScPainter *p, const CharStyle& style, LayoutFlags flags, GlyphLayout& glyphs );
 	void DrawPolyL(QPainter *p, QPolygon pts);
 	QString ExpandToken(uint base);
 	const FPointArray shape() const { return PoLine; }
@@ -594,6 +610,10 @@ public: // Start public functions
 	void setGradientColor3(QColor val);
 	QColor gradientColor4() const { return GrColorP4QColor; }
 	void setGradientColor4(QColor val);
+	void setGradientExtend(VGradient::VGradientRepeatMethod val);
+	void setStrokeGradientExtend(VGradient::VGradientRepeatMethod val);
+	VGradient::VGradientRepeatMethod getGradientExtend();
+	VGradient::VGradientRepeatMethod getStrokeGradientExtend();
 
 	//>> ********* Attributes of the item *********
 
@@ -646,28 +666,28 @@ public: // Start public functions
 	void setOverprint(bool val);
 
 	// soft shadow
-	void setHasSoftShadow(bool val) { m_hasSoftShadow = val; }
+	void setHasSoftShadow(bool val);
 	bool hasSoftShadow() { return m_hasSoftShadow; }
 
-	void setSoftShadowColor(const QString &newColor) { m_softShadowColor = newColor; }
+	void setSoftShadowColor(const QString &val);
 	QString softShadowColor() { return m_softShadowColor; }
 
-	void setSoftShadowShade(int val) { m_softShadowShade = val; }
+	void setSoftShadowShade(int val);
 	int softShadowShade() { return m_softShadowShade; }
 
-	void setSoftShadowBlurRadius(double val) { m_softShadowBlurRadius = val; }
+	void setSoftShadowBlurRadius(double val);
 	double softShadowBlurRadius() { return m_softShadowBlurRadius; }
 
-	void setSoftShadowXOffset(double val) { m_softShadowXOffset = val; }
+	void setSoftShadowXOffset(double val);
 	double softShadowXOffset() { return m_softShadowXOffset; }
 
-	void setSoftShadowYOffset(double val) { m_softShadowYOffset = val; }
+	void setSoftShadowYOffset(double val);
 	double softShadowYOffset() { return m_softShadowYOffset; }
 
-	void setSoftShadowOpacity(double val) { m_softShadowOpacity = val; }
+	void setSoftShadowOpacity(double val);
 	double softShadowOpacity() { return m_softShadowOpacity; }
 
-	void setSoftShadowBlendMode(int val) { m_softShadowBlendMode = val; }
+	void setSoftShadowBlendMode(int val);
 	double softShadowBlendMode() { return m_softShadowBlendMode; }
 
 	int frameType() const { return FrameType; } ///< rect / oval / round / other
@@ -700,6 +720,7 @@ public: // Start public functions
 	double columnGap() const { return ColGap; }
 	double gridOffset() const;
 	double gridDistance() const;
+	int verticalAlignment();
 	void setTextToFrameDistLeft(double);
 	void setTextToFrameDistRight(double);
 	void setTextToFrameDistTop(double);
@@ -708,6 +729,7 @@ public: // Start public functions
 	void setColumnGap(double);
 	void setGridOffset(double);
 	void setGridDistance(double);
+	void setVerticalAlignment(int);
 	FirstLineOffsetPolicy firstLineOffset()const;
 	void setFirstLineOffset(FirstLineOffsetPolicy);
 	/**
@@ -836,6 +858,8 @@ public: // Start public functions
 	 * @param newTransparency transparency of the line color
 	 */
 	void setLineTransparency(double newTransparency);
+
+	void setHatchParameters(int mode, double distance, double angle, bool useBackground, QString background, QString foreground);
 
 	/** @brief Get the name of the stroke pattern of the object */
 	QString strokePattern() const { return patternStrokeVal; }
@@ -1180,7 +1204,7 @@ public:	// Start public variables
 	double gYpos;
 	double gWidth;
 	double gHeight;
-	int GrType; ///< used values 6 = linear, 7 = radial, 8 = pattern, 9 = 4 color gradient, 10 = diamond, 11 = mesh gradient
+	int GrType; ///< used values 6 = linear, 7 = radial, 8 = pattern, 9 = 4 color gradient, 10 = diamond, 11,12,13 = mesh gradient, 14 = hatch
 	double GrStartX;
 	double GrStartY;
 	double GrEndX;
@@ -1189,6 +1213,7 @@ public:	// Start public variables
 	double GrFocalY;
 	double GrScale;
 	double GrSkew;
+	VGradient::VGradientRepeatMethod GrExtend;
 	FPoint GrControl1;
 	FPoint GrControl2;
 	FPoint GrControl3;
@@ -1260,7 +1285,8 @@ public:	// Start public variables
 	double BBoxH; ///< Bounding Box-H
 	double CurX; ///< Zeichen X-Position
 	double CurY; ///< Zeichen Y-Position
-	StoryText itemText; ///< Text des Elements
+	StoryText itemText; ///< Text of element
+	TextLayout textLayout;
 	bool isBookmark; ///< Flag for PDF Bookmark
 	bool Dirty; ///< Flag for redraw in EditMode
 	bool invalid; ///< Flag indicates that layout has changed (eg. for textlayout)
@@ -1385,6 +1411,7 @@ public:	// Start public variables
 		double GrStrokeFocalY;
 		double GrStrokeScale;
 		double GrStrokeSkew;
+		VGradient::VGradientRepeatMethod GrStrokeExtend;
 
 		/**
 		* @brief Mask gradient variables
@@ -1422,6 +1449,12 @@ public:	// Start public variables
 			int weldID;
 		};
 		QList<weldingInfo> weldList;
+		double hatchAngle;
+		double hatchDistance;
+		int hatchType;				// 0 = single 1 = double 2 = triple
+		bool hatchUseBackground;
+		QString hatchBackground;
+		QString hatchForeground;
 
 		// End public variables
 
@@ -1533,7 +1566,6 @@ protected: // Start protected functions
 	void restoreLineTP(SimpleState *state, bool isUndo);
 	void restoreLineWidth(SimpleState *state, bool isUndo);
 	void restoreLinkTextFrame(UndoState *state, bool isUndo);
-	void restoreLoremIpsum(SimpleState *state, bool isUndo);
 	void restoreMarkString(SimpleState *state, bool isUndo);
 	void restoreMaskGradient(SimpleState *state, bool isUndo);
 	void restoreMaskType(SimpleState *state,bool isUndo);
@@ -1573,7 +1605,16 @@ protected: // Start protected functions
 	void restoreUnWeldItem(SimpleState *state, bool isUndo);
 	void restoreUniteItem(SimpleState *state, bool isUndo);
 	void restoreUnlinkTextFrame(UndoState *state, bool isUndo);
+	void restoreVerticalAlign(SimpleState *state, bool isUndo);
 	void restoreWeldItems(SimpleState *state, bool isUndo);
+	void restoreSoftShadow(SimpleState *state, bool isUndo);
+	void restoreSoftShadowColor(SimpleState *state, bool isUndo);
+	void restoreSoftShadowShade(SimpleState *state, bool isUndo);
+	void restoreSoftShadowBlurRadius(SimpleState *state, bool isUndo);
+	void restoreSoftShadowXOffset(SimpleState *state, bool isUndo);
+	void restoreSoftShadowYOffset(SimpleState *state, bool isUndo);
+	void restoreSoftShadowOpacity(SimpleState *state, bool isUndo);
+	void restoreSoftShadowBlendMode(SimpleState *state, bool isUndo);
 
 
 	/*@}*/
@@ -1599,6 +1640,7 @@ protected: // Start protected variables
 	uint MaxChars;
 	bool m_sampleItem; ///< Used to not draw the frame for sample items
 	MarginStruct m_textDistanceMargins; ///< Left, Top, Bottom, Right distances of text from the frame
+	int verticalAlign;
 	/**
 	 * @brief Frame Type, eg line, text frame, etc.
 	 *
@@ -1765,6 +1807,8 @@ protected: // Start protected variables
 	bool m_isReversed; ///< Is the frame is reversed?
 	FirstLineOffsetPolicy firstLineOffsetP;
 	bool m_groupClips;
+	QColor hatchBackgroundQ;
+	QColor hatchForegroundQ;
 
 			// End protected variables
 

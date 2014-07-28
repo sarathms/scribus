@@ -15,32 +15,35 @@ for which a new license (GPL+exception) is in place.
 #include <QPainterPath>
 #include <QRegExp>
 #include <QTemporaryFile>
+
+#include "svgplugin.h"
+
 #include "color.h"
 #include "commonstrings.h"
 #include "fonts/scfontmetrics.h"
 #include "fpointarray.h"
 #include "loadsaveplugin.h"
-#include "ui/scmwmenumanager.h"
 #include "pageitem.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
-#include "sccolorengine.h"
+#include "qtiocompressor.h"
 #include "scclocale.h"
+#include "sccolorengine.h"
 #include "scconfig.h"
-#include "scgzfile.h"
 #include "sclimits.h"
 #include "scmimedata.h"
 #include "scpaths.h"
 #include "scpattern.h"
 #include "scraction.h"
-#include "scribus.h"
 #include "scribusXml.h"
 #include "scribuscore.h"
 #include "scribusdoc.h"
+#include "scribusdoc.h"
+#include "scribusview.h"
 #include "selection.h"
-#include "svgplugin.h"
 #include "ui/customfdialog.h"
 #include "ui/propertiespalette.h"
+#include "ui/scmwmenumanager.h"
 #include "undomanager.h"
 #include "util.h"
 #include "util_formats.h"
@@ -342,11 +345,13 @@ bool SVGPlug::loadData(QString fName)
 	}
 	if ((fName.right(2) == "gz") || (isCompressed))
 	{
-		ScGzFile file(fName);
-		if (!file.open(QIODevice::ReadOnly))
+		QFile file(fName);
+		QtIOCompressor compressor(&file);
+		compressor.setStreamFormat(QtIOCompressor::GzipFormat);
+		if (!compressor.open(QIODevice::ReadOnly))
 			return false;
-		success = inpdoc.setContent(&file);
-		file.close();
+		success = inpdoc.setContent(&compressor);
+		compressor.close();
 	}
 	else
 	{
@@ -370,8 +375,11 @@ void SVGPlug::convert(const TransactionSettings& trSettings, int flags)
 	if (!interactive || (flags & LoadSavePlugin::lfInsertPage))
 	{
 		m_Doc->setPage(width, height, 0, 0, 0, 0, 0, 0, false, false);
-		m_Doc->addPage(0);
-		m_Doc->view()->addPage(0);
+		if (m_Doc->Pages->count() == 0)
+		{
+			m_Doc->addPage(0);
+			m_Doc->view()->addPage(0);
+		}
 	}
 	else
 	{
@@ -625,6 +633,7 @@ void SVGPlug::finishNode( const QDomNode &e, PageItem* item)
 		{
 			//QTransform mm = gc->matrix;
 			item->setLineWidth(item->lineWidth() * (coeff1 + coeff2) / 2.0);
+			item->itemText.trim();
 		}
 		break;
 	default:
@@ -694,6 +703,7 @@ void SVGPlug::finishNode( const QDomNode &e, PageItem* item)
 			{
 				item->fill_gradient = gc->FillGradient;
 				item->setGradient(importedGradTrans[gc->GFillCol1]);
+				item->setGradientExtend(VGradient::pad);
 				if (!gc->FillCSpace)
 				{
 					item->GrStartX = gc->GradFillX1 * item->width();
@@ -767,6 +777,7 @@ void SVGPlug::finishNode( const QDomNode &e, PageItem* item)
 			{
 				item->stroke_gradient = gc->StrokeGradient;
 				item->setStrokeGradient(importedGradTrans[gc->GStrokeCol1]);
+				item->setStrokeGradientExtend(VGradient::pad);
 				if (!gc->StrokeCSpace)
 				{
 					item->GrStrokeStartX = gc->GradStrokeX1 * item->width();
@@ -1648,8 +1659,16 @@ QList<PageItem*> SVGPlug::parsePolyline(const QDomElement &e)
 			ite->PoLine.svgClosePath();
 		else
 			ite->convertTo(PageItem::PolyLine);
-		finishNode(e, ite);
-		PElements.append(ite);
+		if (ite->PoLine.size() < 4)
+		{
+			tmpSel->addItem(ite);
+			m_Doc->itemSelection_DeleteItem(tmpSel);
+		}
+		else
+		{
+			finishNode(e, ite);
+			PElements.append(ite);
+		}
 	}
 	delete( m_gc.pop() );
 	return PElements;
@@ -2819,7 +2838,7 @@ void SVGPlug::parseMarker(const QDomElement &b)
 			currItem->gXpos = currItem->xPos() - minx;
 			currItem->gYpos = currItem->yPos() - miny;
 			currItem->setXYPos(currItem->gXpos, currItem->gYpos, true);
-			pat.pattern = currItem->DrawObj_toImage(qMax(maxx - minx, maxy - miny));
+			pat.pattern = currItem->DrawObj_toImage(qMin(qMax(maxx - minx, maxy - miny), 500.0));
 			pat.width = maxx - minx;
 			pat.height = maxy - miny;
 			m_Doc->DoDrawing = false;
@@ -2866,7 +2885,7 @@ void SVGPlug::parsePattern(const QDomElement &b)
 			pat.setDoc(m_Doc);
 			PageItem* currItem = GElements.at(0);
 			m_Doc->DoDrawing = true;
-			pat.pattern = currItem->DrawObj_toImage(qMax(wpat, hpat));
+			pat.pattern = currItem->DrawObj_toImage(qMin(qMax(wpat, hpat), 500.0));
 			double xOrg = 0.0;
 			double yOrg = 0.0;
 			if (inGroupXOrigin < 0.0)

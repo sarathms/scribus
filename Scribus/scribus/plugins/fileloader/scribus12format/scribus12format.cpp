@@ -14,6 +14,7 @@ for which a new license (GPL+exception) is in place.
 #include "prefsmanager.h"
 #include "pageitem_latexframe.h"
 #include "pageitem_group.h"
+#include "qtiocompressor.h"
 #include "scconfig.h"
 #include "scclocale.h"
 #include "scribusdoc.h"
@@ -25,7 +26,6 @@ for which a new license (GPL+exception) is in place.
 #include "util_color.h"
 #include "util_layer.h"
 #include "util_math.h"
-#include "scgzfile.h"
 #include <QCursor>
 #include <QFileInfo>
 #include <QList>
@@ -130,11 +130,14 @@ bool Scribus12Format::fileSupported(QIODevice* /* file */, const QString & fileN
 	QByteArray docBytes("");
 	if(fileName.right(2) == "gz")
 	{
-		if (!ScGzFile::readFromFile(fileName, docBytes, 4096))
-		{
-			// FIXME: Needs better error return
+		QFile file(fileName);
+		QtIOCompressor compressor(&file);
+		compressor.setStreamFormat(QtIOCompressor::GzipFormat);
+		compressor.open(QIODevice::ReadOnly);
+		docBytes = compressor.read(1024);
+		compressor.close();
+		if (docBytes.isEmpty())
 			return false;
-		}
 	}
 	else
 	{
@@ -151,11 +154,14 @@ QString Scribus12Format::readSLA(const QString & fileName)
 	QByteArray docBytes("");
 	if(fileName.right(2) == "gz")
 	{
-		if (!ScGzFile::readFromFile(fileName, docBytes))
-		{
-			// FIXME: Needs better error return
+		QFile file(fileName);
+		QtIOCompressor compressor(&file);
+		compressor.setStreamFormat(QtIOCompressor::GzipFormat);
+		compressor.open(QIODevice::ReadOnly);
+		docBytes = compressor.readAll();
+		compressor.close();
+		if (docBytes.isEmpty())
 			return QString::null;
-		}
 	}
 	else
 	{
@@ -1223,13 +1229,13 @@ bool Scribus12Format::loadFile(const QString & fileName, const FileFormat & /* f
 					}
 					if(pdfF.tagName() == "Effekte")
 					{
-    					struct PDFPresentationData ef;
-    					ef.pageEffectDuration = pdfF.attribute("pageEffectDuration").toInt();
-    					ef.pageViewDuration = pdfF.attribute("pageViewDuration").toInt();
-    					ef.effectType = pdfF.attribute("effectType").toInt();
-    					ef.Dm = pdfF.attribute("Dm").toInt();
-    					ef.M = pdfF.attribute("M").toInt();
-		    			ef.Di = pdfF.attribute("Di").toInt();
+						struct PDFPresentationData ef;
+						ef.pageEffectDuration = pdfF.attribute("pageEffectDuration").toInt();
+						ef.pageViewDuration = pdfF.attribute("pageViewDuration").toInt();
+						ef.effectType = pdfF.attribute("effectType").toInt();
+						ef.Dm = pdfF.attribute("Dm").toInt();
+						ef.M = pdfF.attribute("M").toInt();
+						ef.Di = pdfF.attribute("Di").toInt();
 						EffVal.append(ef);
 					}
 					PFO = PFO.nextSibling();
@@ -1322,15 +1328,12 @@ bool Scribus12Format::loadFile(const QString & fileName, const FileFormat & /* f
 		for (int ii = 0; ii < allItems.count(); ii++)
 		{
 			PageItem* gItem = allItems[ii];
-			if (gItem->isGroup())
+			if (gItem->isGroup() && gItem->groupItemList[0]->isTableItem)
 			{
-				if (gItem->groupItemList[0]->isTableItem)
-				{
-					if (gItem->Parent == NULL)
-						convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &m_Doc->DocItems);
-					else
-						convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &(gItem->asGroupFrame()->groupItemList));
-				}
+				if (gItem->isGroupChild())
+					convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &(gItem->asGroupFrame()->groupItemList));
+				else
+					convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &m_Doc->DocItems);
 			}
 		}
 		allItems.clear();
@@ -1346,21 +1349,18 @@ bool Scribus12Format::loadFile(const QString & fileName, const FileFormat & /* f
 		for (int ii = 0; ii < allItems.count(); ii++)
 		{
 			PageItem* gItem = allItems[ii];
-			if (gItem->isGroup())
+			if (gItem->isGroup() && gItem->groupItemList[0]->isTableItem)
 			{
-				if (gItem->groupItemList[0]->isTableItem)
-				{
-					if (gItem->Parent == NULL)
-						convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &m_Doc->MasterItems);
-					else
-						convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &(gItem->asGroupFrame()->groupItemList));
-				}
+				if (gItem->isGroupChild())
+					convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &(gItem->asGroupFrame()->groupItemList));
+				else
+					convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &m_Doc->MasterItems);
 			}
 		}
 		allItems.clear();
 	}
 	
-	setCurrentComboItem(m_View->unitSwitcher, unitGetStrFromIndex(m_Doc->unitIndex()));
+	setCurrentComboItem(m_ScMW->unitSwitcher, unitGetStrFromIndex(m_Doc->unitIndex()));
 	if (m_mwProgressBar!=0)
 		m_mwProgressBar->setValue(DOC.childNodes().count());
 
@@ -2042,11 +2042,11 @@ bool Scribus12Format::loadPage(const QString & fileName, int pageNumber, bool Mp
 					}
 					delete last;
 
-// 					if (obj.attribute("NEXTPAGE").toInt() == pageNumber)
-// 					{
+//					if (obj.attribute("NEXTPAGE").toInt() == pageNumber)
+//					{
 //						Neu->NextIt = baseobj + obj.attribute("NEXTITEM").toInt();
-// 						nextPg[Neu->ItemNr] = a; // obj.attribute("NEXTPAGE").toInt();
-// 					}
+//						nextPg[Neu->ItemNr] = a; // obj.attribute("NEXTPAGE").toInt();
+//					}
 //					else
 //						Neu->NextIt = -1;
 					if (Neu->isTableItem)
@@ -2129,15 +2129,12 @@ bool Scribus12Format::loadPage(const QString & fileName, int pageNumber, bool Mp
 					for (int ii = 0; ii < allItems.count(); ii++)
 					{
 						PageItem* gItem = allItems[ii];
-						if (gItem->isGroup())
+						if (gItem->isGroup() && gItem->groupItemList[0]->isTableItem)
 						{
-							if (gItem->groupItemList[0]->isTableItem)
-							{
-								if (gItem->Parent == NULL)
-									convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &m_Doc->DocItems);
-								else
-									convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &(gItem->asGroupFrame()->groupItemList));
-							}
+							if (gItem->isGroupChild())
+								convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &(gItem->asGroupFrame()->groupItemList));
+							else
+								convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &m_Doc->DocItems);
 						}
 					}
 					allItems.clear();
@@ -2153,20 +2150,17 @@ bool Scribus12Format::loadPage(const QString & fileName, int pageNumber, bool Mp
 					for (int ii = 0; ii < allItems.count(); ii++)
 					{
 						PageItem* gItem = allItems[ii];
-						if (gItem->isGroup())
+						if (gItem->isGroup() && gItem->groupItemList[0]->isTableItem)
 						{
-							if (gItem->groupItemList[0]->isTableItem)
-							{
-								if (gItem->Parent == NULL)
-									convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &m_Doc->MasterItems);
-								else
-									convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &(gItem->asGroupFrame()->groupItemList));
-							}
+							if (gItem->isGroupChild())
+								convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &(gItem->asGroupFrame()->groupItemList));
+							else
+								convertOldTable(m_Doc, gItem, gItem->groupItemList, NULL, &m_Doc->MasterItems);
 						}
 					}
 					allItems.clear();
 				}
-				
+
 				if (!Mpage)
 					m_View->reformPages();
 				PAGE=DOC.firstChild();

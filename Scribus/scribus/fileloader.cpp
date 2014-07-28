@@ -126,8 +126,8 @@ int FileLoader::testFile()
 		bool found = false;
 		for (int a = 0; a < it->fileExtensions.count(); a++)
 		{
-			QString exts = it->fileExtensions[a];
-			if (ext.contains(exts, Qt::CaseInsensitive))
+			QString exts = it->fileExtensions[a].toLower();
+			if (ext == exts)
 			{
 				if (it->plug != 0)
 				{
@@ -247,7 +247,7 @@ bool FileLoader::saveFile(const QString& fileName, ScribusDoc *doc, QString *sav
 	QList<FileFormat>::const_iterator it;
 	if (findFormat(FORMATID_SLA150EXPORT, it))
 	{
-		it->setupTargets(doc, 0, doc->scMW(), doc->scMW()->mainWindowProgressBar, &(prefsManager->appPrefs.fontPrefs.AvailFonts));
+		it->setupTargets(doc, doc->view(), doc->scMW(), doc->scMW()->mainWindowProgressBar, &(prefsManager->appPrefs.fontPrefs.AvailFonts));
 		ret = it->saveFile(fileName);
 		if (savedFile)
 			*savedFile = it->lastSavedFile();
@@ -407,7 +407,8 @@ bool FileLoader::postLoad(ScribusDoc* currDoc)
 			currDoc->docHyphenator->MinWordLen=currDoc->hyphMinimumWordLength();
 			currDoc->docHyphenator->HyCount=currDoc->hyphConsecutiveLines();
 	}
-
+	if (ReplacedFonts.isEmpty())
+		return true;
 	ReplacedFonts = currDoc->AllFonts->getSubstitutions(ReplacedFonts.keys());
 	if (ReplacedFonts.count() != 0)
 	{

@@ -54,6 +54,7 @@ for which a new license (GPL+exception) is in place.
 #include "scclocale.h"
 #include "scpainter.h"
 #include "scpaths.h"
+#include "scribus.h"
 #include "sctextstream.h"
 #include "scribusXml.h"
 #include "undomanager.h"
@@ -1341,7 +1342,7 @@ void PaintManagerDialog::loadVectors(QString data)
 		miny = qMin(miny, y1);
 		maxx = qMax(maxx, x2);
 		maxy = qMax(maxy, y2);
-		pat.pattern = currItem->DrawObj_toImage(qMax(maxx - minx, maxy - miny));
+		pat.pattern = currItem->DrawObj_toImage(qMin(qMax(maxx - minx, maxy - miny), 500.0));
 		pat.width = maxx - minx;
 		pat.height = maxy - miny;
 		currItem->setXYPos(0, 0, true);

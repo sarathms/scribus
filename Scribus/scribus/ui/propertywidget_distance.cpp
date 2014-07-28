@@ -7,6 +7,7 @@ for which a new license (GPL+exception) is in place.
 
 #include "propertywidget_distance.h"
 
+#include "appmodes.h"
 #include "pageitem_table.h"
 #include "pageitem_textframe.h"
 #include "scribus.h"
@@ -148,7 +149,8 @@ void PropertyWidget_Distance::setCurrentItem(PageItem *item)
 		columnGapLabel->setEnabled(true);
 	}
 
-	displayTextDistances(textItem->textToFrameDistLeft(), textItem->textToFrameDistTop(), textItem->textToFrameDistBottom(), textItem->textToFrameDistRight());
+	showTextDistances(textItem->textToFrameDistLeft(), textItem->textToFrameDistTop(), textItem->textToFrameDistBottom(), textItem->textToFrameDistRight());
+	verticalAlign->setCurrentIndex(textItem->verticalAlignment());
 	connectSignals();
 }
 
@@ -162,6 +164,7 @@ void PropertyWidget_Distance::connectSignals()
 	connect(rightDistance , SIGNAL(valueChanged(double)), this, SLOT(handleTextDistances()), Qt::UniqueConnection);
 	connect(bottomDistance, SIGNAL(valueChanged(double)), this, SLOT(handleTextDistances()), Qt::UniqueConnection);
 	connect(tabsButton    , SIGNAL(clicked())           , this, SLOT(handleTabs()), Qt::UniqueConnection);
+	connect(verticalAlign , SIGNAL(activated(int))      , this, SLOT(handleVAlign()), Qt::UniqueConnection);
 }
 
 void PropertyWidget_Distance::disconnectSignals()
@@ -174,6 +177,7 @@ void PropertyWidget_Distance::disconnectSignals()
 	disconnect(rightDistance , SIGNAL(valueChanged(double)), this, SLOT(handleTextDistances()));
 	disconnect(bottomDistance, SIGNAL(valueChanged(double)), this, SLOT(handleTextDistances()));
 	disconnect(tabsButton    , SIGNAL(clicked())           , this, SLOT(handleTabs()));
+	disconnect(verticalAlign , SIGNAL(activated(int))      , this, SLOT(handleVAlign()));
 }
 
 void PropertyWidget_Distance::configureWidgets(void)
@@ -223,7 +227,7 @@ void PropertyWidget_Distance::handleUpdateRequest(int /*updateFlags*/)
 	// Nothing to do in this widget
 }
 
-void PropertyWidget_Distance::displayColumns(int r, double g)
+void PropertyWidget_Distance::showColumns(int r, double g)
 {
 	if (!m_ScMW || m_ScMW->scriptIsRunning())
 		return;
@@ -263,7 +267,7 @@ void PropertyWidget_Distance::displayColumns(int r, double g)
 	columnGap->blockSignals(cGapSigWasBlocked);
 }
 
-void PropertyWidget_Distance::displayTextDistances(double left, double top, double bottom, double right)
+void PropertyWidget_Distance::showTextDistances(double left, double top, double bottom, double right)
 {
 	leftDistance->showValue(left * m_unitRatio);
 	topDistance->showValue(top * m_unitRatio);
@@ -283,8 +287,8 @@ void PropertyWidget_Distance::handleColumns()
 	if (textItem)
 	{
 		textItem->setColumns(static_cast<int>(columns->value()));
-		displayColumns(textItem->Cols, textItem->ColGap);
-		//this is already done in displayColumns()
+		showColumns(textItem->Cols, textItem->ColGap);
+		//this is already done in showColumns()
 		/*if (static_cast<int>(columns->value()) == 1)
 		{
 			columnGap->setEnabled(false);
@@ -339,10 +343,27 @@ void PropertyWidget_Distance::handleGapSwitch()
 	if (m_doc->appMode == modeEditTable)
 		textItem = m_item->asTable()->activeCell().textFrame();
 	if (textItem != NULL)
-		displayColumns(textItem->Cols, textItem->ColGap);
+		showColumns(textItem->Cols, textItem->ColGap);
 
 	int index = columnGapLabel->currentIndex();
 	columnGap->setToolTip((index == 0) ? tr( "Distance between columns" ) : tr( "Column width" ));
+}
+
+void PropertyWidget_Distance::handleVAlign()
+{
+	if (!m_doc || !m_item || !m_ScMW || m_ScMW->scriptIsRunning())
+		return;
+	PageItem *textItem = m_item;
+	if (m_doc->appMode == modeEditTable)
+		textItem = m_item->asTable()->activeCell().textFrame();
+	if (textItem != NULL)
+	{
+		textItem->setVerticalAlignment(verticalAlign->currentIndex());
+		textItem->update();
+		if (m_doc->appMode == modeEditTable)
+			m_item->asTable()->update();
+		m_doc->regionsChanged()->update(QRect());
+	}
 }
 
 void PropertyWidget_Distance::handleTabs()
@@ -391,7 +412,7 @@ void PropertyWidget_Distance::handleTextDistances()
 	double top    = topDistance->value() / m_unitRatio;
 	double bottom = bottomDistance->value() / m_unitRatio;
 	textItem->setTextToFrameDist(left, right, top, bottom);
-	displayColumns(textItem->Cols, textItem->ColGap);
+	showColumns(textItem->Cols, textItem->ColGap);
 
 	textItem->update();
 	if (m_doc->appMode == modeEditTable)
@@ -412,6 +433,13 @@ void PropertyWidget_Distance::changeEvent(QEvent *e)
 void PropertyWidget_Distance::languageChange()
 {
 	columnsLabel->setText( tr("Colu&mns:"));
+
+	int oldAliLabel = verticalAlign->currentIndex();
+	verticalAlign->clear();
+	verticalAlign->addItem( tr("Top"));
+	verticalAlign->addItem( tr("Middle"));
+	verticalAlign->addItem( tr("Bottom"));
+	verticalAlign->setCurrentIndex(oldAliLabel);
 
 	int oldcolgapLabel = columnGapLabel->currentIndex();
 	columnGapLabel->clear();

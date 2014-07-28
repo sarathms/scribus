@@ -21,6 +21,8 @@ for which a new license (GPL+exception) is in place.
  *                                                                         *
  ***************************************************************************/
 
+#include "pageitem_textframe.h"
+
 #include <QDebug>
 #include <QList>
 #include <QTransform>
@@ -28,37 +30,35 @@ for which a new license (GPL+exception) is in place.
 #include <QPoint>
 #include <QPolygon>
 #include <QRegion>
+#include <cairo.h>
 #include <cassert>
 
-#include "scconfig.h"
-
+#include "appmodes.h"
 #include "canvas.h"
 #include "commonstrings.h"
 #include "hyphenator.h"
-#include "numeration.h"
 #include "marks.h"
 #include "notesstyles.h"
+#include "numeration.h"
 #include "pageitem.h"
 #include "pageitem_group.h"
-#include "pageitem_textframe.h"
 #include "pageitem_noteframe.h"
 #include "prefsmanager.h"
+#include "scconfig.h"
 #include "scpage.h"
 #include "scpainter.h"
 #include "scpaths.h"
 #include "scraction.h"
 #include "scribus.h"
 #include "scribusdoc.h"
+#include "scribusview.h"
 #include "scribusstructs.h"
 #include "selection.h"
+#include "ui/guidemanager.h"
 #include "undomanager.h"
 #include "undostate.h"
 #include "util.h"
 #include "util_math.h"
-
-#include "ui/guidemanager.h"
-
-#include <cairo.h>
 
 using namespace std;
 
@@ -72,7 +72,7 @@ PageItem_TextFrame::PageItem_TextFrame(ScribusDoc *pa, double x, double y, doubl
 	unicodeInputCount = 0;
 	unicodeInputString = "";
 	m_origAnnotPos = QRectF(xPos(), yPos(), width(), height());
-
+	verticalAlign = 0;
 	connect(&itemText,SIGNAL(changed()), this, SLOT(slotInvalidateLayout()));
 }
 
@@ -85,7 +85,7 @@ PageItem_TextFrame::PageItem_TextFrame(const PageItem & p) : PageItem(p)
 	unicodeInputString = "";
 	m_notesFramesMap.clear();
 	m_origAnnotPos = QRectF(xPos(), yPos(), width(), height());
-
+	verticalAlign = 0;
 	connect(&itemText,SIGNAL(changed()), this, SLOT(slotInvalidateLayout()));
 }
 
@@ -93,7 +93,7 @@ static QRegion itemShape(PageItem* docItem, double xOffset, double yOffset)
 {
 	QRegion res;
 	QTransform pp;
-	if (docItem->Parent != NULL)
+	if (docItem->isGroupChild())
 		pp.translate(docItem->gXpos, docItem->gYpos);
 	else
 		pp.translate(docItem->xPos() - xOffset, docItem->yPos() - yOffset);
@@ -101,7 +101,7 @@ static QRegion itemShape(PageItem* docItem, double xOffset, double yOffset)
 	if (docItem->textFlowUsesBoundingBox())
 	{
 		QRectF bb = docItem->getVisualBoundingRect();
-		if (docItem->Parent != 0)
+		if (docItem->isGroupChild())
 		{
 			bb.translate(-docItem->xPos(), -docItem->yPos());
 			bb.translate(docItem->gXpos, docItem->gYpos);
@@ -183,11 +183,11 @@ static QRegion itemShape(PageItem* docItem, double xOffset, double yOffset)
 QRegion PageItem_TextFrame::calcAvailableRegion()
 {
 	QRegion result(this->Clip);
-	if ((!isEmbedded) || (Parent != NULL))
+	if ((!isEmbedded) || (isGroupChild()))
 	{
 		bool invertible(false);
 		QTransform canvasToLocalMat;
-		if (Parent != NULL)
+		if (isGroupChild())
 			canvasToLocalMat.translate(gXpos, gYpos);
 		else
 			canvasToLocalMat.translate(m_xPos, m_yPos);
@@ -209,7 +209,7 @@ QRegion PageItem_TextFrame::calcAvailableRegion()
 				return result;
 			Mp = m_Doc->MasterPages.at(m_Doc->MasterNames[OnMasterPage]);
 			Dp = m_Doc->Pages->at(savedOwnPage);
-			if (Parent != NULL)
+			if (isGroupChild())
 				thisList = Parent->asGroupFrame()->groupItemList;
 			else
 				thisList = m_Doc->MasterItems;
@@ -250,7 +250,7 @@ QRegion PageItem_TextFrame::calcAvailableRegion()
 		else
 		{
 			int thisid = 0;
-			if (Parent != NULL)
+			if (isGroupChild())
 			{
 				thisid = Parent->asGroupFrame()->groupItemList.indexOf(this);
 				docItemsCount = Parent->asGroupFrame()->groupItemList.count();
@@ -842,7 +842,7 @@ struct LineControl {
 				asce = (itemText.object(line.firstItem+zc)->height() + itemText.object(line.firstItem+zc)->lineWidth()) * scaleV + offset;
 				desc = 0.0;
 			}
-			else //if ((itemText.charStyle(current.line.firstItem+zc).effects() & ScLayout_DropCap) == 0)
+			else //if ((itemText.flags(current.line.firstItem+zc) & ScLayout_DropCap) == 0)
 			{
 				asce = cStyle.font().realCharAscent(ch, cStyle.fontSize() / 10.0) * scaleV + offset;
 				desc = cStyle.font().realCharDescent(ch, cStyle.fontSize() / 10.0) * scaleV - offset;
@@ -1089,7 +1089,7 @@ static void indentLine(StoryText& itemText, LineSpec& line, double leftIndent)
 //static double opticalLeftMargin(const StoryText& itemText, const LineSpec& line)
 //{
 //	int b = line.firstItem;
-//	while (b < line.lastItem && (itemText.item(b)->effects() & ScLayout_SuppressSpace))
+//	while (b < line.lastItem && (itemText.flags(b)) & ScLayout_SuppressSpace))
 //		   ++b;
 //
 //	double chs = itemText.charStyle(b).fontSize() * (itemText.charStyle(b).scaleH() / 1000.0);
@@ -1224,12 +1224,12 @@ bool PageItem_TextFrame::moveLinesFromPreviousFrame ()
 	PageItem_TextFrame* prev = dynamic_cast<PageItem_TextFrame*>(BackBox);
 	if (!prev) return false;
 	if (!prev->incompleteLines) return false;   // no incomplete lines - nothing to do
-	int pos = itemText.lastInFrame();
+	int pos = textLayout.endOfFrame()-1;
 	QChar lastChar = itemText.text (pos);
 	// qDebug()<<"pos is"<<pos<<", length is"<<itemText.length()<<", incomplete is "<<prev->incompleteLines;
 	if ((pos != itemText.length()-1) && (!SpecialChars::isBreak (lastChar, true)))
 		return false;  // the paragraph isn't ending yet
-	int lines = itemText.lines();  // lines added to the current frame
+	int lines = textLayout.lines();  // lines added to the current frame
 
 	ParagraphStyle style = itemText.paragraphStyle (pos);
 	int need = style.keepLinesEnd () + 1;
@@ -1248,7 +1248,7 @@ bool PageItem_TextFrame::moveLinesFromPreviousFrame ()
 	// Okay, move the starting/ending character
 	int startingPos = prev->incompletePositions[prev->incompleteLines - pull];
 	for (int i = 0; i < pull; ++i)
-		prev->itemText.removeLastLine();
+		prev->textLayout.removeLastLine();
 	firstChar = prev->MaxChars = startingPos;
 	// keep the remaining incomplete lines flagged as such
 	// this ensures that if pulling one line won't be enough, the subsequent call to layout() will pull more
@@ -1261,7 +1261,7 @@ bool PageItem_TextFrame::moveLinesFromPreviousFrame ()
 void PageItem_TextFrame::adjustParagraphEndings ()
 {
 	// More text to go - let's apply paragraph flowing options - orphans/widows, etc
-	int pos = itemText.lastInFrame();
+	int pos = textLayout.endOfFrame() - 1;
 	if (pos >= itemText.length() - 1) return;
 
 	ParagraphStyle style = itemText.paragraphStyle (pos);
@@ -1271,11 +1271,11 @@ void PageItem_TextFrame::adjustParagraphEndings ()
 	if (keepWithNext || (!SpecialChars::isBreak (lastChar, true))) {
 		// paragraph continues in the next frame, or needs to be kept with the next one
 		// check how many lines are in this frame
-		int lineStart = itemText.startOfLine (pos);
+		int lineStart = textLayout.startOfLine (pos);
 		incompleteLines = 1;
 		incompletePositions.prepend (lineStart);
 		while (lineStart > paragraphStart) {
-			lineStart = itemText.startOfLine (lineStart - 1);
+			lineStart = textLayout.startOfLine (lineStart - 1);
 			incompleteLines++;
 			incompletePositions.prepend (lineStart);
 		}
@@ -1290,8 +1290,8 @@ void PageItem_TextFrame::adjustParagraphEndings ()
 		if (pull) {
 			// push this paragraph to the next frame
 			for (int i = 0; i < pull; ++i)
-				itemText.removeLastLine();
-			MaxChars = itemText.lastInFrame() + 1;
+				textLayout.removeLastLine();
+			MaxChars = textLayout.endOfFrame();
 			incompleteLines = 0;
 			incompletePositions.clear();
 		}
@@ -1359,7 +1359,7 @@ void PageItem_TextFrame::layout()
 	int    DropLines = 0;
 	int    DropLinesCount = 0;
 
-	itemText.clearLines();
+	textLayout.clear();
 	incompleteLines = 0;
 	incompletePositions.clear();
 
@@ -1544,7 +1544,7 @@ void PageItem_TextFrame::layout()
 						Q_ASSERT(nStyle != NULL);
 					QString chsName = nStyle->marksChStyle();
 					CharStyle currStyle(itemText.charStyle(a));
-					if ((chsName != "") && (chsName != tr("No Style")))
+					if (!chsName.isEmpty())
 					{
 						CharStyle marksStyle(m_Doc->charStyle(chsName));
 						if (!currStyle.equiv(marksStyle))
@@ -1628,7 +1628,7 @@ void PageItem_TextFrame::layout()
 				{
 					const QString& curParent(style.hasParent() ? style.parent() : style.name());
 					CharStyle newStyle;
-					if (style.peCharStyleName() == tr("No Style") || style.peCharStyleName().isEmpty())
+					if (style.peCharStyleName().isEmpty())
 						newStyle.setParent(m_Doc->paragraphStyle(curParent).charStyle().name());
 					else if (charStyle.name() != style.peCharStyleName())
 						newStyle.setParent(m_Doc->charStyle(style.peCharStyleName()).name());
@@ -1636,7 +1636,7 @@ void PageItem_TextFrame::layout()
 					charStyle.setStyle(newStyle);
 					itemText.setCharStyle(a, 1 , charStyle);
 				}
-				else if (style.peCharStyleName() != tr("No Style") && !style.peCharStyleName().isEmpty())
+				else if (!style.peCharStyleName().isEmpty())
 				//par effect is cleared but is set dcCharStyleName = clear drop cap char style
 				{
 					const QString& curParent(style.hasParent() ? style.parent() : style.name());
@@ -1787,7 +1787,7 @@ void PageItem_TextFrame::layout()
 				itemText.clearFlag(a, ScLayout_StartOfLine);
 			}
 			glyphs->yadvance = 0;
-			layoutGlyphs(charStyle, chstr, *glyphs);
+			layoutGlyphs(charStyle, chstr, itemText.flags(a), *glyphs);
 
 			// find out width, ascent and descent of char
 			if (HasObject)
@@ -1802,15 +1802,15 @@ void PageItem_TextFrame::layout()
 				if (a+1 < itemText.length())
 				{
 					uint glyph2 = font.char2CMap(itemText.text(a+1));
-					double kern= font.glyphKerning(glyphs->last()->glyph, glyph2, chs / 10.0) * glyphs->scaleH;
+					double kern = font.glyphKerning(glyphs->last()->glyph, glyph2, chs / 10.0) * glyphs->scaleH;
 					wide += kern;
 					glyphs->last()->xadvance += kern;
 					// change xadvance, xoffset according to JIS X4051
 					int nextStat = SpecialChars::getCJKAttr(itemText.text(a+1));
 					int prevStat;
-					if(curStat != 0)
+					if (curStat != 0)
 					{	// current char is CJK
-						if(nextStat == 0 && !SpecialChars::isBreakingSpace(itemText.text(a+1))){
+						if (nextStat == 0 && !SpecialChars::isBreakingSpace(itemText.text(a+1))){
 							switch(curStat & SpecialChars::CJK_CHAR_MASK){
 							case SpecialChars::CJK_KANJI:
 							case SpecialChars::CJK_KANA:
@@ -1868,7 +1868,7 @@ void PageItem_TextFrame::layout()
 
 						}
 					} else {	// current char is not CJK
-						if(nextStat != 0 && !SpecialChars::isBreakingSpace(currentCh)){
+						if (nextStat != 0 && !SpecialChars::isBreakingSpace(currentCh)){
 							switch(nextStat & SpecialChars::CJK_CHAR_MASK){
 							case SpecialChars::CJK_KANJI:
 							case SpecialChars::CJK_KANA:
@@ -1918,7 +1918,7 @@ void PageItem_TextFrame::layout()
 					glyphs->xoffset -= 0.5; //drop caps are always to far from column left edge
 				}
 				glyphs->xadvance = wide;
-				desc = realDesc =0;
+				desc = realDesc = 0;
 			}
 			else // !DropCMode
 			{
@@ -2829,7 +2829,7 @@ void PageItem_TextFrame::layout()
 						}
 						fillInTabLeaders(itemText, current.line);
 						//if right margin is set we temporally save line, not append it
-						itemText.appendLine(current.line);
+						textLayout.appendLine(current.line);
 						setMaxY(maxYDesc);
 						current.restartIndex = current.line.lastItem +1;
 						a = current.restartIndex -1;
@@ -3031,7 +3031,7 @@ void PageItem_TextFrame::layout()
 			current.startOfCol = false;
 			goNextColumn = false;
 
-			itemText.appendLine(current.line);
+			textLayout.appendLine(current.line);
 			setMaxY(maxYDesc);
 			current.startOfCol = false;
 
@@ -3043,6 +3043,24 @@ void PageItem_TextFrame::layout()
 		}
 	}
 	MaxChars = itemText.length();
+	if ((verticalAlign > 0) && (NextBox == NULL))
+	{
+		int vertAlign = verticalAlign;
+		double topDist = m_textDistanceMargins.Top;
+		double hAdjust = 0;
+		if (verticalAlign == 1)
+			hAdjust = (height() - (m_textDistanceMargins.Bottom + lineCorr) - maxY) / 2.0;
+		else if (verticalAlign == 2)
+			hAdjust = (height() - (m_textDistanceMargins.Bottom + lineCorr) - maxY);
+		if (hAdjust > 0)
+		{
+			m_textDistanceMargins.Top += hAdjust;
+			verticalAlign = 0;
+			layout();
+			m_textDistanceMargins.Top = topDist;
+			verticalAlign = vertAlign;
+		}
+	}
 	invalid = false;
 	if (!isNoteFrame() && (!m_Doc->notesList().isEmpty() || m_Doc->notesChanged()))
 	{ //if notes are used
@@ -3649,9 +3667,9 @@ void PageItem_TextFrame::DrawObj_Item(ScPainter *p, QRectF cullingArea)
 		assert( firstInFrame() >= 0 );
 		assert( lastInFrame() < itemText.length() );
 		LineSpec ls;
-		for (uint ll=0; ll < itemText.lines(); ++ll)
+		for (uint ll=0; ll < textLayout.lines(); ++ll)
 		{
-			ls = itemText.line(ll);
+			ls = textLayout.line(ll);
 			double CurX = ls.x;
 
 			// Draw text selection rectangles
@@ -3803,10 +3821,10 @@ void PageItem_TextFrame::DrawObj_Item(ScPainter *p, QRectF cullingArea)
 							if (m_Doc->guidesPrefs().showControls && itemText.hasMark(a) && (glyphs->glyph != SpecialChars::OBJECT))
 							{
 								GlyphLayout markGlyph;
-								layoutGlyphs(charStyle,SpecialChars::OBJECT, markGlyph);
-								drawGlyphs(p, charStyle, markGlyph);
+								layoutGlyphs(charStyle, SpecialChars::OBJECT, ScLayout_None, markGlyph);
+								drawGlyphs(p, charStyle, ScLayout_None, markGlyph);
 							}
-							drawGlyphs(p, charStyle, *glyphs);
+							drawGlyphs(p, charStyle, itemText.flags(a), *glyphs);
 						}
 						p->restore();//RE4
 					}
@@ -3940,8 +3958,8 @@ void PageItem_TextFrame::DrawObj_Post(ScPainter *p)
 
 void PageItem_TextFrame::DrawObj_Decoration(ScPainter *p)
 {
-	if (isAnnotation() && ((annotation().Type() > 1) && (annotation().Type() < 7)) && (annotation().Bwid() > 0))
-		return;
+	//#12405 if (isAnnotation() && ((annotation().Type() > 1) && (annotation().Type() < 7)) && (annotation().Bwid() > 0))
+	//	return;
 	p->save();
 	p->setAntialiasing(false);
 	if (!isEmbedded)
@@ -3979,7 +3997,10 @@ void PageItem_TextFrame::DrawObj_Decoration(ScPainter *p)
 		}
 		if ((m_Doc->guidesPrefs().colBordersShown) && (!m_Doc->drawAsPreview))
 			drawColumnBorders(p);
-		if ((m_Doc->guidesPrefs().layerMarkersShown) && (m_Doc->layerCount() > 1) && (!m_Doc->layerOutline(LayerID)) && (!m_Doc->drawAsPreview))
+		if ((m_Doc->guidesPrefs().layerMarkersShown) &&
+			(m_Doc->layerCount() > 1) &&
+			(!m_Doc->layerOutline(LayerID)) &&
+			(!m_Doc->drawAsPreview))
 		{
 			p->setPen(Qt::black, 0, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
 			p->setPenOpacity(1.0);
@@ -4033,6 +4054,25 @@ void PageItem_TextFrame::clearContents()
 	{
 		nextItem->invalid = true;
 		nextItem = nextItem->nextInChain();
+	}
+}
+
+void PageItem_TextFrame::truncateContents()
+{
+	if ((this->nextInChain() == NULL) && frameOverflows())
+	{
+		ParagraphStyle defaultStyle = this->itemText.defaultStyle();
+		int pos = itemText.cursorPosition();
+		if (itemText.lengthOfSelection() == 0)
+		{
+			itemText.select(maxCharsInFrame(), itemText.length() - maxCharsInFrame(), true);
+			deleteSelectedTextFromFrame();
+		}
+		itemText.setCursorPosition(pos, true);
+
+		if(UndoManager::undoEnabled() && undoManager->getLastUndo())
+			undoManager->getLastUndo()->setName(Um::TruncateText);
+		this->itemText.setDefaultStyle(defaultStyle);
 	}
 }
 
@@ -4090,10 +4130,11 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 	if (k->modifiers() & Qt::AltModifier)
 		keyModifiers |= Qt::ALT;
 
+	ScribusView* view = m_Doc->view();
+
 	//<< ISO 14755
 	//Check if we are trying to enter Unicode sequence mode first
-	QKeySequence currKeySeq = QKeySequence(k->key() | keyModifiers);
-	if (currKeySeq.matches(doc()->scMW()->scrActions["specialUnicodeSequenceBegin"]->shortcut())==QKeySequence::ExactMatch)
+	if (view->m_ScMW->actionManager->compareKeySeqToShortcut(k->key(), buttonModifiers, "specialUnicodeSequenceBegin"))
 	{
 		unicodeTextEditMode = true;
 		unicodeInputCount = 0;
@@ -4103,7 +4144,7 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 	}
 	//>>
 
-	ScribusView* view = m_Doc->view();
+
 	switch (kk)
 	{
 	case Qt::Key_PageDown:
@@ -4223,12 +4264,12 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 			pos = len-1;
 		if ( (buttonModifiers & Qt::ControlModifier) == 0 )
 		{
-			pos = itemText.startOfLine(pos);
+			pos = textLayout.startOfLine(pos);
 		}
 		else
 		{
 			//Control Home for start of frame text
-			pos = itemText.startOfFrame(pos);
+			pos = textLayout.startOfFrame();
 		}
 		itemText.setCursorPosition(pos);
 		if ( buttonModifiers & Qt::ShiftModifier )
@@ -4244,12 +4285,12 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 			break; // at end of frame
 		if ( (buttonModifiers & Qt::ControlModifier) == 0 )
 		{
-			itemText.setCursorPosition( itemText.endOfLine(itemText.cursorPosition()) );
+			itemText.setCursorPosition( textLayout.endOfLine(itemText.cursorPosition()) );
 		}
 		else
 		{
 			//Control End for end of frame text
-			itemText.setCursorPosition( itemText.endOfFrame(itemText.cursorPosition()) );
+			itemText.setCursorPosition( textLayout.endOfFrame() );
 		}
 		if ( buttonModifiers & Qt::ShiftModifier )
 			ExpandSel(1, oldPos);
@@ -4270,7 +4311,7 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 		{
 			if (itemText.cursorPosition() <= lastInFrame())
 			{
-				itemText.setCursorPosition( itemText.nextLine(itemText.cursorPosition()) );
+				itemText.setCursorPosition( textLayout.nextLine(itemText.cursorPosition()) );
 				if ( buttonModifiers & Qt::ShiftModifier )
 				{
 					if ( buttonModifiers & Qt::AltModifier )
@@ -4278,7 +4319,7 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 					ExpandSel(1, oldPos);
 				}
 				else
-					if ((itemText.lines() > 0) && (oldPos >= itemText.line(itemText.lines()-1).firstItem) && (itemText.cursorPosition() >= lastInFrame()) && (NextBox != 0))
+					if ((textLayout.lines() > 0) && (oldPos >= textLayout.line(textLayout.lines()-1).firstItem) && (itemText.cursorPosition() >= lastInFrame()) && (NextBox != 0))
 					{
 						if (NextBox->frameDisplays(itemText.cursorPosition()))
 						{
@@ -4321,7 +4362,7 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 			{
 				if (itemText.cursorPosition() > lastInFrame() || itemText.cursorPosition() >= itemText.length())
 					itemText.setCursorPosition(lastInFrame());
-				itemText.setCursorPosition( itemText.prevLine(itemText.cursorPosition()) );
+				itemText.setCursorPosition( textLayout.prevLine(itemText.cursorPosition()) );
 				if ( buttonModifiers & Qt::ShiftModifier )
 				{
 					if ( buttonModifiers & Qt::AltModifier )
@@ -4329,7 +4370,7 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 					ExpandSel(-1, oldPos);
 				}
 				else
-					if ((itemText.lines() > 0) && (oldPos <= itemText.line(0).lastItem) && (itemText.cursorPosition()  == firstInFrame()) && (BackBox != 0))
+					if ((textLayout.lines() > 0) && (oldPos <= textLayout.line(0).lastItem) && (itemText.cursorPosition()  == firstInFrame()) && (BackBox != 0))
 					{
 						view->Deselect(true);
 						// TODO position at the right place in previous frame
@@ -4361,7 +4402,7 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 			//currItem = currItem->BackBox;
 		}
 		else
-			itemText.setCursorPosition( itemText.startOfFrame(itemText.cursorPosition()) );
+			itemText.setCursorPosition( textLayout.startOfFrame() );
 		if ( buttonModifiers & Qt::ShiftModifier )
 			ExpandSel(-1, oldPos);
 		m_Doc->scMW()->setTBvals(this);
@@ -4375,7 +4416,7 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 			//currItem = currItem->BackBox;
 		}
 		else
-			itemText.setCursorPosition( itemText.endOfFrame(itemText.cursorPosition()) );
+			itemText.setCursorPosition( textLayout.endOfFrame() );
 		if ( buttonModifiers & Qt::ShiftModifier )
 			ExpandSel(1, oldPos);
 		m_Doc->scMW()->setTBvals(this);
@@ -4412,10 +4453,10 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 		if ((itemText.cursorPosition() > 0) && (itemText.cursorPosition() >= lastInFrame())) // I do not see how its possible, may be dead code - pm
 		{
 			itemText.setCursorPosition( lastInFrame() );
-//			if (itemText.charStyle(CPos-1).effects() & ScLayout_SuppressSpace)
+//			if (itemText.flags(CPos-1) & ScLayout_SuppressSpace)
 //			{
 //				--CPos;
-				while ((itemText.cursorPosition() > 1) && (itemText.charStyle().effects() & ScLayout_SuppressSpace) && (itemText.charStyle(itemText.cursorPosition() - 1).effects() & ScLayout_SuppressSpace))
+				while ((itemText.cursorPosition() > 1) && (itemText.flags(itemText.cursorPosition() - 1) & ScLayout_SuppressSpace))
 				{
 					itemText.setCursorPosition(-1, true);
 					if (itemText.cursorPosition() == 0)
@@ -4425,7 +4466,7 @@ void PageItem_TextFrame::handleModeEditKey(QKeyEvent *k, bool& keyRepeat)
 		}
 		else
 		{
-			while ((itemText.cursorPosition() > 1) && (itemText.charStyle().effects() & ScLayout_SuppressSpace) && (itemText.charStyle(itemText.cursorPosition() - 1).effects() & ScLayout_SuppressSpace))
+			while ((itemText.cursorPosition() > 1) && (itemText.flags(itemText.cursorPosition() - 1) & ScLayout_SuppressSpace))
 			{
 				itemText.setCursorPosition(-1, true);
 				if (itemText.cursorPosition() == 0)
@@ -5174,7 +5215,7 @@ bool PageItem_TextFrame::createInfoGroup(QFrame *infoGroup, QGridLayout *infoGro
 
 	linesCT->setText(tr("Lines: "));
 	infoGroupLayout->addWidget( linesCT, 2, 0, Qt::AlignRight );
-	linesT->setText(QString::number(itemText.lines()));
+	linesT->setText(QString::number(textLayout.lines()));
 	infoGroupLayout->addWidget( linesT, 2, 1 );
 
 
@@ -5248,9 +5289,11 @@ void PageItem_TextFrame::applicableActions(QStringList & actionList)
 		actionList << "itemConvertToPolygon";
 	}
 	actionList << "itemConvertToOutlines";
-	if (itemText.lines() != 0)
+	if (textLayout.lines() != 0)
 	{
 		actionList << "editClearContents";
+		if ((this->nextInChain() == NULL) && frameOverflows())
+			actionList << "editTruncateContents";
 		actionList << "itemAdjustFrameHeightToText";
 	}
 }

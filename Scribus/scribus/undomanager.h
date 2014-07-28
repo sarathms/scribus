@@ -467,6 +467,8 @@ public:
 	static QString DelMasterPage;
 	static QString ImportMasterPage;
 	static QString DuplicateMasterPage;
+	static QString ApplyMasterPage;
+	static QString RenameMasterPage;
 	static QString Resize;
 	static QString Rotate;
 	static QString MoveFromTo;
@@ -503,7 +505,6 @@ public:
 	static QString Rename;
 	static QString FromTo;
 	static QString Mode;
-	static QString ApplyMasterPage;
 	static QString Paste;
 	static QString Cut;
 	static QString Transparency;
@@ -584,6 +585,7 @@ public:
 	static QString AppendText;
 	static QString ImportText;
 	static QString ClearText;
+	static QString TruncateText;
 	static QString AddLoremIpsum;
 	static QString DeleteText;
 	static QString InsertText;
@@ -661,6 +663,14 @@ public:
 	static QString ClearImage;
 	static QString PathOperation;
 	static QString WeldItems;
+	static QString SoftShadow;
+	static QString SoftShadowColor;
+	static QString SoftShadowShade;
+	static QString SoftShadowBlurRadius;
+	static QString SoftShadowXOffset;
+	static QString SoftShadowYOffset;
+	static QString SoftShadowOpacity;
+	static QString SoftShadowBlendMode;
 	/*@}*/
 
 	/**

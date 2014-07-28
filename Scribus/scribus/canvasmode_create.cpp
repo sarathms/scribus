@@ -28,35 +28,38 @@
 #include <QRect>
 #include <QWidgetAction>
 
-#include "ui/basepointwidget.h"
+#include "appmodes.h"
 #include "canvas.h"
 #include "fpoint.h"
 #include "fpointarray.h"
-#include "text/frect.h"
-#include "ui/hruler.h"
-#include "ui/vruler.h"
 #include "hyphenator.h"
-#include "ui/insertTable.h"
-#include "ui/oneclick.h"
 #include "pageitem_table.h"
 #include "pageitem_textframe.h"
-#include "ui/pageselector.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
-#include "ui/propertiespalette.h"
 #include "scraction.h"
-#include "ui/scrapbookpalette.h"
 #include "scribus.h"
+#include "scribusXml.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
-#include "scribusXml.h"
 #include "selection.h"
+#include "text/frect.h"
+#include "ui/basepointwidget.h"
+#include "ui/hruler.h"
+#include "ui/insertTable.h"
+#include "ui/oneclick.h"
+#include "ui/pageselector.h"
+#include "ui/propertiespalette.h"
+#include "ui/scrapbookpalette.h"
+#include "ui/vruler.h"
 #include "undomanager.h"
 #include "units.h"
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
+
+
 
 
 
@@ -316,7 +319,11 @@ void CreateMode::mouseMoveEvent(QMouseEvent *m)
 			QRectF createObjectRect(createObjectPos.x(), createObjectPos.y(), wSize, hSize);
 			createObjectRect = createObjectRect.normalized();
 			if (createObjectMode != modeDrawLine)
-				m_canvas->displaySizeHUD(m->globalPos(), createObjectRect.width(), createObjectRect.height(), false);
+			{
+				if (modifiers == Qt::ControlModifier)
+					hSize = wSize;
+				m_canvas->displaySizeHUD(m->globalPos(), wSize, hSize, false);
+			}
 			else
 			{
 				double angle = -xy2Deg(wSize, hSize);
@@ -461,7 +468,7 @@ void CreateMode::selectPage(QMouseEvent *m)
 			if (docCurrPageNo != j)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(j));
-				m_view->setMenTxt(j);
+				m_view->m_ScMW->slotSetCurrentPage(j);
 				m_view->DrawNew();
 			}
 		}

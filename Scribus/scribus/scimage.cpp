@@ -8,7 +8,7 @@ for which a new license (GPL+exception) is in place.
 #include "cmsettings.h"
 #include "scclocale.h"
 #include "scimage.h"
-#include "scribus.h"
+
 #include "scpaths.h"
 #include "scribuscore.h"
 #include "scimgdataloader_gimp.h"
@@ -16,6 +16,7 @@ for which a new license (GPL+exception) is in place.
 #include "scimgdataloader_gmagick.h"
 #endif
 #include "scimgdataloader_jpeg.h"
+#include "scimgdataloader_ora.h"
 #include "scimgdataloader_pict.h"
 #include "scimgdataloader_ps.h"
 #include "scimgdataloader_psd.h"
@@ -1679,6 +1680,7 @@ void ScImage::scaleImage32bpp(int nwidth, int nheight)
 			register long fraccoltofill, fraccolleft = 0;
 			register int needcol;
 			nxP = (QRgb*)dst.scanLine(rowswritten++);
+			QRgb *nxPEnd = nxP + newcols;
 			fraccoltofill = SCALE;
 			a = r = g = b = HALFSCALE;
 			needcol = 0;
@@ -1727,12 +1729,12 @@ void ScImage::scaleImage32bpp(int nwidth, int nheight)
 			if ( fraccoltofill > 0 )
 			{
 				--xP;
-				a += fraccolleft * qAlpha( *xP );
+				a += fraccoltofill * qAlpha( *xP );
 				r += fraccoltofill * qRed( *xP );
 				g += fraccoltofill * qGreen( *xP );
 				b += fraccoltofill * qBlue( *xP );
 			}
-			if ( ! needcol )
+			if (nxP < nxPEnd)
 			{
 				r /= SCALE;
 				if ( r > maxval ) r = maxval;
@@ -1743,6 +1745,8 @@ void ScImage::scaleImage32bpp(int nwidth, int nheight)
 				a /= SCALE;
 				if ( a > maxval ) a = maxval;
 				*nxP = qRgba( (int)r, (int)g, (int)b, (int)a );
+				while (++nxP != nxPEnd)
+					nxP[0] = nxP[-1];
 			}
 		}
 	}
@@ -1890,6 +1894,7 @@ void ScImage::scaleImageGeneric(int nwidth, int nheight)
 				register long fraccoltofill, fraccolleft = 0;
 				register int needcol;
 				nxP = dst.scanLine(rowswritten++) + chIndex;
+				unsigned char *nxPEnd = nxP + newcols * nChannels;
 				fraccoltofill = SCALE;
 				p = HALFSCALE;
 				needcol = 0;
@@ -1926,13 +1931,15 @@ void ScImage::scaleImageGeneric(int nwidth, int nheight)
 				if (fraccoltofill > 0)
 				{
 					xP -= nChannels;
-					p += fraccolleft * (*xP);
+					p += fraccoltofill * (*xP);
 				}
-				if (!needcol)
+				if (nxP < nxPEnd)
 				{
 					p /= SCALE;
 					if ( p > maxval ) p = maxval;
 					*nxP = (unsigned char) p;
+					while ((nxP += nChannels) != nxPEnd)
+						nxP[0] = nxP[-nChannels];
 				}
 			}
 		}
@@ -1994,6 +2001,12 @@ bool ScImage::getAlpha(QString fn, int page, QByteArray& alpha, bool PDF, bool p
 	else if (extensionIndicatesPSD(ext))
 	{
 		pDataLoader.reset( new ScImgDataLoader_PSD() );
+		if	(pDataLoader.get())
+			pDataLoader->setRequest(imgInfo.isRequest, imgInfo.RequestProps);
+	}
+	else if (ext == "ora")
+	{
+		pDataLoader.reset( new ScImgDataLoader_ORA() );
 		if	(pDataLoader.get())
 			pDataLoader->setRequest(imgInfo.isRequest, imgInfo.RequestProps);
 	}
@@ -2243,20 +2256,14 @@ bool ScImage::loadPicture(const QString & fn, int page, const CMSettings& cmSett
 			return false;
 	}
 	QString ext2 = getImageType(fn);
-	if (ext.isEmpty() || (ext2 != ext))
+	if (ext.isEmpty() || (!ext2.isEmpty() && (ext2 != ext)))
 		ext = ext2;
 	if (extensionIndicatesPDF(ext))
-	{
 		pDataLoader.reset( new ScImgDataLoader_PDF() );
-	}
 	else if (extensionIndicatesEPSorPS(ext))
-	{
 		pDataLoader.reset( new ScImgDataLoader_PS() );
-	}
 	else if (extensionIndicatesTIFF(ext))
-	{
 		pDataLoader.reset( new ScImgDataLoader_TIFF() );
-	}
 	else if (extensionIndicatesPSD(ext))
 	{
 		pDataLoader.reset( new ScImgDataLoader_PSD() );
@@ -2272,6 +2279,11 @@ bool ScImage::loadPicture(const QString & fn, int page, const CMSettings& cmSett
 		pDataLoader.reset( new ScImgDataLoader_PICT() );
 	else if (ext == "wpg")
 		pDataLoader.reset( new ScImgDataLoader_WPG() );
+	else if (ext == "ora")
+	{
+		pDataLoader.reset( new ScImgDataLoader_ORA() );
+		pDataLoader->setRequest(imgInfo.isRequest, imgInfo.RequestProps);
+	}
 #ifdef GMAGICK_FOUND
 	else if (fmtImg.contains(ext))
 		pDataLoader.reset( new ScImgDataLoader_QT() );

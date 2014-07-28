@@ -8,6 +8,8 @@ for which a new license (GPL+exception) is in place.'
 #include "units.h"
 #include "scribusdoc.h"
 #include "selection.h"
+#include "scribusview.h"
+#include "appmodes.h"
 #include "utils.h"
 #include "hyphenator.h"
 #include "scripterimpl.h"
@@ -143,7 +145,7 @@ QString TextAPI::text()
 
 int TextAPI::textLines()
 {
-	return item->itemText.lines();
+	return item->textLayout.lines();
 }
 
 int TextAPI::textLength()

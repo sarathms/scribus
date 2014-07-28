@@ -4,8 +4,8 @@ to the COPYING file provided with the program. Following this notice may exist
 a copyright and/or license notice that predates the release of Scribus 1.3.2
 for which a new license (GPL+exception) is in place.
 */
-#ifndef IMPORTWPG_H
-#define IMPORTWPG_H
+#ifndef IMPORTPUB_H
+#define IMPORTPUB_H
 
 #include <QObject>
 #include <QString>
@@ -20,101 +20,10 @@ for which a new license (GPL+exception) is in place.
 #include <QMultiMap>
 #include <QVector>
 
-#include <libmspub/libmspub.h>
-#include <libwpd-stream/libwpd-stream.h>
-#include <libwpd/libwpd.h>
-#include <libwpg/libwpg.h>
-
 class MultiProgressDialog;
 class ScribusDoc;
 class Selection;
 class TransactionSettings;
-
-class RawPainter : public libwpg::WPGPaintInterface
-{
-public:
-	RawPainter();
-	void startGraphics(const ::WPXPropertyList &propList);
-	void endGraphics();
-	void startLayer(const ::WPXPropertyList &propList);
-	void endLayer();
-	void startEmbeddedGraphics(const ::WPXPropertyList &propList);
-	void endEmbeddedGraphics();
-	void setStyle(const ::WPXPropertyList &propList, const ::WPXPropertyListVector &gradient);
-	void drawRectangle(const ::WPXPropertyList &propList);
-	void drawEllipse(const ::WPXPropertyList &propList);
-	void drawPolyline(const ::WPXPropertyListVector &vertices);
-	void drawPolygon(const ::WPXPropertyListVector &vertices);
-	void drawPath(const ::WPXPropertyListVector &path);
-	void drawGraphicObject(const ::WPXPropertyList &propList, const ::WPXBinaryData &binaryData);
-	void startTextObject(const ::WPXPropertyList &propList, const ::WPXPropertyListVector &path);
-	void endTextObject();
-	void startTextLine(const ::WPXPropertyList &propList);
-	void endTextLine();
-	void startTextSpan(const ::WPXPropertyList &propList);
-	void endTextSpan();
-	void insertText(const ::WPXString &str);
-	QString constructFontName(QString fontBaseName, QString fontStyle);
-	double valueAsPoint(const WPXProperty *prop);
-	double fromPercentage(const QString &s );
-	QColor  parseColorN( const QString &rgbColor );
-	QString parseColor( const QString &s );
-	void insertImage(PageItem* ite, QString imgExt, QByteArray &imageData);
-	void applyFill(PageItem* ite);
-	void applyShadow(PageItem* ite);
-	void applyFlip(PageItem* ite);
-	void recolorItem(PageItem* ite, QString efVal);
-	void finishItem(PageItem* ite);
-
-	ScribusDoc* m_Doc;
-	Selection* tmpSel;
-	QList<PageItem*> *Elements;
-	struct groupEntry
-	{
-		QList<PageItem*> Items;
-		FPointArray clip;
-	};
-	QStack<groupEntry> groupStack;
-	QStringList *importedColors;
-	QStringList *importedPatterns;
-	double LineW;
-	QString CurrColorFill;
-	QString CurrColorStroke;
-	double CurrStrokeShade;
-	double CurrFillShade;
-	double CurrStrokeTrans;
-	double CurrFillTrans;
-	FPointArray Coords;
-	bool fillrule;
-	double gradientAngle;
-	bool isGradient;
-	VGradient currentGradient;
-	QString gradColor1Str;
-	QColor gradColor1;
-	double gradColor1Trans;
-	QString gradColor2Str;
-	QColor gradColor2;
-	double gradColor2Trans;
-	QVector<double> dashArray;
-	Qt::PenJoinStyle lineJoin;
-	Qt::PenCapStyle lineEnd;
-	double baseX, baseY;
-	double docWidth;
-	double docHeight;
-	int importerFlags;
-	bool firstPage;
-	QString baseLayer;
-	int actPage;
-	WPXPropertyList m_style;
-	PageItem *actTextItem;
-	ParagraphStyle textStyle;
-	CharStyle textCharStyle;
-	double m_linespace;
-	double m_maxFontSize;
-	bool lineSpSet;
-	bool lineSpIsPT;
-	bool doProcessing;
-};
 
 //! \brief PUB importer plugin
 class PubPlug : public QObject
@@ -149,7 +58,7 @@ public:
 
 private:
 	bool convert(QString fn);
-	
+
 	QList<PageItem*> Elements;
 	double baseX, baseY;
 	double docWidth;

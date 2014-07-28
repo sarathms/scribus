@@ -519,7 +519,7 @@ void SMParagraphStyle::setupConnections()
 	connect(m_pwidget->dropCapLines, SIGNAL(valueChanged(int)), this, SLOT(slotDropCapLines(int)));
 	connect(m_pwidget->parEffectOffset, SIGNAL(valueChanged(double)), this, SLOT(slotParEffectOffset()));
 	connect(m_pwidget->parEffectIndentBox, SIGNAL(toggled(bool)), this, SLOT(slotParEffectIndent(bool)));
-	connect(m_pwidget->parEffectCharStyleCombo, SIGNAL(activated(const QString&)), this, SLOT(slotParEffectCharStyle(const QString&)));
+	connect(m_pwidget->parEffectCharStyleCombo, SIGNAL(activated(int)), this, SLOT(slotParEffectCharStyle(int)));
 
 	connect(m_pwidget->bulletBox, SIGNAL(toggled(bool)), this, SLOT(slotBullet(bool)));
 	connect(m_pwidget->bulletStrEdit, SIGNAL(editTextChanged(QString)), this, SLOT(slotBulletStr(QString)));
@@ -570,7 +570,6 @@ void SMParagraphStyle::setupConnections()
 	connect(m_pwidget->cpage->tracking_, SIGNAL(valueChanged(double)), this, SLOT(slotTracking()));
 	connect(m_pwidget->cpage->widthSpaceSpin, SIGNAL(valueChanged(double)), this, SLOT(slotWordTracking()));
 	connect(m_pwidget->cpage->baselineOffset_, SIGNAL(valueChanged(double)), this, SLOT(slotBaselineOffset()));
-	connect(m_pwidget->cpage->fontFace_, SIGNAL(fontSelected(QString)), this, SLOT(slotFont(QString)));
 	connect(m_pwidget->cpage->parentCombo, SIGNAL(activated(const QString&)), this, SLOT(slotCharParentChanged(const QString&)));
 }
 
@@ -604,7 +603,7 @@ void SMParagraphStyle::removeConnections()
 	disconnect(m_pwidget->dropCapLines, SIGNAL(valueChanged(int)), this, SLOT(slotDropCapLines(int)));
 	disconnect(m_pwidget->parEffectOffset, SIGNAL(valueChanged(double)), this, SLOT(slotParEffectOffset()));
 	disconnect(m_pwidget->parEffectIndentBox, SIGNAL(toggled(bool)), this, SLOT(slotParEffectIndent(bool)));
-	disconnect(m_pwidget->parEffectCharStyleCombo, SIGNAL(activated(const QString&)), this, SLOT(slotParEffectCharStyle(const QString&)));
+	disconnect(m_pwidget->parEffectCharStyleCombo, SIGNAL(activated(int)), this, SLOT(slotParEffectCharStyle(int)));
 
 	disconnect(m_pwidget->bulletBox, SIGNAL(toggled(bool)), this, SLOT(slotBullet(bool)));
 	disconnect(m_pwidget->bulletStrEdit, SIGNAL(editTextChanged(QString)), this, SLOT(slotBulletStr(QString)));
@@ -653,7 +652,6 @@ void SMParagraphStyle::removeConnections()
 	disconnect(m_pwidget->cpage->tracking_, SIGNAL(valueChanged(double)), this, SLOT(slotTracking()));
 	disconnect(m_pwidget->cpage->widthSpaceSpin, SIGNAL(valueChanged(double)), this, SLOT(slotWordTracking()));
 	disconnect(m_pwidget->cpage->baselineOffset_, SIGNAL(valueChanged(double)), this, SLOT(slotBaselineOffset()));
-	disconnect(m_pwidget->cpage->fontFace_, SIGNAL(fontSelected(QString)), this, SLOT(slotFont(QString)));
 	disconnect(m_pwidget->cpage->parentCombo, SIGNAL(activated(const QString&)), this, SLOT(slotCharParentChanged(const QString&)));
 }
 
@@ -959,9 +957,14 @@ void SMParagraphStyle::slotParEffectIndent(bool isOn)
 	}
 }
 
-void SMParagraphStyle::slotParEffectCharStyle(const QString& name)
+void SMParagraphStyle::slotParEffectCharStyle(int index)
 {
-	if (m_pwidget->parEffectCharStyleCombo->useParentValue())
+	QString name;
+
+	if (index > 0)
+		name = m_pwidget->parEffectCharStyleCombo->itemText(index);
+
+	if (name.isEmpty() || m_pwidget->parEffectCharStyleCombo->useParentValue())
 		for (int i = 0; i < m_selection.count(); ++i)
 			m_selection[i]->resetPeCharStyleName();
 	else
@@ -2261,7 +2264,6 @@ void SMCharacterStyle::setupConnections()
 	connect(m_page->tracking_, SIGNAL(valueChanged(double)), this, SLOT(slotTracking()));
 	connect(m_page->widthSpaceSpin, SIGNAL(valueChanged(double)), this, SLOT(slotWordTracking()));
 	connect(m_page->baselineOffset_, SIGNAL(valueChanged(double)), this, SLOT(slotBaselineOffset()));
-	connect(m_page->fontFace_, SIGNAL(fontSelected(QString)), this, SLOT(slotFont(QString)));
 	connect(m_page->parentCombo, SIGNAL(activated(const QString&)),
 	        this, SLOT(slotParentChanged(const QString&)));
 }
@@ -2298,7 +2300,6 @@ void SMCharacterStyle::removeConnections()
 	disconnect(m_page->tracking_, SIGNAL(valueChanged(double)), this, SLOT(slotTracking()));
 	disconnect(m_page->widthSpaceSpin, SIGNAL(valueChanged(double)), this, SLOT(slotWordTracking()));
 	disconnect(m_page->baselineOffset_, SIGNAL(valueChanged(double)), this, SLOT(slotBaselineOffset()));
-	disconnect(m_page->fontFace_, SIGNAL(fontSelected(QString)), this, SLOT(slotFont(QString)));
 	disconnect(m_page->parentCombo, SIGNAL(activated(const QString&)),
 			this, SLOT(slotParentChanged(const QString&)));
 }
@@ -2654,12 +2655,11 @@ void SMCharacterStyle::slotBaselineOffset()
 
 void SMCharacterStyle::slotFont(QString s)
 {
-	ScFace sf;
 	if (m_page->fontFace_->useParentFont())
 		for (int i = 0; i < m_selection.count(); ++i)
 			m_selection[i]->resetFont();
 	else {
-		sf = PrefsManager::instance()->appPrefs.fontPrefs.AvailFonts[s];
+		ScFace sf = PrefsManager::instance()->appPrefs.fontPrefs.AvailFonts[s];
 
 		for (int i = 0; i < m_selection.count(); ++i)
 			m_selection[i]->setFont(sf);

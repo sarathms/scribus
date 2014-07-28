@@ -29,6 +29,7 @@ for which a new license (GPL+exception) is in place.
 #include "scraction.h"
 #include "scribuscore.h"
 #include "scribusdoc.h"
+#include "scribusview.h"
 #include "scpaths.h"
 #include "selection.h"
 #include "prefsfile.h"
@@ -125,7 +126,7 @@ void ScripterCore::buildScribusScriptsMenu()
 		{
 			QFileInfo fs(ds[dc]);
 			QString strippedName=fs.baseName();
-			scrScripterActions.insert(strippedName, new ScrAction( ScrAction::RecentScript, strippedName, QKeySequence(), this));
+			scrScripterActions.insert(strippedName, new ScrAction( ScrAction::RecentScript, strippedName, QKeySequence(), this, strippedName));
 			connect( scrScripterActions[strippedName], SIGNAL(triggeredData(QString)), this, SLOT(StdScript(QString)) );
 			menuMgr->addMenuItemString(strippedName, "ScribusScripts");
 		}
@@ -141,7 +142,7 @@ void ScripterCore::rebuildRecentScriptsMenu()
 	{
 		QString strippedName=RecentScripts[m];
 		strippedName.remove(QDir::separator());
-		scrRecentScriptActions.insert(strippedName, new ScrAction( ScrAction::RecentScript, RecentScripts[m], QKeySequence(), this));
+		scrRecentScriptActions.insert(strippedName, new ScrAction( ScrAction::RecentScript, RecentScripts[m], QKeySequence(), this, RecentScripts[m]));
 		connect( scrRecentScriptActions[strippedName], SIGNAL(triggeredData(QString)), this, SLOT(RecentScript(QString)) );
 		menuMgr->addMenuItemString(strippedName, "RecentScripts");
 	}
@@ -164,12 +165,8 @@ void ScripterCore::FinishScriptRun()
 		ScMW->doc->RePos = true;
 		ScMW->doc->RePos = false;
 		if (ScMW->doc->m_Selection->count() != 0)
-		{
 			ScMW->doc->m_Selection->itemAt(0)->emitAllToGUI();
-			ScMW->HaveNewSel(ScMW->doc->m_Selection->itemAt(0)->itemType());
-		}
-		else
-			ScMW->HaveNewSel(-1);
+		ScMW->HaveNewSel();
 		ScMW->view->DrawNew();
 		//CB Really only need (want?) this for new docs, but we need it after a call to ScMW doFileNew.
 		//We don't want it in cmddoc calls as itll interact with the GUI before a script may be finished.

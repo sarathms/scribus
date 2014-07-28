@@ -19,11 +19,25 @@
 #include <QMouseEvent>
 #include <QPainter>
 
-#include "ui/guidemanager.h"
+#include "appmodes.h"
 #include "guidemanagercore.h"
 #include "scribus.h"
 #include "scribusdoc.h"
+#include "scribusview.h"
+#include "ui/guidemanager.h"
 #include "util_icon.h"
+
+
+RulerGesture::RulerGesture(ScribusView *view, RulerGesture::Mode mode) :
+	CanvasGesture(view),
+	m_ScMW(m_view->m_ScMW),
+	m_mode(mode), m_haveGuide(false),
+	m_haveCursor(false),
+	m_xy(0,0)
+{
+
+}
+
 
 void RulerGesture::drawControls(QPainter* p)
 {
@@ -63,7 +77,7 @@ void RulerGesture::clear()
 void RulerGesture::prepare(Mode mode)
 {
 	m_haveGuide = false;
-	m_mode = mode;	
+	m_mode = mode;
 }
 
 

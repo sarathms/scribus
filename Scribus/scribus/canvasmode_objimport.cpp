@@ -26,11 +26,10 @@
 #include <QMimeData>
 #include <QDebug>
 
+#include "appmodes.h"
 #include "canvas.h"
 #include "fpoint.h"
 #include "fpointarray.h"
-#include "ui/pageselector.h"
-#include "ui/scrspinbox.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
@@ -38,12 +37,17 @@
 #include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
+#include "ui/pageselector.h"
+#include "ui/scrspinbox.h"
 #include "undomanager.h"
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
 
-CanvasMode_ObjImport::CanvasMode_ObjImport(ScribusView* view) : CanvasMode(view), m_ScMW(view->m_ScMW) 
+
+CanvasMode_ObjImport::CanvasMode_ObjImport(ScribusView* view) :
+	CanvasMode(view),
+	m_ScMW(view->m_ScMW)
 {
 	Mxp = Myp = -1;
 	m_mimeData = NULL;
@@ -186,7 +190,7 @@ void CanvasMode_ObjImport::mouseReleaseEvent(QMouseEvent *m)
 		{
 			double gx, gy, gh, gw;
 			m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
-			m_doc->moveGroup(mousePointDoc.x() - gx, mousePointDoc.y() -gy, false);
+			m_doc->moveGroup(mousePointDoc.x() - gx, mousePointDoc.y() -gy);
 		}
 		// Commit undo transaction if necessary
 		if (undoTransaction)
@@ -207,8 +211,8 @@ void CanvasMode_ObjImport::mouseReleaseEvent(QMouseEvent *m)
 	m_canvas->m_viewMode.operItemResizing = false;
 	m_view->MidButt = false;
 	//Make sure the Zoom spinbox and page selector dont have focus if we click on the canvas
-	m_view->zoomSpinBox->clearFocus();
-	m_view->pageSelector->clearFocus();
+	m_view->m_ScMW->zoomSpinBox->clearFocus();
+	m_view->m_ScMW->pageSelector->clearFocus();
 }
 
 

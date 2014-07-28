@@ -24,9 +24,6 @@ for which a new license (GPL+exception) is in place.
 #include <QVector>
 
 #include "pagestructs.h"
-// #include "style.h"
-// #include "styles/charstyle.h"
-// #include "styles/paragraphstyle.h"
 #include "scribusapi.h"
 
 class  QDomElement;
@@ -37,6 +34,8 @@ class  ScribusDoc;
 class  ScribusView;
 class  ScStreamFilter;
 struct CopyPasteBuffer;
+
+
 
 // class Foi;
 
@@ -127,20 +126,15 @@ QString SCRIBUS_API getLongPathName(const QString & shortPath);
    \retval QString standardized filename
    \author Petr Vanek
  */
-QString SCRIBUS_API getFileNameByPage(ScribusDoc* currDoc, uint pageNo, QString extension);
-void SCRIBUS_API sDebug(QString message);
+QString SCRIBUS_API getFileNameByPage(ScribusDoc* currDoc, uint pageNo, QString extension, QString prefix=QString::null);
 //asterix is QString used in numeration when number is presented as few chars, like *, **, *** etc
 //default is '*' but can be used any string
 const QString SCRIBUS_API getStringFromSequence(NumFormat type, uint position, QString asterix="*");
 const QString SCRIBUS_API arabicToRoman(uint i);
+const QString SCRIBUS_API arabicToCJK(uint i);
+QChar SCRIBUS_API cjkDigit(uint i);
 const QString SCRIBUS_API numberToLetterSequence(uint i);
 void SCRIBUS_API parsePagesString(QString pages, std::vector<int>* pageNs, int sourcePageCount);
-
-/*! \brief performance measurements.
-It prints given message with it current timestamp.
-Useful for duration holes finding.
-\author Petr Vanek */
-void tDebug(QString message);
 
 QString SCRIBUS_API readLinefromDataStream(QDataStream &s);
 void SCRIBUS_API setCurrentComboItem(QComboBox *box, QString text);
@@ -148,10 +142,8 @@ void SCRIBUS_API setCurrentComboItem(QComboBox *box, QString text);
 QString SCRIBUS_API readAdobeUniCodeString(QDataStream &s);
 
 QString SCRIBUS_API getDashString(int dashtype, double linewidth);
-void    SCRIBUS_API getDashArray(int dashtype, double linewidth, QVector<double> &m_array);
-void    SCRIBUS_API getDashArray(int dashtype, double linewidth, QVector<float> &m_array);
-
-void SCRIBUS_API printBacktrace(int nFrames);
+void    SCRIBUS_API getDashArray(int dashtype, double linewidth, QVector<double> &dashArray);
+void    SCRIBUS_API getDashArray(int dashtype, double linewidth, QVector<float> &dashArray);
 
 /*!
  *\brief Convert pre-1.5.x tables to table as implemented in 1.5.x

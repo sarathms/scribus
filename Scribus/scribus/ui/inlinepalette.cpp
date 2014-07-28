@@ -25,6 +25,8 @@ for which a new license (GPL+exception) is in place.
 #include <QByteArray>
 #include <QDrag>
 #include <QMimeData>
+
+#include "appmodes.h"
 #include "pageitem.h"
 #include "pageitem_table.h"
 #include "pageitem_textframe.h"
@@ -284,5 +286,5 @@ void InlinePalette::changeEvent(QEvent *e)
 
 void InlinePalette::languageChange()
 {
-	setWindowTitle( tr( "Inline Frames" ) );
+	setWindowTitle( tr( "Inline Items" ) );
 }

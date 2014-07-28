@@ -24,8 +24,11 @@ for which a new license (GPL+exception) is in place.
 #include <QDebug>
 #include <QPixmap>
 
+#include "appmodes.h"
 #include "scpage.h"
 #include "scribus.h"
+#include "scribusdoc.h"
+#include "scribusview.h"
 #include "selection.h"
 #include "undomanager.h"
 #include "undostate.h"
@@ -318,12 +321,9 @@ void ScPage::restorePageItemCreation(ScItemState<PageItem*> *state, bool isUndo)
 	int stateCode = state->transactionCode;
 	PageItem *ite = state->getItem();
 	bool oldMPMode=m_Doc->masterPageMode();
-	if ((stateCode == 0) || (stateCode == 1))
-	{
-		m_Doc->setMasterPageMode(!ite->OnMasterPage.isEmpty());
-		if (m_Doc->appMode == modeEditClip) // switch off from edit shape
-			m_Doc->scMW()->nodePalette->EndEdit();
-	}
+	m_Doc->setMasterPageMode(!ite->OnMasterPage.isEmpty());
+	if (m_Doc->appMode == modeEditClip) // switch off from edit shape
+		m_Doc->scMW()->nodePalette->EndEdit();
 	m_Doc->m_Selection->delaySignalsOn();
 	if (isUndo)
 	{
@@ -345,9 +345,9 @@ void ScPage::restorePageItemCreation(ScItemState<PageItem*> *state, bool isUndo)
 			m_Doc->view()->Deselect(true);
 		m_Doc->Items->append(ite);
 		ite->OwnPage = m_Doc->OnPage(ite);
-		if ((stateCode == 0) || (stateCode == 2))
-			update();
 	}
+	if ((stateCode == 0) || (stateCode == 2))
+		update();
 	m_Doc->setMasterPageMode(oldMPMode);
 	m_Doc->m_Selection->delaySignalsOff();
 }
@@ -356,13 +356,14 @@ void ScPage::restorePageItemDeletion(ScItemState< QList<PageItem*> > *state, boo
 {
 	if (!state)
 		return;
+	int stateCode = state->transactionCode;
 	QList<PageItem*> itemList = state->getItem();
 	int id = state->getInt("ITEMID");
 	int id2 = state->getInt("ID");
 	if (itemList.count() <= 0) 
 		return;
 	m_Doc->view()->Deselect(true);
-	bool oldMPMode=m_Doc->masterPageMode();
+	bool oldMPMode = m_Doc->masterPageMode();
 	m_Doc->setMasterPageMode(!itemList.at(0)->OnMasterPage.isEmpty());
 	if (m_Doc->appMode == modeEditClip) // switch off from edit shape
 		m_Doc->scMW()->nodePalette->EndEdit();
@@ -371,13 +372,15 @@ void ScPage::restorePageItemDeletion(ScItemState< QList<PageItem*> > *state, boo
 	{
 		//CB #3373 reinsert at old position and renumber items
 		PageItem* ite = itemList.at(id2);
-		m_Doc->Items->insert(id, ite);
+		if (ite->Parent && ite->Parent->isGroup())
+			ite->Parent->asGroupFrame()->groupItemList.insert(id, ite);
+		else
+			m_Doc->Items->insert(id, ite);
 		for (int i = 0; i < itemList.count(); ++i)
 		{
 			PageItem* ite = itemList.at(i);
 			m_Doc->view()->SelectItem(ite);
 		}
- 		update();
 	}
 	else
 	{
@@ -392,8 +395,10 @@ void ScPage::restorePageItemDeletion(ScItemState< QList<PageItem*> > *state, boo
 		tmpSelection.addItem(ite);
 		m_Doc->itemSelection_DeleteItem(&tmpSelection);
 	}
-	m_Doc->m_Selection->delaySignalsOff();
+	if ((stateCode == 0) || (stateCode == 2))
+		update();
 	m_Doc->setMasterPageMode(oldMPMode);
+	m_Doc->m_Selection->delaySignalsOff();
 }
 
 void ScPage::restorePageItemConversion(ScItemState<std::pair<PageItem*, PageItem*> >*state, bool isUndo)

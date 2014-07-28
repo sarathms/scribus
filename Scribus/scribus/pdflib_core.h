@@ -31,6 +31,7 @@ class MultiProgressDialog;
 class ScLayer;
 class ScText;
 
+#include "pdfoptions.h"
 #include "scribusstructs.h"
 #include "scimagestructs.h"
 #include "tableborder.h"
@@ -82,6 +83,9 @@ private:
 		QMap<int, ImageLoadRequest> RequestProps;
 	};
 
+	bool PDF_IsPDFX();
+	bool PDF_IsPDFX(PDFOptions::PDFVersion ver);
+
 	bool PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QString, QMap<uint, FPointArray> > DocFonts, BookMView* vi);
 	void PDF_Begin_Page(const ScPage* pag, QPixmap pm);
 	void PDF_End_Page(int physPage);
@@ -130,7 +134,7 @@ private:
 	QString putColorUncached(const QString& color, int Shade, bool fill);
 	QString Write_TransparencyGroup(double trans, int blend, QString &data, PageItem *controlItem = 0);
 	QString setTextSt(PageItem *ite, uint PNr, const ScPage* pag);
-	bool    setTextCh(PageItem *ite, uint PNr, double x, double y, uint d,  QString &tmp, QString &tmp2, ScText *hl, const ParagraphStyle& pstyle, const ScPage* pag);
+	bool    setTextCh(PageItem *ite, uint PNr, double x, double y, uint d,  QString &tmp, QString &tmp2, const CharStyle& cstyle, GlyphLayout *glyphs, PathData* pdata, const ParagraphStyle& pstyle, const ScPage* pag);
 	void    getBleeds(const ScPage* page, double &left, double &right);
 	void    getBleeds(const ScPage* page, double &left, double &right, double &bottom, double& top);
 
@@ -157,6 +161,7 @@ private:
 	QString PDF_PutSoftShadow(PageItem* ite, const ScPage* pag);
 	bool    PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* pag, uint PNr, bool embedded = false, bool pattern = false);
 	void    PDF_Bookmark(PageItem *currItem, double ypos);
+	bool	PDF_HatchFill(QString& output, PageItem *currItem);
 	bool    PDF_PatternFillStroke(QString& output, PageItem *currItem, int kind = 0, bool forArrow = false);
 	bool    PDF_MeshGradientFill(QString& output, PageItem *currItem);
 	bool	PDF_PatchMeshGradientFill(QString& output, PageItem *c);

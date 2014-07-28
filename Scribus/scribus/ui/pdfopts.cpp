@@ -15,20 +15,10 @@ for which a new license (GPL+exception) is in place.
 #include "scconfig.h"
 #include "pdfopts.h"
 
-#include "commonstrings.h"
-#include "pdfoptions.h"
-#include "prefsfile.h"
-#include "prefsmanager.h"
-#include "scpaths.h"
-#include "scribusview.h"
-#include "ui/customfdialog.h"
-#include "ui/scrspinbox.h"
-#include "units.h"
-#include "util.h"
-#include "util_icon.h"
 
 #include <QByteArray>
 #include <QCheckBox>
+#include <QFileDialog>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -40,6 +30,19 @@ for which a new license (GPL+exception) is in place.
 #include <QToolButton>
 #include <QToolTip>
 #include <QVBoxLayout>
+
+#include "commonstrings.h"
+#include "pdfoptions.h"
+#include "prefsfile.h"
+#include "prefsmanager.h"
+#include "scpaths.h"
+#include "scribusdoc.h"
+#include "scribusview.h"
+#include "ui/customfdialog.h"
+#include "ui/scrspinbox.h"
+#include "units.h"
+#include "util.h"
+#include "util_icon.h"
 
 PDFExportDialog::PDFExportDialog( QWidget* parent, const QString & docFileName,
 								  const QMap<QString, int > & DocFonts,
@@ -94,10 +97,10 @@ PDFExportDialog::PDFExportDialog( QWidget* parent, const QString & docFileName,
 		}
 	}
 	NameLayout->addWidget( fileNameLineEdit, 0, 0 );
-	FileC = new QToolButton( Name );
-	FileC->setText( tr( "Cha&nge..." ) );
-	FileC->setMinimumSize( QSize( 88, 24 ) );
-	NameLayout->addWidget( FileC, 0, 1 );
+	changeButton = new QPushButton( Name );
+	changeButton->setText( tr( "Cha&nge..." ) );
+	changeButton->setMinimumSize( QSize( 88, 24 ) );
+	NameLayout->addWidget( changeButton, 0, 1 );
 	multiFile = new QCheckBox( tr( "Output one file for eac&h page" ), Name );
 	multiFile->setChecked(m_opts.doMultiFile);
 	NameLayout->addWidget( multiFile, 1, 0 );
@@ -115,25 +118,25 @@ PDFExportDialog::PDFExportDialog( QWidget* parent, const QString & docFileName,
 	Layout7->setMargin( 0 );
 	QSpacerItem* spacer_2 = new QSpacerItem( 2, 2, QSizePolicy::Expanding, QSizePolicy::Minimum );
 	Layout7->addItem( spacer_2 );
-	OK = new QPushButton( tr( "&Save" ), this );
-	OK->setAutoDefault( true );
-	OK->setDefault( true );
-	Layout7->addWidget( OK );
-	Cancel = new QPushButton( CommonStrings::tr_Cancel, this );
-	Layout7->addWidget( Cancel );
+	okButton = new QPushButton( tr( "&Save" ), this );
+	okButton->setAutoDefault( true );
+	okButton->setDefault( true );
+	Layout7->addWidget( okButton );
+	cancelButton = new QPushButton( CommonStrings::tr_Cancel, this );
+	Layout7->addWidget( cancelButton );
 	PDFExportLayout->addLayout( Layout7 );
 	if ((m_opts.Version == PDFOptions::PDFVersion_X3) && (Options->InfoString->text().isEmpty()))
-		OK->setEnabled(false);
+		okButton->setEnabled(false);
 	resize(sizeHint());
 //	setMaximumSize( sizeHint() );
 //tooltips
 	multiFile->setToolTip( "<qt>" + tr( "This enables exporting one individually named PDF file for each page in the document. Page numbers are added automatically. This is most useful for imposing PDF for commercial printing.") + "</qt>" );
 	openAfterExportCheckBox->setToolTip( "<qt>" + tr( "Open the exported PDF with the PDF viewer as set in External Tools preferences, when not exporting to a multi-file export destination.") + "</qt>" );
-	OK->setToolTip( "<qt>" + tr( "The save button will be disabled if you are trying to export PDF/X and the info string is missing from the PDF/X tab.") + "</qt>" );
+	okButton->setToolTip( "<qt>" + tr( "The save button will be disabled if you are trying to export PDF/X and the info string is missing from the PDF/X tab.") + "</qt>" );
 	// signals and slots connections
-	connect( FileC, SIGNAL( clicked() ), this, SLOT( ChangeFile() ) );
-	connect( OK, SIGNAL( clicked() ), this, SLOT( DoExport() ) );
-	connect( Cancel, SIGNAL( clicked() ), this, SLOT( reject() ) );
+	connect( changeButton, SIGNAL( clicked() ), this, SLOT( ChangeFile() ) );
+	connect( okButton, SIGNAL( clicked() ), this, SLOT( DoExport() ) );
+	connect( cancelButton, SIGNAL( clicked() ), this, SLOT( reject() ) );
 	connect( fileNameLineEdit, SIGNAL( editingFinished() ), this, SLOT( fileNameChanged() ) );
 	connect( Options, SIGNAL(noInfo()), this, SLOT(disableSave()));
 	connect( Options, SIGNAL(hasInfo()), this, SLOT(enableSave()));
@@ -141,12 +144,12 @@ PDFExportDialog::PDFExportDialog( QWidget* parent, const QString & docFileName,
 
 void PDFExportDialog::enableSave()
 {
-	OK->setEnabled(true);
+	okButton->setEnabled(true);
 }
 
 void PDFExportDialog::disableSave()
 {
-	OK->setEnabled(false);
+	okButton->setEnabled(false);
 }
 
 void PDFExportDialog::DoExport()
@@ -207,21 +210,14 @@ void PDFExportDialog::DoExport()
 
 void PDFExportDialog::ChangeFile()
 {
-	QString fn;
 	PrefsContext* dirs = PrefsManager::instance()->prefsFile->getContext("dirs");
 	QString wdir = dirs->get("pdf", ".");
-	CustomFDialog dia(this, wdir, tr("Save As"), tr("PDF Files (*.pdf);;All Files (*)"), fdNone);
-	if (!fileNameLineEdit->text().isEmpty())
+	QString d = QFileDialog::getSaveFileName(this, tr("Save As"), wdir, tr("PDF Files (*.pdf);;All Files (*)"), 0, QFileDialog::DontConfirmOverwrite);
+	if (d.length()>0)
 	{
-		QString fileName = QDir::fromNativeSeparators(fileNameLineEdit->text()); 
-		dia.setSelection(fileName);
-	}
-	if (dia.exec() == QDialog::Accepted)
-	{
-		// selectedFile() may return path with native separators
-		fn = QDir::fromNativeSeparators(dia.selectedFile());
+		QString fn(QDir::fromNativeSeparators(d));
 		dirs->set("pdf", fn.left(fn.lastIndexOf("/")));
-		fileNameLineEdit->setText( QDir::toNativeSeparators(fn) );
+		fileNameLineEdit->setText( d );
 	}	
 }
 

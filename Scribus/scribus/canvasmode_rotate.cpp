@@ -19,19 +19,22 @@
 #include <QPainter>
 #include <QTimer>
 
+#include "appmodes.h"
 #include "canvas.h"
-#include "ui/contextmenu.h"
-#include "ui/scrspinbox.h"
 #include "fpoint.h"
 #include "pageitem.h"
-#include "ui/pageselector.h"
 #include "prefsmanager.h"
+#include "scribus.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
+#include "ui/contextmenu.h"
+#include "ui/pageselector.h"
+#include "ui/scrspinbox.h"
 #include "undomanager.h"
 #include "util_icon.h"
 #include "util_math.h"
+
 
 CanvasMode_Rotate::CanvasMode_Rotate(ScribusView* view) : CanvasMode(view)
 {
@@ -369,8 +372,8 @@ void CanvasMode_Rotate::mouseReleaseEvent(QMouseEvent *m)
 	for (int i = 0; i < m_doc->m_Selection->count(); ++i)
 		m_doc->m_Selection->itemAt(i)->checkChanges(true);
 	//Make sure the Zoom spinbox and page selector dont have focus if we click on the canvas
-	m_view->zoomSpinBox->clearFocus();
-	m_view->pageSelector->clearFocus();
+	m_view->m_ScMW->zoomSpinBox->clearFocus();
+	m_view->m_ScMW->pageSelector->clearFocus();
 }
 
 void CanvasMode_Rotate::mouseMoveEvent(QMouseEvent *m)

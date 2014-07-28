@@ -386,6 +386,7 @@ bool SlaOutputDev::handleTextAnnot(Annot* annota, double xCoor, double yCoor, do
 		ite->annotation().setIcon(Annotation::Icon_Note);
 	ite->setItemName( CommonStrings::itemName_TextAnnotation + QString("%1").arg(m_doc->TotalItems));
 	ite->itemText.insertChars(UnicodeParsedString(annota->getContents()));
+	ite->itemText.trim();
 	return true;
 }
 
@@ -739,6 +740,7 @@ bool SlaOutputDev::handleWidgetAnnot(Annot* annota, double xCoor, double yCoor, 
 				{
 					ite->itemText.insertChars(UnicodeParsedString(btn->getContent()));
 					applyTextStyle(ite, fontName, CurrColorText, fontSize);
+					ite->itemText.trim();
 					if (btn->isMultiline())
 						ite->annotation().addToFlag(Annotation::Flag_Multiline);
 					if (btn->isPassword())
@@ -1326,13 +1328,15 @@ void SlaOutputDev::restoreState(GfxState *state)
 							sing->setWidthHeight(ite->width(), ite->height(), true);
 							sing->groupWidth = ite->width();
 							sing->groupHeight = ite->height();
-							if (sing->isImageFrame())
+						/*	if (sing->isImageFrame())
 							{
 								QTransform ft;
 								ft.translate(-result.boundingRect().x(), -result.boundingRect().y());
 								ft.scale(ite->width() / result.boundingRect().width(), ite->height() / result.boundingRect().height());
 								result = ft.map(result);
-							}
+							}*/
+							sing->ClipEdited = true;
+							sing->FrameType = 3;
 							sing->PoLine.fromQPainterPath(result);
 							m_doc->AdjustItemSize(sing);
 							if (sing->isGroup())
@@ -1400,7 +1404,7 @@ void SlaOutputDev::endTransparencyGroup(GfxState *state)
 				ScPattern pat = ScPattern();
 				pat.setDoc(m_doc);
 				m_doc->DoDrawing = true;
-				pat.pattern = ite->DrawObj_toImage(qMax(ite->width(), ite->height()));
+				pat.pattern = ite->DrawObj_toImage(qMin(qMax(ite->width(), ite->height()), 500.0));
 				pat.xoffset = 0;
 				pat.yoffset = 0;
 				m_doc->DoDrawing = false;
@@ -1811,6 +1815,10 @@ GBool SlaOutputDev::axialShadedFill(GfxState *state, GfxAxialShading *shading, d
 		QString stopColor2 = getColor(color_space, &stop2, &shade);
 		FillGradient.addStop( ScColorEngine::getShadeColor(m_doc->PageColors[stopColor2], m_doc, shade), 1.0, 0.5, 1.0, stopColor2, shade );
 	}
+	if (!shading->getExtend0() || !shading->getExtend1())
+		FillGradient.setRepeatMethod(VGradient::none);
+	else
+		FillGradient.setRepeatMethod(VGradient::pad);
 	((GfxAxialShading*)shading)->getCoords(&GrStartX, &GrStartY, &GrEndX, &GrEndY);
 	double xmin, ymin, xmax, ymax;
 	// get the clip region bbox
@@ -1905,6 +1913,10 @@ GBool SlaOutputDev::radialShadedFill(GfxState *state, GfxRadialShading *shading,
 		QString stopColor2 = getColor(color_space, &stop2, &shade);
 		FillGradient.addStop( ScColorEngine::getShadeColor(m_doc->PageColors[stopColor2], m_doc, shade), 1.0, 0.5, 1.0, stopColor2, shade );
 	}
+	if (!shading->getExtend0() || !shading->getExtend1())
+		FillGradient.setRepeatMethod(VGradient::none);
+	else
+		FillGradient.setRepeatMethod(VGradient::pad);
 	double r0, x1, y1, r1;
 	((GfxRadialShading*)shading)->getCoords(&GrStartX, &GrStartY, &r0, &x1, &y1, &r1);
 	double xmin, ymin, xmax, ymax;
@@ -2254,7 +2266,7 @@ GBool SlaOutputDev::tilingPatternFill(GfxState *state, Gfx * /*gfx*/, Catalog *c
 		ScPattern pat = ScPattern();
 		pat.setDoc(m_doc);
 		m_doc->DoDrawing = true;
-		pat.pattern = ite->DrawObj_toImage(qMax(ite->width(), ite->height()));
+		pat.pattern = ite->DrawObj_toImage(qMin(qMax(ite->width(), ite->height()), 500.0));
 		pat.xoffset = 0;
 		pat.yoffset = 0;
 		m_doc->DoDrawing = false;
@@ -2399,16 +2411,20 @@ void SlaOutputDev::drawImageMask(GfxState *state, Object *ref, Stream *str, int 
 	{
 		mm.reset();
 		mm.rotate(-tline.angle());
+		res = res.transformed(mm);
 	}
 	else
 	{
-		mm.reset();
-		if (sx < 0)
-			mm.scale(-1, 1);
-		if (sy < 0)
-			mm.scale(1, -1);
+		if ((sx < 0) || (sy < 0))
+		{
+			mm.reset();
+			if (sx < 0)
+				mm.scale(-1, 1);
+			if (sy < 0)
+				mm.scale(1, -1);
+			res = res.transformed(mm);
+		}
 	}
-	res = res.transformed(mm);
 	if (res.isNull())
 	{
 		delete imgStr;
@@ -2531,16 +2547,19 @@ void SlaOutputDev::drawSoftMaskedImage(GfxState *state, Object *ref, Stream *str
 	{
 		mm.reset();
 		mm.rotate(-tline.angle());
+		res = res.transformed(mm);
 	}
 	else
 	{
-		mm.reset();
-		if (sx < 0)
-			mm.scale(-1, 1);
-		if (sy < 0)
-			mm.scale(1, -1);
+		if ((sx < 0) || (sy < 0))
+		{
+			if (sx < 0)
+				mm.scale(-1, 1);
+			if (sy < 0)
+				mm.scale(1, -1);
+			res = res.transformed(mm);
+		}
 	}
-	res = res.transformed(mm);
 	int z = m_doc->itemAdd(PageItem::ImageFrame, PageItem::Unspecified, xCoor + trect.x(), yCoor + trect.y(), trect.width(), trect.height(), 0, CommonStrings::None, CommonStrings::None, true);
 	PageItem* ite = m_doc->Items->at(z);
 	ite->SetRectFrame();
@@ -2666,16 +2685,19 @@ void SlaOutputDev::drawMaskedImage(GfxState *state, Object *ref, Stream *str,  i
 	{
 		mm.reset();
 		mm.rotate(-tline.angle());
+		res = res.transformed(mm);
 	}
 	else
 	{
-		mm.reset();
-		if (sx < 0)
-			mm.scale(-1, 1);
-		if (sy < 0)
-			mm.scale(1, -1);
+		if ((sx < 0) || (sy < 0))
+		{
+			if (sx < 0)
+				mm.scale(-1, 1);
+			if (sy < 0)
+				mm.scale(1, -1);
+			res = res.transformed(mm);
+		}
 	}
-	res = res.transformed(mm);
 	int z = m_doc->itemAdd(PageItem::ImageFrame, PageItem::Unspecified, xCoor + trect.x(), yCoor + trect.y(), trect.width(), trect.height(), 0, CommonStrings::None, CommonStrings::None, true);
 	PageItem* ite = m_doc->Items->at(z);
 	ite->SetRectFrame();
@@ -2805,21 +2827,25 @@ void SlaOutputDev::drawImage(GfxState *state, Object *ref, Stream *str, int widt
 	QRectF trect = m_ctm.mapRect(crect);
 	double sx = m_ctm.m11();
 	double sy = m_ctm.m22();
+	QImage img = image->copy();
 	QTransform mm = QTransform(ctm[0] / width, ctm[1] / width, -ctm[2] / height, -ctm[3] / height, 0, 0);
 	if ((mm.type() == QTransform::TxShear) || (mm.type() == QTransform::TxRotate))
 	{
 		mm.reset();
 		mm.rotate(-tline.angle());
+		img = image->transformed(mm);
 	}
 	else
 	{
-		mm.reset();
-		if (sx < 0)
-			mm.scale(-1, 1);
-		if (sy < 0)
-			mm.scale(1, -1);
+		if ((sx < 0) || (sy < 0))
+		{
+			if (sx < 0)
+				mm.scale(-1, 1);
+			if (sy < 0)
+				mm.scale(1, -1);
+			img = image->transformed(mm);
+		}
 	}
-	QImage img = image->transformed(mm);
 	int z = m_doc->itemAdd(PageItem::ImageFrame, PageItem::Unspecified, xCoor + trect.x(), yCoor + trect.y(), trect.width(), trect.height(), 0, CommonStrings::None, CommonStrings::None, true);
 	PageItem* ite = m_doc->Items->at(z);
 	ite->SetRectFrame();

@@ -32,21 +32,22 @@ for which a new license (GPL+exception) is in place.
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
 
-
+#include "appmodes.h"
+#include "commonstrings.h"
+#include "hyphenator.h"
 #include "langmgr.h"
 #include "pageitem.h"
 #include "pageitem_table.h"
-#include "pageitem_textframe.h"
-#include "scribus.h"
-#include "scribusdoc.h"
-#include "scribusview.h"
-#include "scpaths.h"
-#include "selection.h"
+//#include "pageitem_textframe.h"
 #include "prefsmanager.h"
-#include "commonstrings.h"
-#include "hyphenator.h"
-#include "util_icon.h"
+#include "scpaths.h"
+//
+#include "scribusdoc.h"
+//
+#include "selection.h"
 #include "undomanager.h"
+#include "util_icon.h"
+
 
 QString getLoremLocation(QString fname)
 {
@@ -169,12 +170,19 @@ LoremManager::LoremManager(ScribusDoc* doc, QWidget* parent) : QDialog( parent )
 	paraBox->setMinimum( 1 );
 	paraBox->setValue(PrefsManager::instance()->appPrefs.miscPrefs.paragraphsLI);
 	layout2->addWidget( paraBox );
-	randomCheckBox = new QCheckBox(this);
-	randomCheckBox->setChecked(true);
-	layout2->addWidget( randomCheckBox );
+
 	paraSpacer = new QSpacerItem( 2, 2, QSizePolicy::Expanding, QSizePolicy::Minimum );
 	layout2->addItem( paraSpacer );
 	layout3->addLayout( layout2 );
+
+	randomCheckBox = new QCheckBox(this);
+	randomCheckBox->setChecked(true);
+	layout3->addWidget( randomCheckBox );
+	appendCheckBox = new QCheckBox(this);
+	appendCheckBox->setChecked(false);
+	layout3->addWidget( appendCheckBox );
+
+//	layout3->addLayout( layout4 );
 
 	layout1 = new QHBoxLayout;
 	layout1->setMargin(0);
@@ -262,6 +270,7 @@ void LoremManager::languageChange()
 	setWindowTitle( tr( "Lorem Ipsum" ) );
 	paraLabel->setText( tr( "Paragraphs:" ) );
 	randomCheckBox->setText( tr("Random Paragraphs"));
+	appendCheckBox->setText( tr("Append to existing text"));
 	okButton->setText( CommonStrings::tr_OK );
 	okButton->setShortcut( QKeySequence( tr( "Alt+O" ) ) );
 	cancelButton->setText( CommonStrings::tr_Cancel );
@@ -294,7 +303,7 @@ void LoremManager::insertLoremIpsum(QString name, int paraCount, bool random)
 		if (!i2->asTextFrame())
 			continue;
 		UndoTransaction* activeTransaction = NULL;
-		if (i2->itemText.length() != 0)
+		if (!appendCheckBox->isChecked() && i2->itemText.length() != 0)
 		{
 			if (UndoManager::undoEnabled())
 				activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::Selection, Um::IGroup, Um::AddLoremIpsum, "", Um::ICreate));
@@ -315,23 +324,6 @@ void LoremManager::insertLoremIpsum(QString name, int paraCount, bool random)
 			qDebug("LoremManager::okButton_clicked() *lp == NULL");
 			return;
 		}
-
-#if 0		
-// 		Set up the gtWriter instance with the selected paragraph style
-		gtWriter* writer = new gtWriter(false, currItem);
-		if (writer != NULL)
-		{
-				writer->setUpdateParagraphStyles(false);
-				writer->setOverridePStyleFont(false);
-				gtFrameStyle* fstyle = writer->getDefaultStyle();
-				gtParagraphStyle* pstyle = new gtParagraphStyle(*fstyle);
-				pstyle->setName(i2->currentStyle().name());
-				writer->setParagraphStyle(pstyle);
-				done = true;
-				writer->append(lp->createLorem(paraCount));
-		}
-		delete writer;		
-#endif
 		
 		// K.I.S.S.:
 		QString sampleText = lp->createLorem(paraCount, random);
@@ -339,7 +331,9 @@ void LoremManager::insertLoremIpsum(QString name, int paraCount, bool random)
 		{
 			SimpleState *ss = new SimpleState(Um::AddLoremIpsum,"",Um::ICreate);
 			ss->set("LOREM_FRAMETEXT", "lorem_frametext");
+			ss->set("ETEA", QString("insert_frametext"));
 			ss->set("TEXT_STR",sampleText);
+			ss->set("START", i2->itemText.length());
 			undoManager->action(i2, ss);
 		}
 		if (activeTransaction)
@@ -348,7 +342,8 @@ void LoremManager::insertLoremIpsum(QString name, int paraCount, bool random)
 			delete activeTransaction;
 			activeTransaction = NULL;
 		}
-		i2->itemText.insertChars(0, sampleText);
+		int l=i2->itemText.length();
+		i2->itemText.insertChars(l, sampleText);
 		delete lp;
 		if (m_Doc->docHyphenator->AutoCheck)
 			m_Doc->docHyphenator->slotHyphenate(i2);

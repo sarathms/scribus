@@ -22,22 +22,26 @@
 #include <QPoint>
 #include <QRect>
 
+
+#include "KarbonCurveFit.h"
+#include "appmodes.h"
 #include "canvas.h"
 #include "canvasgesture_resize.h"
 #include "fpoint.h"
-#include "KarbonCurveFit.h"
-#include "ui/pageselector.h"
 #include "prefsmanager.h"
 #include "scraction.h"
 #include "scribus.h"
+#include "scribusXml.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
-#include "scribusXml.h"
-#include "ui/scrspinbox.h"
 #include "selection.h"
+#include "ui/pageselector.h"
+#include "ui/scrspinbox.h"
 #include "undomanager.h"
 #include "util.h"
 #include "util_math.h"
+
+
 
 
 
@@ -123,8 +127,8 @@ void CalligraphicMode::mouseMoveEvent(QMouseEvent *m)
 		else
 			RecordP.addPoint(FPoint(newXF, newYF));
 		QPolygon& redrawPolygon(m_canvas->newRedrawPolygon());
-		double mx = sin(m_doc->itemToolPrefs().calligrapicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligrapicPenWidth / 2.0);
-		double my = cos(m_doc->itemToolPrefs().calligrapicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligrapicPenWidth / 2.0);
+		double mx = sin(m_doc->itemToolPrefs().calligraphicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligraphicPenWidth / 2.0);
+		double my = cos(m_doc->itemToolPrefs().calligraphicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligraphicPenWidth / 2.0);
 		for (int px = 0; px < RecordP.size()-1; ++px)
 		{
 			FPoint clp = RecordP.point(px);
@@ -242,13 +246,13 @@ void CalligraphicMode::mouseReleaseEvent(QMouseEvent *m)
 			UndoTransaction *createTransaction = NULL;
 			if(UndoManager::undoEnabled())
 				createTransaction = new UndoTransaction(UndoManager::instance()->beginTransaction());
-			uint z = m_doc->itemAdd(PageItem::Polygon, PageItem::Unspecified, Mxp, Myp, 1, 1, m_doc->itemToolPrefs().calligrapicPenLineWidth, m_doc->itemToolPrefs().calligrapicPenFillColor, m_doc->itemToolPrefs().calligrapicPenLineColor, true);
+			uint z = m_doc->itemAdd(PageItem::Polygon, PageItem::Unspecified, Mxp, Myp, 1, 1, m_doc->itemToolPrefs().calligraphicPenLineWidth, m_doc->itemToolPrefs().calligraphicPenFillColor, m_doc->itemToolPrefs().calligraphicPenLineColor, true);
 			currItem = m_doc->Items->at(z);
 			currItem->PoLine.resize(0);
 			QList<QPointF> clipU;
 			QList<QPointF> clipL;
-			double mx = sin(m_doc->itemToolPrefs().calligrapicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligrapicPenWidth / 2.0);
-			double my = cos(m_doc->itemToolPrefs().calligrapicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligrapicPenWidth / 2.0);
+			double mx = sin(m_doc->itemToolPrefs().calligraphicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligraphicPenWidth / 2.0);
+			double my = cos(m_doc->itemToolPrefs().calligraphicPenAngle / 180.0 * M_PI) * (m_doc->itemToolPrefs().calligraphicPenWidth / 2.0);
 			for (int px = 0; px < RecordP.size()-1; ++px)
 			{
 				FPoint clp = RecordP.point(px);
@@ -273,9 +277,9 @@ void CalligraphicMode::mouseReleaseEvent(QMouseEvent *m)
 			currItem->ClipEdited = true;
 			currItem->FrameType = 3;
 			currItem->OwnPage = m_doc->OnPage(currItem);
-			currItem->PLineArt = Qt::PenStyle(m_doc->itemToolPrefs().calligrapicPenStyle);
-			currItem->setFillShade(m_doc->itemToolPrefs().calligrapicPenFillColorShade);
-			currItem->setLineShade(m_doc->itemToolPrefs().calligrapicPenLineColorShade);
+			currItem->PLineArt = Qt::PenStyle(m_doc->itemToolPrefs().calligraphicPenStyle);
+			currItem->setFillShade(m_doc->itemToolPrefs().calligraphicPenFillColorShade);
+			currItem->setLineShade(m_doc->itemToolPrefs().calligraphicPenLineColorShade);
 			currItem->setFillEvenOdd(true);
 			m_view->resetMousePressed();
 			currItem->checkChanges();
@@ -322,8 +326,8 @@ void CalligraphicMode::mouseReleaseEvent(QMouseEvent *m)
 		m_doc->itemAddCommit(m_doc->m_Selection->itemAt(0));
 	}
 	//Make sure the Zoom spinbox and page selector dont have focus if we click on the canvas
-	m_view->zoomSpinBox->clearFocus();
-	m_view->pageSelector->clearFocus();
+	m_view->m_ScMW->zoomSpinBox->clearFocus();
+	m_view->m_ScMW->pageSelector->clearFocus();
 	if (m_doc->m_Selection->itemAt(0) != 0) // is there the old clip stored for the undo action
 	{
 		currItem = m_doc->m_Selection->itemAt(0);
@@ -350,7 +354,7 @@ void CalligraphicMode::selectPage(QMouseEvent *m)
 			if (docCurrPageNo != j)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(j));
-				m_view->setMenTxt(j);
+				m_view->m_ScMW->slotSetCurrentPage(j);
 				m_view->DrawNew();
 			}
 		}

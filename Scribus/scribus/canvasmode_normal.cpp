@@ -32,6 +32,7 @@
 #include <QDrag>
 #include <QDebug>
 
+#include "appmodes.h"
 #include "canvas.h"
 #include "canvasgesture_linemove.h"
 #include "canvasgesture_resize.h"
@@ -41,24 +42,21 @@
 #include "fpointarray.h"
 #include "hyphenator.h"
 #include "loadsaveplugin.h"
-#include "pageitem_line.h"
-#include "pageitem_textframe.h"
-#include "pageitem_regularpolygon.h"
 #include "pageitem_arc.h"
+#include "pageitem_line.h"
+#include "pageitem_regularpolygon.h"
+#include "pageitem_textframe.h"
+#include "plugins/formatidlist.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
 #include "scmimedata.h"
 #include "scraction.h"
 #include "scribus.h"
+#include "scribusXml.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
-#include "scribusXml.h"
 #include "selection.h"
-#include "undomanager.h"
-#include "util.h"
-#include "util_icon.h"
-#include "util_math.h"
 #include "ui/aligndistribute.h"
 #include "ui/contextmenu.h"
 #include "ui/customfdialog.h"
@@ -69,7 +67,12 @@
 #include "ui/propertiespalette_line.h"
 #include "ui/propertiespalette_text.h"
 #include "ui/propertiespalette_xyz.h"
-#include "plugins/formatidlist.h"
+#include "undomanager.h"
+#include "util.h"
+#include "util_icon.h"
+#include "util_math.h"
+
+
 
 
 
@@ -431,7 +434,7 @@ void CanvasMode_Normal::mouseMoveEvent(QMouseEvent *m)
 				{
 					if (m_canvas->cursorOverTextFrameControl(m->globalPos(), hoveredItem))
 					{
-						QToolTip::showText(m->globalPos() + QPoint(5, 5), tr("Overflow Characters: %1").arg(hoveredItem->frameOverflowCount()), m_canvas);
+						QToolTip::showText(m->globalPos() + QPoint(5, 5), tr("Overflow Characters: %1 (%2 White Spaces)").arg(hoveredItem->frameOverflowCount()).arg(hoveredItem->frameOverflowBlankCount()), m_canvas);
 					}
 				}
 				else
@@ -1101,13 +1104,13 @@ void CanvasMode_Normal::mouseReleaseEvent(QMouseEvent *m)
 					else
 						ny = npx.y();
 				}
-				m_doc->moveGroup(nx-gx, ny-gy, false);
+				m_doc->moveGroup(nx-gx, ny-gy);
 				m_doc->m_Selection->setGroupRect();
 				m_doc->m_Selection->getVisualGroupRect(&gx, &gy, &gw, &gh);
 				nx = gx+gw;
 				ny = gy+gh;
 				if (m_doc->ApplyGuides(&nx, &ny) && !m_doc->ApplyGuides(&nx, &ny,true))
-					m_doc->moveGroup(nx-(gx+gw), ny-(gy+gh), false);
+					m_doc->moveGroup(nx-(gx+gw), ny-(gy+gh));
 				m_doc->m_Selection->setGroupRect();
 			}
 			else
@@ -1158,10 +1161,10 @@ void CanvasMode_Normal::mouseReleaseEvent(QMouseEvent *m)
 			if (currItem->OwnPage != -1)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(currItem->OwnPage));
-				m_view->setMenTxt(currItem->OwnPage);
+				m_view->m_ScMW->slotSetCurrentPage(currItem->OwnPage);
 			}
 			//CB done with emitAllToGUI
-			//emit HaveSel(currItem->itemType());
+			//emit HaveSel();
 			//EmitValues(currItem);
 			//CB need this for? a moved item will send its new data with the new xpos/ypos emits
 			//CB TODO And what if we have dragged to a new page. Items X&Y are not updated anyway now
@@ -1191,7 +1194,7 @@ void CanvasMode_Normal::mouseReleaseEvent(QMouseEvent *m)
 					if (docCurrPageNo != i)
 					{
 						m_doc->setCurrentPage(m_doc->Pages->at(i));
-						m_view->setMenTxt(i);
+						m_view->m_ScMW->slotSetCurrentPage(i);
 					}
 					break;
 				}
@@ -1283,8 +1286,8 @@ void CanvasMode_Normal::mouseReleaseEvent(QMouseEvent *m)
 		}
 	}
 	//Make sure the Zoom spinbox and page selector dont have focus if we click on the canvas
-	m_view->zoomSpinBox->clearFocus();
-	m_view->pageSelector->clearFocus();
+	m_view->m_ScMW->zoomSpinBox->clearFocus();
+	m_view->m_ScMW->pageSelector->clearFocus();
 	if (m_doc->m_Selection->count() > 0)
 	{
 		if (m_doc->m_Selection->itemAt(0) != 0) // is there the old clip stored for the undo action
@@ -1348,7 +1351,7 @@ void CanvasMode_Normal::handlePushButtonPress(PageItem* currItem)
 void CanvasMode_Normal::handleRadioButtonPress(PageItem* currItem)
 {
 	m_view->m_AnnotChanged = true;
-	if (currItem->Parent != NULL)
+	if (currItem->isGroupChild())
 	{
 		PageItem *group = currItem->Parent->asGroupFrame();
 		for (int a = 0; a < group->groupItemList.count(); a++)
@@ -1426,7 +1429,7 @@ void CanvasMode_Normal::handlePushButtonRelease(PageItem* currItem)
 void CanvasMode_Normal::handleRadioButtonRelease(PageItem* currItem)
 {
 	m_view->m_AnnotChanged = true;
-	if (currItem->Parent != NULL)
+	if (currItem->isGroupChild())
 	{
 		PageItem *group = currItem->Parent->asGroupFrame();
 		for (int a = 0; a < group->groupItemList.count(); a++)
@@ -1694,7 +1697,7 @@ bool CanvasMode_Normal::SeleItem(QMouseEvent *m)
 			if (m_doc->currentPageNumber() != pgNum)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(unsigned(pgNum)));
-				m_view->setMenTxt(unsigned(pgNum));
+				m_view->m_ScMW->slotSetCurrentPage(unsigned(pgNum));
 				pageChanged = true;
 			}
 		}
@@ -1899,7 +1902,7 @@ void CanvasMode_Normal::importToPage()
 		if (m_doc->m_Selection->count() > 0)
 		{
 			m_doc->m_Selection->connectItemToGUI();
-			m_ScMW->HaveNewSel(m_doc->m_Selection->itemAt(0)->itemType());
+			m_ScMW->HaveNewSel();
 		}
 	}
 }

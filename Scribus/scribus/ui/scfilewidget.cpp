@@ -5,12 +5,14 @@ a copyright and/or license notice that predates the release of Scribus 1.3.2
 for which a new license (GPL+exception) is in place.
 */
 
-#include <QDesktopServices>
+#include <QDebug>
+#include <QStandardPaths>
 #include <QListView>
 #include <QPushButton>
+#include <QStringList>
 #include <QUrl>
 
-#include "scescapecatcher.h"
+#include "filedialogeventcatcher.h"
 #include "scfilewidget.h"
 
 
@@ -30,16 +32,23 @@ ScFileWidget::ScFileWidget(QWidget * parent) : QFileDialog(parent, Qt::Widget)
 	QUrl volumes(QUrl::fromLocalFile("/Volumes"));
 	if (!urls.contains(volumes))
 		urls << volumes;
-	//desktop too?	QUrl computer(QUrl::fromLocalFile(QDesktopServices::storageLocation(QDesktopServices::DesktopLocation)));
+	QUrl dt(QUrl::fromLocalFile(QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)));
+	if (!urls.contains(dt))
+		urls << dt;
 	setSidebarUrls(urls);
 #endif
 
-	ScEscapeCatcher* keyCatcher = new ScEscapeCatcher(this);
+	FileDialogEventCatcher* keyCatcher = new FileDialogEventCatcher(this);
 	QList<QListView *> lv = findChildren<QListView *>();
 	QListIterator<QListView *> lvi(lv);
 	while (lvi.hasNext())
 		lvi.next()->installEventFilter(keyCatcher);
 	connect(keyCatcher, SIGNAL(escapePressed()), this, SLOT(reject()));
+	connect(keyCatcher, SIGNAL(dropLocation(QString)), this, SLOT(locationDropped(QString)));
+	connect(keyCatcher, SIGNAL(desktopPressed()), this, SLOT(gotoDesktopDirectory()));
+	connect(keyCatcher, SIGNAL(homePressed()), this, SLOT(gotoHomeDirectory()));
+	connect(keyCatcher, SIGNAL(parentPressed()), this, SLOT(gotoParentDirectory()));
+	connect(keyCatcher, SIGNAL(enterSelectedPressed()), this, SLOT(gotoSelectedDirectory()));
 
 	QList<QPushButton *> b = findChildren<QPushButton *>();
 	QListIterator<QPushButton *> i(b);
@@ -65,3 +74,51 @@ void ScFileWidget::accept()
 	QFileDialog::accept();
 #endif
 }
+
+void ScFileWidget::locationDropped(QString fileUrl)
+{
+	QFileInfo fi(fileUrl);
+	if (fi.isDir())
+		setDirectory(fi.absoluteFilePath());
+	else
+	{
+		setDirectory(fi.absolutePath());
+		selectFile(fi.fileName());
+	}
+}
+
+void ScFileWidget::gotoParentDirectory()
+{
+	QDir d(directory());
+	d.cdUp();
+	setDirectory(d);
+}
+
+void ScFileWidget::gotoSelectedDirectory()
+{
+	QStringList s(selectedFiles());
+	if (s.count()>0)
+	{
+		QFileInfo fi(s.first());
+		qDebug()<<s.first()<<fi.absoluteFilePath();
+		if (fi.isDir())
+			setDirectory(fi.absoluteFilePath());
+	}
+}
+
+void ScFileWidget::gotoDesktopDirectory()
+{
+	QString dp=QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+	QFileInfo fi(dp);
+	if (fi.exists())
+		setDirectory(dp);
+}
+
+void ScFileWidget::gotoHomeDirectory()
+{
+	QString dp=QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+	QFileInfo fi(dp);
+	if (fi.exists())
+		setDirectory(dp);
+}
+

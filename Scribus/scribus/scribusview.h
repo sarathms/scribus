@@ -24,23 +24,17 @@ for which a new license (GPL+exception) is in place.
 #ifndef SCRIBUSVIEW_H
 #define SCRIBUSVIEW_H
 
-#include "styleoptions.h"
-
 #include <vector>
 // include files for QT
 #include <QScrollArea>
 #include <QLineEdit>
 #include <QScrollBar>
-#if OPTION_USE_QTOOLBUTTON
-    #include <QToolButton>
-#else
-    #include <QPushButton>
-#endif
 #include <QMap>
 #include <QMenu>
 #include <QLabel>
 #include <QComboBox>
 #include <QProgressDialog>
+#include <QPushButton>
 #include <QSpinBox>
 #include <QCursor>
 #include <QDragLeaveEvent>
@@ -103,6 +97,7 @@ public:
 	friend class CanvasMode_EditGradient;
 	friend class CanvasMode_EditMeshGradient;
 	friend class CanvasMode_EditMeshPatch;
+	friend class CanvasMode_EditTable;
 	friend class CanvasMode_EditWeldPoint;
 	friend class CanvasMode_EditPolygon;
 	friend class CanvasMode_EditArc;
@@ -120,30 +115,9 @@ public:
 	void stopGesture();
 	
   /** Vergroesserungseingabefeld */
-	ScrSpinBox* zoomSpinBox; //zoom spinbox at bottom of view
-	PageSelector* pageSelector; //Page selector at bottom of view
 	RulerMover *rulerMover; //Widget between the two rulers for dragging the ruler origin
 	Hruler *horizRuler;
 	Vruler *vertRuler;
-#if OPTION_USE_QTOOLBUTTON
-	QToolButton *zoomDefaultToolbarButton;
-	QToolButton *zoomOutToolbarButton;
-	QToolButton *zoomInToolbarButton;
-	QToolButton *cmsToolbarButton;
-	QToolButton *previewToolbarButton;
-	QToolButton *editOnPreviewToolbarButton;
-#else
-	QPushButton *zoomDefaultToolbarButton;
-	QPushButton *zoomOutToolbarButton;
-	QPushButton *zoomInToolbarButton;
-	QPushButton *cmsToolbarButton;
-	QPushButton *previewToolbarButton;
-	QPushButton *editOnPreviewToolbarButton;
-#endif
-	QComboBox *layerMenu; //Menu for layers at bottom of view
-	QComboBox *unitSwitcher; //Menu for units at bottom of view
-	QComboBox *previewQualitySwitcher; //Menu for image preview quality
-	QComboBox *visualMenu;
 	ClockWidget *clockLabel;
 	QPushButton *endEditButton;
   /** Dokument zu dem die Seite gehoert */
@@ -187,14 +161,13 @@ public:
 
 	void reformPages(bool moveObjects = true);
 	void reformPagesView();
-	void updateLayerMenu();
 	void showMasterPage(int nr);
 	void hideMasterPage();
 	void showSymbolPage(QString symbolName);
 	void hideSymbolPage();
 	void showInlinePage(int id);
 	void hideInlinePage();
-	QImage PageToPixmap(int Nr, int maxGr, bool drawFrame = true);
+	QImage PageToPixmap(int Nr, int maxGr, bool drawFrame = true, bool drawBackground = true);
 	QImage MPageToPixmap(QString name, int maxGr, bool drawFrame = true);
 	void RecalcPicturesRes();
 	/**
@@ -208,13 +181,9 @@ public:
 	void TransformPoly(int mode, int rot = 1, double scaling = 1.0);
 	bool slotSetCurs(int x, int y);
 	void HandleCurs(PageItem *currItem, QRect mpo);
-	bool GetItem(PageItem **b, int nr = -1);
 	void Deselect(bool prop = true);
 	void SelectItemNr(uint nr, bool draw = true, bool single = false);
 	void SelectItem(PageItem *pi, bool draw = true, bool single = false);
-	void SetFrameRect();
-	void SetFrameRounded();
-	void SetFrameOval();
 	void rememberOldZoomLocation(int mx=0, int my=0);
 	bool groupTransactionStarted() { return m_groupTransactions > 0; }
 	void startGroupTransaction(const QString &actionName = "",
@@ -260,14 +229,12 @@ public: // for now
 
 public slots: // Public slots
 	void languageChange();
-	void toggleCMS();
+	void toggleCMS(bool cmsOn);
 	void switchPreviewVisual(int vis);
-	void togglePreviewEdit();
-	void togglePreview();
+	void togglePreviewEdit(bool edit);
+	void togglePreview(bool inPreview);
 	void unitChange();
 	void setRulersShown(bool isShown);
-	void slotUpdateContents();
-	void slotUpdateContents(const QRect &r);
   /** Zooms in or out */
 	void slotZoom100();
   /** Zooms in */
@@ -275,26 +242,15 @@ public slots: // Public slots
 	void slotZoomOut(int mx=0,int my=0);
   /** Redraws everything */
 	void DrawNew();
-	void setMenTxt(int Seite);
-	void setLayerMenuText(const QString &);
 	void GotoPa(int Seite);
 	void GotoLa(int l);
 	void GotoPage(int Seite);
 	void ChgUnit(int art);
 
-	/*! \brief Change canvas preview quality for image items.
-	Called by previewQualitySwitcher (signal).
-	See void ScribusDoc::allItems_ChangePreviewResolution(int id)
-	for changing itself
-	*/
-	void changePreviewQuality(int index);
-
 	void SetCPo(double x, double y);
 	void SetCCPo(double x, double y);
 	void editExtendedImageProperties();
 	void RefreshGradient(PageItem *currItem, double dx = 8, double dy = 8);
-	void ToggleBookmark();
-	void ToggleAnnotation();
 	void ToPicFrame();
 	void ToPolyFrame();
 	void ToTextFrame();
@@ -304,7 +260,6 @@ public slots: // Public slots
 	void Bezier2Poly();
 	void PasteToPage();
 	void TextToPath();
-	void adjustCMS();
 
 //for linking frame after draw new frame
 private:
@@ -314,8 +269,6 @@ private: // Private attributes
 	int m_previousMode;
 	QMenu *pmen3;
 	QMenu *pmenResolution;
-	QMenu *cmsAdjustMenu;
-	QAction *idCmsAdjustMenu;
 	QPoint m_pressLocation;
 	QTime m_moveTimer;
 	QTimer *m_dragTimer;
@@ -391,7 +344,7 @@ protected: // Protected methods
 signals:
 	void changeUN(int);
 	void changeLA(int);
-	void HaveSel(int);
+	void HaveSel();
 	void DocChanged();
 	void ItemGeom();
 	void PolyOpen();
@@ -425,6 +378,7 @@ signals:
 	void LevelChanged(uint);
 	void HavePoint(bool, bool);
 	void ClipPo(double, double);
+	void PolyStatus(int, uint);
 	void AnnotProps();
 	void EndNodeEdit();
 	void Hrule(int);

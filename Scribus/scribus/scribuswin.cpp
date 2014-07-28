@@ -22,29 +22,23 @@ for which a new license (GPL+exception) is in place.
  ***************************************************************************/
 
 #include "scribuswin.h"
-#include "scribus.h"
-#include "commonstrings.h"
-#include "fileloader.h"
-#include "ui/pagepalette.h"
-#include "ui/pageselector.h"
-#include "ui/scrspinbox.h"
-#include "ui/storyeditor.h"
-#include "util.h"
-#include "util_file.h"
-#include "util_icon.h"
 
 #include <QApplication>
-#include <QCloseEvent>
 #include <QDir>
-#include <QFileInfo>
 #include <QMessageBox>
+
+#include "scribus.h"
+#include "scribusdoc.h"
+#include "scribusview.h"
+#include "commonstrings.h"
+#include "ui/storyeditor.h"
+#include "util_icon.h"
 
 ScribusWin::ScribusWin(QWidget* parent, ScribusDoc* doc) : QMainWindow(parent)
 {
 	setWindowIcon(loadIcon("AppIcon2.png"));
 	setAttribute(Qt::WA_DeleteOnClose);
 	m_Doc = doc;
-	currentDir = QDir::currentPath();
 }
 
 void ScribusWin::setMainWindow(ScribusMainWindow *mw)
@@ -56,117 +50,48 @@ void ScribusWin::setView(ScribusView* newView)
 {
 	m_View = newView;
 	++m_Doc->viewCount;
-	winIndex = ++m_Doc->viewID;
-	statusFrame = new QFrame(this);
-	statusFrameLayout = new QHBoxLayout(statusFrame);
-	statusFrameLayout->setMargin(0);
-	statusFrameLayout->setSpacing(0);
-	m_View->unitSwitcher->setParent(statusFrame);
-	m_View->previewQualitySwitcher->setParent(statusFrame);
-	m_View->layerMenu->setParent(statusFrame);
-	m_View->zoomOutToolbarButton->setParent(statusFrame);
-	m_View->zoomDefaultToolbarButton->setParent(statusFrame);
-	m_View->zoomInToolbarButton->setParent(statusFrame);
-	m_View->pageSelector->setParent(statusFrame);
-	m_View->zoomSpinBox->setParent(statusFrame);
-	m_View->cmsToolbarButton->setParent(statusFrame);
-	m_View->previewToolbarButton->setParent(statusFrame);
-	m_View->visualMenu->setParent(statusFrame);
-	statusFrameLayout->addWidget(m_View->unitSwitcher);
-	statusFrameLayout->addWidget(m_View->zoomSpinBox);
-	statusFrameLayout->addWidget(m_View->zoomOutToolbarButton);
-	statusFrameLayout->addWidget(m_View->zoomDefaultToolbarButton);
-	statusFrameLayout->addWidget(m_View->zoomInToolbarButton);
-	statusFrameLayout->addWidget(m_View->pageSelector);
-	statusFrameLayout->addWidget(m_View->layerMenu);
-	QSpacerItem* spacer = new QSpacerItem( 2, 2, QSizePolicy::Expanding, QSizePolicy::Minimum );
-	statusFrameLayout->addItem( spacer );
-	statusFrameLayout->addWidget(m_View->cmsToolbarButton);
-	statusFrameLayout->addWidget(m_View->editOnPreviewToolbarButton);
-	statusFrameLayout->addWidget(m_View->previewToolbarButton);
-	statusFrameLayout->addWidget(m_View->previewQualitySwitcher);
-	statusFrameLayout->addWidget(m_View->visualMenu);
-	statusBar()->addPermanentWidget(statusFrame, 4);
-	currentDir = QDir::currentPath();
+	m_winIndex = ++m_Doc->viewID;
 	setCentralWidget(newView);
+	setStatusBar(0);
 }
 
-void ScribusWin::slotAutoSave()
+void ScribusWin::slotSaved(QString newName)
 {
-	if ((m_Doc->hasName) && (m_Doc->isModified()))
-	{
-		//#8081 : change behavior of autosave, autosave writes now to an .autosave file
-		//instead of overwriting source document
-		//moveFile(m_Doc->DocName, m_Doc->DocName+".bak");
-		FileLoader fl(m_Doc->DocName);
-		if (fl.saveFile(m_Doc->DocName+".autosave", m_Doc, 0))
-		{
-			//#8081 related : do not unset modified flag until user really save file
-			//m_Doc->setModified(false);
-			setWindowTitle(QDir::toNativeSeparators(m_Doc->DocName));
-			qApp->processEvents();
-			emit AutoSaved();
-		}
-	}
+	setWindowTitle(QDir::toNativeSeparators(newName));
+	qApp->processEvents();
+	emit autoSaved(); //TODO: to update the main window title, do this from the doc?
 }
 
 void ScribusWin::closeEvent(QCloseEvent *ce)
 {
 	activateWindow();
 	m_MainWindow->newActWin(getSubWin());
-	if (m_Doc->symbolEditMode())
+	if (m_Doc->isModified() && (m_Doc->viewCount == 1))
 	{
-		m_MainWindow->editSymbolEnd();
-		ce->ignore();
-		return;
-	}
-	else if (m_Doc->inlineEditMode())
-	{
-		m_MainWindow->editInlineEnd();
-		ce->ignore();
-		return;
-	}
-	else if (m_Doc->masterPageMode())
-	{
-		m_MainWindow->manageMasterPagesEnd();
-		ce->ignore();
-		return;
-	}
-	else
-	{
-		if (m_Doc->isModified() && (m_Doc->viewCount == 1))
+		int exit = QMessageBox::information(m_MainWindow, CommonStrings::trWarning, tr("Document:")+" "+
+											QDir::toNativeSeparators(m_Doc->DocName)+"\n"+
+											tr("has been changed since the last save."),
+											QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+											QMessageBox::Cancel);
+		if (exit == QMessageBox::Cancel)
 		{
-			int exit = QMessageBox::information(m_MainWindow, CommonStrings::trWarning, tr("Document:")+" "+
-												QDir::toNativeSeparators(m_Doc->DocName)+"\n"+
-												tr("has been changed since the last save."),
-												QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
-												QMessageBox::Cancel);
-			if (exit == QMessageBox::Cancel)
+			ce->ignore();
+			return;
+		}
+		if (exit == QMessageBox::Save)
+		{
+			if (m_MainWindow->slotFileSave())
+			{
+				if (m_Doc == m_MainWindow->storyEditor->currentDocument())
+					m_MainWindow->storyEditor->close();
+			}
+			else
 			{
 				ce->ignore();
 				return;
 			}
-			if (exit == QMessageBox::Save)
-			{
-				if (m_MainWindow->slotFileSave())
-				{
-					if (m_Doc == m_MainWindow->storyEditor->currentDocument())
-						m_MainWindow->storyEditor->close();
-				}
-				else
-				{
-					ce->ignore();
-					return;
-				}
-			}
 		}
-		m_MainWindow->DoFileClose();
 	}
+	m_MainWindow->DoFileClose();
 	ce->accept();
 }
-
-void ScribusWin::resizeEvent(QResizeEvent *re)
-{
-	statusBar()->setSizeGripEnabled(!isMaximized());
-}
-

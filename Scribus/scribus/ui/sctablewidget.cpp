@@ -6,6 +6,7 @@ for which a new license (GPL+exception) is in place.
 */
 #include "sctablewidget.h"
 
+#include <QDebug>
 //Widgets supported
 #include <QComboBox>
 #include <QCheckBox>
@@ -51,25 +52,44 @@ bool ScTableWidget::eventFilter(QObject *obj, QEvent *event)
 			}
 		}
 		else
+		{
+			QCheckBox* checkbox = qobject_cast<QCheckBox*>(obj);
+			if (checkbox)
 			{
-				QCheckBox* checkbox = qobject_cast<QCheckBox*>(obj);
-				if (checkbox)
+				if (widgetPositions.contains(checkbox))
 				{
-					if (widgetPositions.contains(checkbox))
-					{
-						r=widgetPositions.value(checkbox).first;
-						c=widgetPositions.value(checkbox).second;
-					}
+					r=widgetPositions.value(checkbox).first;
+					c=widgetPositions.value(checkbox).second;
 				}
 			}
+		}
 		if (r!=-1 && c!=-1)
 			emit cellChanged(r,c);
 	}
 	return QTableWidget::eventFilter(obj, event);
 }
 
+void ScTableWidget::comboBoxReceiver(int i)
+{
+	if (!sender())
+		return;
+	QComboBox* comboBox = qobject_cast<QComboBox*>(sender());
+	if (!comboBox)
+		return;
+	if (!widgetPositions.contains(comboBox))
+		return;
+	int r=-1, c=-1;
+	r=widgetPositions.value(comboBox).first;
+	c=widgetPositions.value(comboBox).second;
+	if (r!=-1 && c!=-1)
+		emit cellChanged(r,c);
+}
+
 void ScTableWidget::setCellWidget(int row, int column, QWidget * widget)
 {
+	QComboBox* comboBox = qobject_cast<QComboBox*>(widget);
+	if (comboBox)
+		connect(comboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(comboBoxReceiver(int)));
 	widget->installEventFilter(this);
 	QTableWidget::setCellWidget(row, column, widget);
 	widgetPositions.insert(widget, QPair<int, int>(row, column));

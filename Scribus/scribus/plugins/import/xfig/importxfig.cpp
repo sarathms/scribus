@@ -17,11 +17,12 @@ for which a new license (GPL+exception) is in place.
 
 #include <cstdlib>
 
-#include "commonstrings.h"
 #include "importxfig.h"
+
+#include "commonstrings.h"
 #include "loadsaveplugin.h"
-#include "pagesize.h"
 #include "pageitem.h"
+#include "pagesize.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
@@ -33,9 +34,10 @@ for which a new license (GPL+exception) is in place.
 #include "scmimedata.h"
 #include "scpaths.h"
 #include "scpattern.h"
-#include "scribus.h"
 #include "scribusXml.h"
 #include "scribuscore.h"
+#include "scribusdoc.h"
+#include "scribusview.h"
 #include "sctextstream.h"
 #include "selection.h"
 #include "ui/customfdialog.h"
@@ -47,6 +49,7 @@ for which a new license (GPL+exception) is in place.
 #include "util_formats.h"
 #include "util_icon.h"
 #include "util_math.h"
+
 
 extern SCRIBUS_API ScribusQApp * ScQApp;
 
@@ -63,15 +66,15 @@ QImage XfigPlug::readThumbnail(QString fName)
 {
 	QFileInfo fi = QFileInfo(fName);
 	baseFile = QDir::cleanPath(QDir::toNativeSeparators(fi.absolutePath()+"/"));
-	double b, h, x, y;
-	parseHeader(fName, x, y, b, h);
+	double w=0.0, h=0.0, x=0.0, y=0.0;
+	parseHeader(fName, x, y, w, h);
 	docX = x;
 	docY = y;
-	if (b == 0.0)
-		b = PrefsManager::instance()->appPrefs.docSetupPrefs.pageWidth;
+	if (w == 0.0)
+		w = PrefsManager::instance()->appPrefs.docSetupPrefs.pageWidth;
 	if (h == 0.0)
 		h = PrefsManager::instance()->appPrefs.docSetupPrefs.pageHeight;
-	docWidth = b - x;
+	docWidth = w - x;
 	docHeight = h - y;
 	progressDialog = NULL;
 	m_Doc = new ScribusDoc();

@@ -58,7 +58,7 @@ for which a new license (GPL+exception) is in place.
 #include "util.h"
 #include "util_icon.h"
 #include "sccolor.h"
-#include "scribusview.h"
+
 #include "scribusdoc.h"
 #include "scpaths.h"
 #include "ui/pageselector.h"
@@ -352,7 +352,7 @@ PPreview::PPreview( QWidget* parent, ScribusView *vin, ScribusDoc *docu, QString
 			EnableCMYK_K->setEnabled(false);
 		}
 	}
-	PGSel->GotoPg(doc->currentPage()->pageNr());
+	PGSel->setGUIForPage(doc->currentPage()->pageNr());
 	// tooltips
 	AntiAlias->setToolTip( "<qt>" + tr( "Provides a more pleasant view of Type 1 fonts, TrueType Fonts, OpenType Fonts, EPS, PDF and vector graphics in the preview, at the expense of a slight slowdown in previewing" ) + "</qt>" );
 	AliasTr->setToolTip( "<qt>" + tr( "Shows transparency and transparent items in your document. Requires Ghostscript 7.07 or later" ) + "</qt>");

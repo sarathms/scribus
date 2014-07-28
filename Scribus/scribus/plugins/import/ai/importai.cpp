@@ -20,25 +20,25 @@ for which a new license (GPL+exception) is in place.
 #include <tiffio.h>
 #include <zlib.h>
 
-#include "commonstrings.h"
-
 #include "importai.h"
+
+#include "commonstrings.h"
 #include "loadsaveplugin.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
 #include "prefstable.h"
 #include "rawimage.h"
+#include "scclocale.h"
 #include "sccolorengine.h"
 #include "scconfig.h"
-#include "scclocale.h"
 #include "scmimedata.h"
 #include "scpaths.h"
 #include "scpattern.h"
-#include "scribus.h"
 #include "scribusXml.h"
 #include "scribuscore.h"
 #include "scribusdoc.h"
+#include "scribusview.h"
 #include "sctextstream.h"
 #include "selection.h"
 #include "text/specialchars.h"
@@ -51,9 +51,9 @@ for which a new license (GPL+exception) is in place.
 #include "util_color.h"
 #include "util_file.h"
 #include "util_formats.h"
+#include "util_ghostscript.h"
 #include "util_icon.h"
 #include "util_math.h"
-#include "util_ghostscript.h"
 
 #include <cairo.h>
 
@@ -2548,6 +2548,7 @@ void AIPlug::processData(QString data)
 					ite = m_Doc->Items->at(z);
 					ite->setTextToFrameDist(0.0, 0.0, 0.0, 0.0);
 					ite->itemText.append(textData);
+					ite->itemText.trim();
 					double xpos = ite->xPos();
 					double ypos = ite->yPos();
 					ite->setWidthHeight(qMax(ite->width(), maxWidth), qMax(ite->height(), maxHeight));
@@ -2743,7 +2744,7 @@ void AIPlug::processPattern(QDataStream &ts)
 						PageItem* currItem = tmpSel->itemAt(0);
 						currItem->setItemName(currentPatternDefName);
 						m_Doc->DoDrawing = true;
-						QImage tmpImg = currItem->DrawObj_toImage(qMax(qRound(patternX2 - patternX1), qRound(patternY2 - patternY1)));
+						QImage tmpImg = currItem->DrawObj_toImage(qMin(qMax(qRound(patternX2 - patternX1), qRound(patternY2 - patternY1)), 500));
 						if (!tmpImg.isNull())
 						{
 							QImage retImg = QImage(qRound(patternX2 - patternX1), qRound(patternY2 - patternY1), QImage::Format_ARGB32_Premultiplied);
@@ -2887,7 +2888,7 @@ void AIPlug::processSymbol(QDataStream &ts, bool sym)
 					PageItem* currItem = tmpSel->itemAt(0);
 					currItem->setItemName(currentPatternDefName);
 					m_Doc->DoDrawing = true;
-					pat.pattern = currItem->DrawObj_toImage(qMax(tmpSel->width(), tmpSel->height()));
+					pat.pattern = currItem->DrawObj_toImage(qMin(qMax(tmpSel->width(), tmpSel->height()), 500.0));
 					if (!pat.pattern.isNull())
 					{
 						pat.width = tmpSel->width();

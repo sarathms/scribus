@@ -23,6 +23,8 @@ for which a new license (GPL+exception) is in place.
 #include <QPushButton>
 #include <QSpacerItem>
 #include <QSpinBox>
+#include <QStandardPaths>
+#include <QStringList>
 #include <QTabWidget>
 #include <QToolTip>
 
@@ -38,7 +40,7 @@ for which a new license (GPL+exception) is in place.
 #include "prefsfile.h"
 #include "prefsmanager.h"
 #include "sccombobox.h"
-#include "scescapecatcher.h"
+#include "filedialogeventcatcher.h"
 #include "scrspinbox.h"
 #include "units.h"
 #include "util_icon.h"
@@ -369,7 +371,6 @@ void NewDoc::createOpenDocPage()
 	fileDialog->setOption(QFileDialog::DontUseNativeDialog);
 	fileDialog->setNameFilterDetailsVisible(false);
 	fileDialog->setReadOnly(true);
-
 	fileDialog->setSizeGripEnabled(false);
 	fileDialog->setModal(false);
 	QList<QPushButton *> b = fileDialog->findChildren<QPushButton *>();
@@ -379,14 +380,19 @@ void NewDoc::createOpenDocPage()
 	fileDialog->setWindowFlags(Qt::Widget);
 	openDocLayout->addWidget(fileDialog);
 
-	ScEscapeCatcher* keyCatcher = new ScEscapeCatcher(this);
+	FileDialogEventCatcher* keyCatcher = new FileDialogEventCatcher(this);
 	QList<QListView *> lv = fileDialog->findChildren<QListView *>();
 	QListIterator<QListView *> lvi(lv);
 	while (lvi.hasNext())
 		lvi.next()->installEventFilter(keyCatcher);
 	connect(keyCatcher, SIGNAL(escapePressed()), this, SLOT(reject()));
-
+	connect(keyCatcher, SIGNAL(dropLocation(QString)), this, SLOT(locationDropped(QString)));
+	connect(keyCatcher, SIGNAL(desktopPressed()), this, SLOT(gotoDesktopDirectory()));
+	connect(keyCatcher, SIGNAL(homePressed()), this, SLOT(gotoHomeDirectory()));
+	connect(keyCatcher, SIGNAL(parentPressed()), this, SLOT(gotoParentDirectory()));
+	connect(keyCatcher, SIGNAL(enterSelectedPressed()), this, SLOT(gotoSelectedDirectory()));
 	connect(fileDialog, SIGNAL(filesSelected(const QStringList &)), this, SLOT(openFile()));
+	connect(fileDialog, SIGNAL(rejected()), this, SLOT(reject()));
 }
 
 void NewDoc::openFile()
@@ -690,4 +696,53 @@ void NewDoc::adjustTitles(int tab)
  		setWindowTitle( tr("Open Recent Document"));
  	else
 		setWindowTitle( tr( "New Document" ) );
+}
+
+void NewDoc::locationDropped(QString fileUrl)
+{
+	QFileInfo fi(fileUrl);
+	if (fi.isDir())
+		fileDialog->setDirectory(fi.absoluteFilePath());
+	else
+	{
+		fileDialog->setDirectory(fi.absolutePath());
+		fileDialog->selectFile(fi.fileName());
+	}
+}
+
+void NewDoc::gotoParentDirectory()
+{
+	QDir d(fileDialog->directory());
+	d.cdUp();
+	fileDialog->setDirectory(d);
+}
+
+
+void NewDoc::gotoSelectedDirectory()
+{
+	QStringList s(fileDialog->selectedFiles());
+	if (s.count()>0)
+	{
+		QFileInfo fi(s.first());
+		qDebug()<<s.first()<<fi.absoluteFilePath();
+		if (fi.isDir())
+			fileDialog->setDirectory(fi.absoluteFilePath());
+	}
+}
+
+void NewDoc::gotoDesktopDirectory()
+{
+	QString dp=QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+	QFileInfo fi(dp);
+	if (fi.exists())
+		fileDialog->setDirectory(dp);
+}
+
+
+void NewDoc::gotoHomeDirectory()
+{
+	QString dp=QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+	QFileInfo fi(dp);
+	if (fi.exists())
+		fileDialog->setDirectory(dp);
 }

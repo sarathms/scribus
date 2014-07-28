@@ -6,6 +6,7 @@ for which a new license (GPL+exception) is in place.
 */
 
 #include "scpainter.h"
+#include "scpattern.h"
 #include "util_color.h"
 #include "util.h"
 #include "util_math.h"
@@ -42,6 +43,7 @@ ScPainter::ScPainter( QImage *target, unsigned int w, unsigned int h, double tra
 	PLineJoin = Qt::MiterJoin;
 	fill_gradient = VGradient(VGradient::linear);
 	stroke_gradient = VGradient(VGradient::linear);
+	setHatchParameters(0, 2, 0, false, QColor(), QColor(), 0.0, 0.0);
 	m_zoomFactor = 1;
 	layeredMode = true;
 	imageMode = true;
@@ -391,6 +393,18 @@ void ScPainter::setMeshGradient(FPoint p1, FPoint p2, FPoint p3, FPoint p4, QLis
 	gradPatchP4 = p4;
 }
 
+void ScPainter::setHatchParameters(int mode, double distance, double angle, bool useBackground, QColor background, QColor foreground, double width, double height)
+{
+	hatchType = mode;
+	hatchDistance = distance;
+	hatchAngle = angle;
+	hatchUseBackground = useBackground;
+	hatchBackground = background;
+	hatchForeground = foreground;
+	hatchWidth = width;
+	hatchHeight = height;
+}
+
 void ScPainter::fillPath()
 {
 	if (fillMode != 0)
@@ -520,6 +534,12 @@ void ScPainter::setRasterOp(int blendMode)
 		cairo_set_operator(m_cr, CAIRO_OPERATOR_HSL_COLOR);
 	else if (blendMode == 15)
 		cairo_set_operator(m_cr, CAIRO_OPERATOR_HSL_LUMINOSITY);
+	else if (blendMode == 16)
+		cairo_set_operator(m_cr, CAIRO_OPERATOR_ADD);
+	else if (blendMode == 17)
+		cairo_set_operator(m_cr, CAIRO_OPERATOR_DEST_IN);
+	else if (blendMode == 18)
+		cairo_set_operator(m_cr, CAIRO_OPERATOR_DEST_OUT);
 	else
 		cairo_set_operator(m_cr, CAIRO_OPERATOR_OVER);
 }
@@ -1345,7 +1365,10 @@ void ScPainter::fillPathHelper()
 				pat = cairo_pattern_create_linear (x1, y1,  x2, y2);
 			else
 				pat = cairo_pattern_create_radial (fx, fy, 0, x1, y1, sqrt(pow(x2 - x1, 2) + pow(y2 - y1,2)));
-			cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
+			if (fill_gradient.repeatMethod() == VGradient::none)
+				cairo_pattern_set_extend(pat, CAIRO_EXTEND_NONE);
+			else
+				cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
 			cairo_pattern_set_filter(pat, CAIRO_FILTER_GOOD);
 			QList<VColorStop*> colorStops = fill_gradient.colorStops();
 			for( int offset = 0 ; offset < colorStops.count() ; offset++ )
@@ -1455,6 +1478,96 @@ void ScPainter::fillPathHelper()
 		cairo_surface_destroy (image2);
 		cairo_set_antialias(m_cr, CAIRO_ANTIALIAS_DEFAULT);
 	}
+	else if (fillMode == 4)
+	{
+		cairo_path_t *path;
+		path = cairo_copy_path(m_cr);
+		cairo_push_group(m_cr);
+		if (hatchUseBackground && hatchBackground.isValid())
+		{
+			double r2, g2, b2;
+			hatchBackground.getRgbF(&r2, &g2, &b2);
+			cairo_set_source_rgb(m_cr, r2, g2, b2);
+			cairo_fill_preserve(m_cr);
+		}
+		double r, g, b;
+		hatchForeground.getRgbF(&r, &g, &b);
+		cairo_clip_preserve (m_cr);
+		cairo_set_line_width( m_cr, 1 );
+		cairo_set_source_rgb(m_cr, r, g, b);
+		translate(hatchWidth / 2.0, hatchHeight / 2.0);
+		double lineLen = sqrt((hatchWidth / 2.0) * (hatchWidth / 2.0) + (hatchHeight / 2.0) * (hatchHeight / 2.0));
+		double dist = 0.0;
+		while (dist < lineLen)
+		{
+			cairo_save( m_cr );
+			rotate(-hatchAngle);
+			newPath();
+			moveTo(-lineLen, dist);
+			lineTo(lineLen, dist);
+			cairo_stroke( m_cr );
+			if (dist > 0)
+			{
+				newPath();
+				moveTo(-lineLen, -dist);
+				lineTo(lineLen, -dist);
+				cairo_stroke( m_cr );
+			}
+			cairo_restore( m_cr );
+			if ((hatchType == 1) || (hatchType == 2))
+			{
+				cairo_save( m_cr );
+				rotate(-hatchAngle + 90);
+				newPath();
+				moveTo(-lineLen, dist);
+				lineTo(lineLen, dist);
+				cairo_stroke( m_cr );
+				if (dist > 0)
+				{
+					newPath();
+					moveTo(-lineLen, -dist);
+					lineTo(lineLen, -dist);
+					cairo_stroke( m_cr );
+				}
+				cairo_restore( m_cr );
+			}
+			if (hatchType == 2)
+			{
+				cairo_save( m_cr );
+				rotate(-hatchAngle + 45);
+				double dDist = dist * sqrt(2.0);
+				newPath();
+				moveTo(-lineLen, dDist);
+				lineTo(lineLen, dDist);
+				cairo_stroke( m_cr );
+				if (dist > 0)
+				{
+					newPath();
+					moveTo(-lineLen, -dDist);
+					lineTo(lineLen, -dDist);
+					cairo_stroke( m_cr );
+				}
+				cairo_restore( m_cr );
+			}
+			dist += hatchDistance;
+		}
+		cairo_pop_group_to_source (m_cr);
+		setRasterOp(m_blendModeFill);
+		if (maskMode > 0)
+		{
+			cairo_pattern_t *patM = getMaskPattern();
+			cairo_pattern_set_filter(patM, CAIRO_FILTER_FAST);
+			cairo_mask(m_cr, patM);
+			if ((maskMode == 2) || (maskMode == 4) || (maskMode == 5) || (maskMode == 6))
+				cairo_surface_destroy(imageMask);
+			cairo_pattern_destroy(patM);
+		}
+		else
+			cairo_paint_with_alpha (m_cr, fill_trans);
+		newPath();
+		cairo_append_path(m_cr, path);
+		cairo_path_destroy(path);
+	}
 	cairo_restore( m_cr );
 	cairo_set_operator(m_cr, CAIRO_OPERATOR_OVER);
 }
@@ -1532,7 +1645,10 @@ void ScPainter::strokePathHelper()
 			pat = cairo_pattern_create_linear (x1, y1,  x2, y2);
 		else
 			pat = cairo_pattern_create_radial (fx, fy, 0, x1, y1, sqrt(pow(x2 - x1, 2) + pow(y2 - y1,2)));
-		cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
+		if (stroke_gradient.repeatMethod() == VGradient::none)
+			cairo_pattern_set_extend(pat, CAIRO_EXTEND_NONE);
+		else
+			cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
 		cairo_pattern_set_filter(pat, CAIRO_FILTER_GOOD);
 		QList<VColorStop*> colorStops = stroke_gradient.colorStops();
 		for( int offset = 0 ; offset < colorStops.count() ; offset++ )
@@ -1609,17 +1725,17 @@ void ScPainter::drawImage( QImage *image)
 	cairo_surface_t *image2  = cairo_image_surface_create_for_data ((uchar*)image->bits(), CAIRO_FORMAT_RGB24, image->width(), image->height(), image->width()*4);
 	cairo_surface_t *image3 = cairo_image_surface_create_for_data ((uchar*)image->bits(), CAIRO_FORMAT_ARGB32, image->width(), image->height(), image->width()*4);
 	cairo_set_source_surface (m_cr, image2, 0, 0);
-	cairo_pattern_set_filter(cairo_get_source(m_cr), CAIRO_FILTER_FAST);
+	cairo_pattern_set_filter(cairo_get_source(m_cr), CAIRO_FILTER_GOOD);
     cairo_mask_surface (m_cr, image3, 0, 0);
 	cairo_surface_destroy (image2);
 	cairo_surface_destroy (image3);
 	cairo_pop_group_to_source (m_cr);
-	cairo_pattern_set_filter(cairo_get_source(m_cr), CAIRO_FILTER_FAST);
+	cairo_pattern_set_filter(cairo_get_source(m_cr), CAIRO_FILTER_GOOD);
 	setRasterOp(m_blendModeFill);
 	if (maskMode > 0)
 	{
 		cairo_pattern_t *patM = getMaskPattern();
-		cairo_pattern_set_filter(patM, CAIRO_FILTER_FAST);
+		cairo_pattern_set_filter(patM, CAIRO_FILTER_GOOD);
 		cairo_mask(m_cr, patM);
 		if ((maskMode == 2) || (maskMode == 4) || (maskMode == 5) || (maskMode == 6))
 			cairo_surface_destroy(imageMask);
@@ -1643,7 +1759,7 @@ void ScPainter::setupPolygon(FPointArray *points, bool closed)
 	newPath();
 	for (int poi=0; poi<points->size()-3; poi += 4)
 	{
-		if (points->point(poi).x() > 900000)
+		if (points->isMarker(poi))
 		{
 			nPath = true;
 			continue;
@@ -1685,7 +1801,7 @@ void ScPainter::setupSharpPolygon(FPointArray *points, bool closed)
 	newPath();
 	for (int poi=0; poi<points->size()-3; poi += 4)
 	{
-		if (points->point(poi).x() > 900000)
+		if (points->isMarker(poi))
 		{
 			nPath = true;
 			continue;

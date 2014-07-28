@@ -11,9 +11,12 @@ for which a new license (GPL+exception) is in place.
 #include <QListWidgetItem>
 #include <QWidget>
 
+
+#include "appmodes.h"
 #include "colorcombo.h"
 #include "commonstrings.h"
 #include "pageitem_table.h"
+#include "propertiespalette_table.h"
 #include "sccolorengine.h"
 #include "scribus.h"
 #include "selection.h"
@@ -23,7 +26,6 @@ for which a new license (GPL+exception) is in place.
 #include "util_color.h"
 #include "util_icon.h"
 
-#include "propertiespalette_table.h"
 
 PropertiesPalette_Table::PropertiesPalette_Table(QWidget* parent) : QWidget(parent),
 	m_mainWindow(0), m_doc(0), m_item(0), m_previousItem(0)
@@ -146,14 +148,14 @@ void PropertiesPalette_Table::handleCellSelectionChanged()
 	updateStyleControls();
 }
 
-void PropertiesPalette_Table::displayTableStyle(const QString& name)
+void PropertiesPalette_Table::showTableStyle(const QString& name)
 {
 	bool blocked = tableStyleCombo->blockSignals(true);
 	tableStyleCombo->setFormat(name);
 	tableStyleCombo->blockSignals(blocked);
 }
 
-void PropertiesPalette_Table::displayCellStyle(const QString& name)
+void PropertiesPalette_Table::showCellStyle(const QString& name)
 {
 	bool blocked = cellStyleCombo->blockSignals(true);
 	cellStyleCombo->setFormat(name);
@@ -172,14 +174,14 @@ void PropertiesPalette_Table::updateStyleControls()
 		// Fill in values.
 		if (m_doc->appMode != modeEditTable)
 		{
-			displayTableStyle(table->style());
+			showTableStyle(table->style());
 			cellStyleCombo->setEnabled(false);
 			buttonClearCellStyle->setEnabled(false);
 		}
 		else
 		{
-//			displayTableStyle(table->style());
-			displayCellStyle(table->activeCell().style());
+//			showTableStyle(table->style());
+			showCellStyle(table->activeCell().style());
 		}
 	}
 	else
@@ -197,7 +199,7 @@ void PropertiesPalette_Table::setTableStyle(const QString &name)
 		return;
 	m_item->asTable()->setStyle(name);
 	m_item->asTable()->update();
-	displayTableStyle(name);
+	showTableStyle(name);
 }
 
 void PropertiesPalette_Table::setCellStyle(const QString &name)
@@ -208,7 +210,7 @@ void PropertiesPalette_Table::setCellStyle(const QString &name)
 	m_item->asTable()->activeCell().setStyle(name);
 	m_doc->dontResize = true;
 	m_item->asTable()->update();
-	displayCellStyle(name);
+	showCellStyle(name);
 }
 
 void PropertiesPalette_Table::on_sideSelector_selectionChanged()

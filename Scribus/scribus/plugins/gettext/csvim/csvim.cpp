@@ -132,6 +132,9 @@ void CsvIm::loadFile()
 		if (colCount < colIndex)
 			colCount = colIndex;
 	}
+	if (data.startsWith("\t"))
+		data.remove(0,1);
+	data.replace("\n\t","\n");
 }
 
 void CsvIm::parseLine(const QString& line, bool isHeader)
@@ -150,7 +153,7 @@ void CsvIm::parseLine(const QString& line, bool isHeader)
 		}
 		return; // line done
 	}
-	
+
 	int vdIndexStart = line.indexOf(valueDelimiter);
 	int vdIndexEnd   = line.indexOf(valueDelimiter, vdIndexStart + 1);
 	if (vdIndexEnd < 0)
@@ -159,12 +162,12 @@ void CsvIm::parseLine(const QString& line, bool isHeader)
 			header += "\t" + line;
 		else
 			data += "\t" + line;
-		return; // error in line, no closing valuedelimiter could be found	
+		return; // error in line, no closing valuedelimiter could be found
 	}
-	
+
 	int fdIndex = line.indexOf(fieldDelimiter, vdIndexEnd + 1);
 	QString tmpCol = "";
-	
+
 	if (fdIndex < 0)
 	{
 		if (vdIndexEnd < 0)
@@ -185,7 +188,7 @@ void CsvIm::parseLine(const QString& line, bool isHeader)
 		++colIndex;
 		return; // no more field delimiters left
 	}
-	
+
 	if (fdIndex < vdIndexStart)
 	{
 		tmpCol = line.mid(0, fdIndex);

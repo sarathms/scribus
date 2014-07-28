@@ -12,6 +12,7 @@ for which a new license (GPL+exception) is in place.
 #include <QPainter>
 #include <QStackedWidget>
 
+#include "appmodes.h"
 #include "commonstrings.h"
 #include "pagelayout.h"
 #include "pagepalette.h"
@@ -21,6 +22,7 @@ for which a new license (GPL+exception) is in place.
 #include "sccombobox.h"
 #include "scpage.h"
 #include "scribus.h"
+#include "scribusdoc.h"
 #include "scribusview.h"
 #include "util_icon.h"
 
@@ -40,7 +42,7 @@ PagePalette::PagePalette(QWidget* parent) : ScDockPalette(parent, "PagePalette",
 
 	setWidget(stackedWidget);
 
-	connect(pageWidget, SIGNAL(gotoMasterPage(QString)), m_scMW, SLOT(manageMasterPages(QString)));
+	connect(pageWidget, SIGNAL(gotoMasterPage(QString)), m_scMW, SLOT(editMasterPagesStart(QString)));
 	
 	Rebuild();
 	languageChange();
@@ -161,7 +163,20 @@ bool PagePalette::masterPageMode()
 
 void PagePalette::startMasterPageMode(QString masterPage)
 {
-	m_view->Deselect(true);
+	ScribusDoc* doc = m_view->Doc;
+	
+	bool mustDeselect = false;
+	mustDeselect |= (!doc->masterPageMode());
+	mustDeselect |= (doc->masterPageMode() && doc->currentPage()->pageName() != masterPage);
+	if (mustDeselect)
+	{
+		// We must avoid deselecting directly if doc is in an edit mode,
+		// otherwise that would cause an inconsistent state. In such case,
+		// fallback to normal mode by precaution
+		if (doc->appMode != modeNormal)
+			m_view->requestMode(modeNormal);
+		m_view->Deselect(true);
+	}
 
 	QStackedWidget* stackedWidget = this->stackedWidget();
 	if (stackedWidget->count() < 2)
@@ -171,7 +186,7 @@ void PagePalette::startMasterPageMode(QString masterPage)
 		stackedWidget->addWidget(mpWidget);
 
 		connect(mpWidget, SIGNAL(removePage(int )), m_scMW, SLOT(deletePage2(int )));
-		connect(mpWidget, SIGNAL(finished())      , m_scMW, SLOT(manageMasterPagesEnd()));
+		connect(mpWidget, SIGNAL(finished())      , m_scMW, SLOT(editMasterPagesEnd()));
 	}
 	else
 	{

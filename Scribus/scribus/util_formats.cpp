@@ -34,12 +34,13 @@ FormatsManager::FormatsManager()
 	m_fmts.insert(FormatsManager::CVG,  QStringList() << "cvg");
 	m_fmts.insert(FormatsManager::WPG,  QStringList() << "wpg");
 	m_fmts.insert(FormatsManager::BMP,  QStringList() << "bmp");
+	m_fmts.insert(FormatsManager::ORA,  QStringList() << "ora");
 #ifdef GMAGICK_FOUND
 	m_fmts.insert(FormatsManager::GMAGICK, QStringList() << "xbm" << "tga" << "ptif" << "ppm" << "pnm" << "pgm" << "pcds" << "pcd" << "pbm" << "mng" << "ico" << "gif" << "fax" << "dpx" << "bmp" << "xcf");
 #endif
 	m_fmts.insert(FormatsManager::UNICONV, QStringList() << "cdt" << "ccx" << "cmx" << "aff" << "sk" << "sk1" << "plt" << "dxf" << "dst" << "pes" << "exp" << "pcs");
 	m_fmts.insert(FormatsManager::PCT,  QStringList() << "pct" << "pic" << "pict");
-	
+
 	m_fmtNames[FormatsManager::EPS]  = QObject::tr("Encapsulated PostScript \"*.eps\"");
 	m_fmtNames[FormatsManager::GIF]  = QObject::tr("GIF");
 	m_fmtNames[FormatsManager::JPEG] = QObject::tr("JPEG");
@@ -58,12 +59,13 @@ FormatsManager::FormatsManager()
 	m_fmtNames[FormatsManager::CVG]  = QObject::tr("Calamus CVG File");
 	m_fmtNames[FormatsManager::WPG]  = QObject::tr("Word Perfect WPG File");
 	m_fmtNames[FormatsManager::BMP]  = QObject::tr("BMP");
+	m_fmtNames[FormatsManager::ORA]  = QObject::tr("Open Raster Files");
 #ifdef GMAGICK_FOUND
 	m_fmtNames[FormatsManager::GMAGICK] = QObject::tr("GraphicsMagick File");
 #endif
 	m_fmtNames[FormatsManager::UNICONV] = QObject::tr("UniConvertor File");
 	m_fmtNames[FormatsManager::PCT]  = QObject::tr("Macintosh Pict File");
-	
+
 	m_fmtMimeTypes.insert(FormatsManager::EPS,  QStringList() << "application/postscript");
 	m_fmtMimeTypes.insert(FormatsManager::GIF,  QStringList() << "image/gif");
 	m_fmtMimeTypes.insert(FormatsManager::JPEG, QStringList() << "image/jpeg");
@@ -82,9 +84,10 @@ FormatsManager::FormatsManager()
 	m_fmtMimeTypes.insert(FormatsManager::CVG,  QStringList() << "");
 	m_fmtMimeTypes.insert(FormatsManager::WPG,  QStringList() << "");
 	m_fmtMimeTypes.insert(FormatsManager::PCT,  QStringList() << "");
-			
+	m_fmtMimeTypes.insert(FormatsManager::ORA,  QStringList() << "");
+
 	QMapIterator<int, QStringList> i(m_fmts);
-	while (i.hasNext()) 
+	while (i.hasNext())
 	{
 		i.next();
 		m_fmtList << i.value().first().toUpper();
@@ -334,10 +337,10 @@ QString getImageType(QString filename)
 	QFileInfo fi(f);
 	if (fi.exists())
 	{
-		QByteArray buf(20, ' ');
+		QByteArray buf(24, ' ');
 		if (f.open(QIODevice::ReadOnly))
 		{
-			f.read(buf.data(), 20);
+			f.read(buf.data(), 24);
 			if ((buf[0] == '%') && (buf[1] == '!') && (buf[2] == 'P') && (buf[3] == 'S') && (buf[4] == '-') && (buf[5] == 'A'))
 				ret = "eps";
 			else if ((buf[0] == '\xC5') && (buf[1] == '\xD0') && (buf[2] == '\xD3') && (buf[3] == '\xC6'))
@@ -346,6 +349,8 @@ QString getImageType(QString filename)
 				ret = "gif";
 			else if ((buf[0] == '\xFF') && (buf[1] == '\xD8') && (buf[2] == '\xFF'))
 				ret = "jpg";
+			else if ((buf[20] == 'G') && (buf[21] == 'P') && (buf[22] == 'A') && (buf[23] == 'T'))
+				ret = "pat";
 			else if ((buf[0] == '%') && (buf[1] == 'P') && (buf[2] == 'D') && (buf[3] == 'F'))
 				ret = "pdf";
 			else if ((buf[0] == 'P') && (buf[1] == 'G') && (buf[2] == 'F'))
@@ -358,7 +363,7 @@ QString getImageType(QString filename)
 				ret = "tif";
 			else if ((buf[0] == '/') && (buf[1] == '*') && (buf[2] == ' ') && (buf[3] == 'X') && (buf[4] == 'P') && (buf[5] == 'M'))
 				ret = "xpm";
-			
+
 			f.close();
 		}
 	}

@@ -16,6 +16,8 @@
 
 #include "canvasmode.h"
 
+#include "actionmanager.h"
+#include "appmodes.h"
 #include "canvas.h"
 #include "canvasgesture_pan.h"
 #include "canvasmode_copyproperties.h"
@@ -361,7 +363,7 @@ void CanvasMode::drawSelection(QPainter* psx, bool drawHandles)
 			psx->setBrush(m_brush["selection"]);
 			double lineAdjust(psx->pen().width()/m_canvas->scale());
 			double x, y, w, h;
-			if (currItem->Parent != NULL)
+			if (currItem->isGroupChild())
 			{
 				QTransform t = currItem->getCombinedTransform();
 				double sx, sy;
@@ -499,6 +501,16 @@ void CanvasMode::drawOutline(QPainter* p, double scalex, double scaley, double d
 		//		m_scaleX *= -1;
 			}
 			p->translate(deltax, deltay);
+			if (currItem->imageFlippedH())
+			{
+				p->translate(currItem->width(), 0);
+				p->scale(-1.0, 1.0);
+			}
+			if (currItem->imageFlippedV())
+			{
+				p->translate(0, currItem->height());
+				p->scale(1.0, -1.0);
+			}
 			if (gRot != 0)
 			{
 				p->setRenderHint(QPainter::Antialiasing);
@@ -569,6 +581,11 @@ void CanvasMode::drawOutline(QPainter* p, double scalex, double scaley, double d
 							p->save();
 							currItem = gItem->groupItemList.at(cg);
 							p->translate(currItem->gXpos, currItem->gYpos);
+							if (currItem->rotation() != 0)
+							{
+								p->setRenderHint(QPainter::Antialiasing);
+								p->rotate(currItem->rotation());
+							}
 							currItem->DrawPolyL(p, currItem->Clip);
 							p->restore();
 						}
@@ -1003,12 +1020,12 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 		if (textCursorChar == SpecialChars::PARSEP || textCursorChar == SpecialChars::LINEBREAK)
 		{
 			// The cursor must be moved to the beginning of the next line
-			FRect bbox = textframe->itemText.boundingBox ( textCursorPos );
+			FRect bbox = textframe->textLayout.boundingBox ( textCursorPos );
 			double lineSpacing(textframe->itemText.paragraphStyle(textCursorPos).lineSpacing());
 
 			// take care if cursor is not in first column
 			int curCol(1);
-			double ccPos(textframe->itemText.boundingBox ( textCursorPos ).x());
+			double ccPos(textframe->textLayout.boundingBox ( textCursorPos ).x());
 			double leftOffset(textframe->textToFrameDistLeft());
 			for(int ci(1); ci <= textframe->columns(); ++ci)
 			{
@@ -1037,7 +1054,7 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 			// We want to position the cursor at the beginning of the next column, if any.
 			// At first we need to know in which column the cursor is.
 			int curCol(1);
-			double ccPos(textframe->itemText.boundingBox ( textCursorPos ).x());
+			double ccPos(textframe->textLayout.boundingBox ( textCursorPos ).x());
 			double leftOffset(textframe->textToFrameDistLeft());
 			for(int ci(1); ci <= textframe->columns(); ++ci)
 			{
@@ -1053,11 +1070,11 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 			{
 				dx = (textframe->columnWidth() * curCol) + (textframe->columnGap() * curCol)  + leftOffset;
 				dy = textframe->textToFrameDistTop();
-				dy1 = textframe->textToFrameDistTop() + textframe->itemText.boundingBox ( textCursorPos ).height();
+				dy1 = textframe->textToFrameDistTop() + textframe->textLayout.boundingBox ( textCursorPos ).height();
 			}
 			else // there is no column after the current column
 			{
-				FRect bbox = textframe->itemText.boundingBox ( textCursorPos );
+				FRect bbox = textframe->textLayout.boundingBox ( textCursorPos );
 				dx = bbox.x();
 				dy = bbox.y();
                 dx += textframe->itemText.getGlyphs(textCursorPos)->wide();
@@ -1069,7 +1086,7 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 		}
 		else
 		{
-			FRect bbox = textframe->itemText.boundingBox ( textCursorPos );
+			FRect bbox = textframe->textLayout.boundingBox ( textCursorPos );
 			dx = bbox.x();
 			dy = bbox.y();
             dx += textframe->itemText.getGlyphs(textCursorPos)->wide();
@@ -1083,7 +1100,7 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 	}
 	else
 	{
-		FRect bbox = textframe->itemText.boundingBox ( textCursorPos );
+		FRect bbox = textframe->textLayout.boundingBox ( textCursorPos );
 		dx = bbox.x();
 		dy = bbox.y();
 		if ( bbox.height() <= 2 )
@@ -1119,6 +1136,7 @@ void CanvasMode::commonDrawTextCursor(QPainter* p, PageItem_TextFrame* textframe
 void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 {
 	int kk = e->key();
+	Qt::KeyboardModifiers buttonModifiers = e->modifiers();
 	QString uc = e->text();
 	ScribusMainWindow* mainWindow = m_view->m_ScMW;
 	QList<QMdiSubWindow *> windows;
@@ -1133,7 +1151,6 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 	if (m_keyRepeat)
 		return;
 	m_keyRepeat = true;
-
 	int keyMod=0;
 	if (e->modifiers() & Qt::ShiftModifier)
 		keyMod |= Qt::SHIFT;
@@ -1166,18 +1183,20 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 		m_doc->ElemToLink = NULL;
 		mainWindow->slotSelect();
 		if (m_doc->m_Selection->count() == 0)
-			mainWindow->HaveNewSel(-1);
+			mainWindow->HaveNewSel();
 		prefsManager->appPrefs.uiPrefs.stickyTools = false;
 		scrActions["stickyTools"]->setChecked(false);
 		return;
 	}
-	Qt::KeyboardModifiers buttonModifiers = e->modifiers();
+	if (m_view->m_ScMW->actionManager->compareKeySeqToShortcut(kk, e->modifiers(), "toolsZoomIn"))
+		scrActions["toolsZoomIn"]->trigger();
+	if (m_view->m_ScMW->actionManager->compareKeySeqToShortcut(kk, e->modifiers(), "toolsZoomOut"))
+		scrActions["toolsZoomOut"]->trigger();
 	/**If we have a doc and we are not changing the page or zoom level in the status bar */
-	if ((!m_view->zoomSpinBox->hasFocus()) && (!m_view->pageSelector->hasFocus()))
+	if ((!m_view->m_ScMW->zoomSpinBox->hasFocus()) && (!m_view->m_ScMW->pageSelector->hasFocus()))
 	{
 		//Show our context menu
-		QKeySequence currKeySeq = QKeySequence(kk | keyMod);
-		if (currKeySeq.matches(scrActions["viewShowContextMenu"]->shortcut()) == QKeySequence::ExactMatch)
+		if (m_view->m_ScMW->actionManager->compareKeySeqToShortcut(kk, e->modifiers(), "viewShowContextMenu"))
 		{
 			ContextMenu* cmen=NULL;
 			m_view->setCursor(QCursor(Qt::ArrowCursor));
@@ -1209,7 +1228,6 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 
 		if (m_doc->m_Selection->count() == 0)
 		{
-			int pg;
 			int wheelVal = prefsManager->mouseWheelJump();
 			if ((buttonModifiers & Qt::ShiftModifier) && !(buttonModifiers & Qt::ControlModifier) && !(buttonModifiers & Qt::AltModifier))
 				wheelVal = qMax(qRound(wheelVal / 10.0), 1);
@@ -1221,38 +1239,6 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 					m_view->requestMode(modeNormal);
 				else
 					m_view->requestMode(modePanning);
-				return;
-				break;
-			case Qt::Key_PageUp:
-				if (m_doc->masterPageMode() || m_doc->symbolEditMode())
-					m_view->scrollBy(0, -prefsManager->mouseWheelJump());
-				else
-				{
-					pg = m_doc->currentPageNumber();
-					if ((buttonModifiers & Qt::ShiftModifier) && !(buttonModifiers & Qt::ControlModifier) && !(buttonModifiers & Qt::AltModifier))
-						pg--;
-					else
-						pg -= m_doc->pageSets()[m_doc->pagePositioning()].Columns;
-					if (pg > -1)
-						m_view->GotoPage(pg);
-				}
-				m_keyRepeat = false;
-				return;
-				break;
-			case Qt::Key_PageDown:
-				if (m_doc->masterPageMode() || m_doc->symbolEditMode())
-					m_view->scrollBy(0, prefsManager->mouseWheelJump());
-				else
-				{
-					pg = m_doc->currentPageNumber();
-					if ((buttonModifiers & Qt::ShiftModifier) && !(buttonModifiers & Qt::ControlModifier) && !(buttonModifiers & Qt::AltModifier))
-						pg++;
-					else
-						pg += m_doc->pageSets()[m_doc->pagePositioning()].Columns;
-					if (pg < static_cast<int>(m_doc->Pages->count()))
-						m_view->GotoPage(pg);
-				}
-				m_keyRepeat = false;
 				return;
 				break;
 			case Qt::Key_Left:
@@ -1304,6 +1290,43 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 				break;
 			}
 		}
+		//Allow page up/down even when items are selected
+		switch (kk)
+		{
+			case Qt::Key_PageUp:
+				if (m_doc->masterPageMode() || m_doc->symbolEditMode())
+					m_view->scrollBy(0, -prefsManager->mouseWheelJump());
+				else
+				{
+					int pg = m_doc->currentPageNumber();
+					if ((buttonModifiers & Qt::ShiftModifier) && !(buttonModifiers & Qt::ControlModifier) && !(buttonModifiers & Qt::AltModifier))
+						pg--;
+					else
+						pg -= m_doc->pageSets()[m_doc->pagePositioning()].Columns;
+					if (pg > -1)
+						m_view->GotoPage(pg);
+				}
+				m_keyRepeat = false;
+				return;
+				break;
+			case Qt::Key_PageDown:
+				if (m_doc->masterPageMode() || m_doc->symbolEditMode())
+					m_view->scrollBy(0, prefsManager->mouseWheelJump());
+				else
+				{
+					int pg = m_doc->currentPageNumber();
+					if ((buttonModifiers & Qt::ShiftModifier) && !(buttonModifiers & Qt::ControlModifier) && !(buttonModifiers & Qt::AltModifier))
+						pg++;
+					else
+						pg += m_doc->pageSets()[m_doc->pagePositioning()].Columns;
+					if (pg < static_cast<int>(m_doc->Pages->count()))
+						m_view->GotoPage(pg);
+				}
+				m_keyRepeat = false;
+				return;
+				break;
+		}
+
 		/** Now if we have an item selected
 		 * - In normal mode we can:
 		 * -- Use backspace or delete to delete the item
@@ -1366,28 +1389,20 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 				resizeBy*=-1.0;
 
 			PageItem *currItem = m_doc->m_Selection->itemAt(0);
-
 			switch (kk)
 			{
 			case Qt::Key_Backspace:
 			case Qt::Key_Delete:
-				m_doc->itemSelection_DeleteItem();
+					if (buttonModifiers==Qt::NoModifier)
+						m_doc->itemSelection_DeleteItem();
+					else
+					{
+						if (m_view->m_ScMW->actionManager->compareKeySeqToShortcut(kk, buttonModifiers, "editClearContents"))
+							scrActions["editClearContents"]->trigger();
+						if (m_view->m_ScMW->actionManager->compareKeySeqToShortcut(kk, buttonModifiers, "editTruncateContents"))
+							scrActions["editTruncateContents"]->trigger();
+					}
 				break;
-				/* CB: Stop using inflexible hardcoded keys here, actions for lower/raise work without this
-					per note above with shortcuts.
-			case Qt::Key_PageUp:
-				if (!currItem->locked())
-				{
-					m_view->RaiseItem();
-				}
-				break;
-			case Qt::Key_PageDown:
-				if (!currItem->locked())
-				{
-					m_view->LowerItem();
-				}
-				break;
-				*/
 			case Qt::Key_Left:
 				if (!currItem->locked())
 				{
@@ -1451,7 +1466,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 						{
 							if (!resizingsmaller)
 							{
-								m_doc->MoveItem(-resizeBy, 0, currItem, false);
+								m_doc->MoveItem(-resizeBy, 0, currItem);
 								currItem->moveImageXYOffsetBy(resizeBy / currItem->imageXScale(), 0);
 							}
 							currItem->Sizing = false;
@@ -1525,7 +1540,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 						{
 							if (resizingsmaller)
 							{
-								m_doc->MoveItem(-resizeBy, 0, currItem, false);
+								m_doc->MoveItem(-resizeBy, 0, currItem);
 								currItem->moveImageXYOffsetBy(resizeBy / currItem->imageXScale(), 0);
 							}
 							currItem->Sizing = false;
@@ -1599,7 +1614,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 						{
 							if (!resizingsmaller)
 							{
-								m_doc->MoveItem(0, -resizeBy, currItem, false);
+								m_doc->MoveItem(0, -resizeBy, currItem);
 								currItem->moveImageXYOffsetBy(0, resizeBy / currItem->imageYScale());
 							}
 							currItem->Sizing = false;
@@ -1673,7 +1688,7 @@ void CanvasMode::commonkeyPressEvent_NormalNodeEdit(QKeyEvent *e)
 						{
 							if (resizingsmaller)
 							{
-								m_doc->MoveItem(0, -resizeBy, currItem, false);
+								m_doc->MoveItem(0, -resizeBy, currItem);
 								currItem->moveImageXYOffsetBy(0, resizeBy / currItem->imageYScale());
 							}
 							currItem->Sizing = false;
@@ -1716,7 +1731,7 @@ void CanvasMode::commonkeyReleaseEvent(QKeyEvent *e)
 		case Qt::Key_Up:
 		case Qt::Key_Down:
 			m_arrowKeyDown = false;
-			if ((!m_view->zoomSpinBox->hasFocus()) && (!m_view->pageSelector->hasFocus()))
+			if ((!m_view->m_ScMW->zoomSpinBox->hasFocus()) && (!m_view->m_ScMW->pageSelector->hasFocus()))
 			{
 				int docSelectionCount=m_doc->m_Selection->count();
 				if ((docSelectionCount != 0) && (m_doc->appMode == modeEditClip) && (m_doc->nodeEdit.hasNodeSelected()))

@@ -33,7 +33,7 @@ for which a new license (GPL+exception) is in place.
 
 #include "pageitem.h"
 #include "pageitem_table.h"
-#include "scribus.h"
+#include "scribusview.h"
 #include "scribusdoc.h"
 #include "scpainter.h"
 
@@ -48,11 +48,6 @@ for which a new license (GPL+exception) is in place.
 #endif
 
 using namespace std;
-
-void sDebug(QString message)
-{
-	qDebug("%s", message.toLatin1().constData());
-}
 
 int System(const QString exename, const QStringList & args, const QString fileStdErr, const QString fileStdOut, bool* cancel)
 {
@@ -525,10 +520,14 @@ QString checkFileExtension(const QString &currName, const QString &extension)
 	return newName;
 }
 
-QString getFileNameByPage(ScribusDoc* currDoc, uint pageNo, QString extension)
+QString getFileNameByPage(ScribusDoc* currDoc, uint pageNo, QString extension, QString prefix)
 {
 	uint number = pageNo + currDoc->FirstPnum;
-	QString defaultName = currDoc->DocName;
+	QString defaultName;
+	if (prefix!=QString::null)
+		defaultName=prefix;
+	else
+		defaultName=currDoc->DocName;
 	if (defaultName.isNull())
 		defaultName = "export";
 	else
@@ -565,6 +564,8 @@ const QString getStringFromSequence(NumFormat type, uint position, QString aster
 			for (uint a=1; a <= position; ++a)
 				retVal.append(asterix);
 			break;
+		case Type_CJK:
+			retVal=arabicToCJK(position);
 		case Type_None:
 			break;
 		default:
@@ -756,12 +757,6 @@ void parsePagesString(QString pages, std::vector<int>* pageNs, int sourcePageCou
 	} while (!tmp.isEmpty());
 }
 
-void tDebug(QString message)
-{
-	QDateTime debugTime;
-	qDebug("%s", QString("%1\t%2").arg(debugTime.currentDateTime().toString("hh:mm:ss:zzz")).arg(message).toLatin1().constData());
-}
-
 
 QString readLinefromDataStream(QDataStream &s)
 {
@@ -823,18 +818,19 @@ QString getDashString(int dashtype, double linewidth)
 	return dashString;
 }
 
-void getDashArray(int dashtype, double linewidth, QVector<float> &m_array) {
-   QVector<double> tmp;
-   getDashArray(dashtype, linewidth, tmp);
-   m_array.clear();
-   for (int i = 0; i < tmp.count(); ++i) {
-   m_array << static_cast<float>(tmp[i]);
-  }
+void getDashArray(int dashtype, double linewidth, QVector<float> &dashArray)
+{
+	QVector<double> tmp;
+	getDashArray(dashtype, linewidth, tmp);
+	dashArray.clear();
+	for (int i = 0; i < tmp.count(); ++i) {
+		dashArray << static_cast<float>(tmp[i]);
+	}
 }
 
-void getDashArray(int dashtype, double linewidth, QVector<double> &m_array)
+void getDashArray(int dashtype, double linewidth, QVector<double> &dashArray)
 {
-	m_array.clear();
+	dashArray.clear();
 	if ((dashtype == 1) || (dashtype == 0))
 		return;
 	double Dt = qMax(1.0*linewidth, 0.1);
@@ -845,176 +841,120 @@ void getDashArray(int dashtype, double linewidth, QVector<double> &m_array)
 		case 1:
 			break;
 		case 2:
-			m_array << Da << Sp;
+			dashArray << Da << Sp;
 			break;
 		case 3:
-			m_array << Dt << Sp;
+			dashArray << Dt << Sp;
 			break;
 		case 4:
-			m_array << Da << Sp << Dt << Sp;
+			dashArray << Da << Sp << Dt << Sp;
 			break;
 		case 5:
-			m_array << Da << Sp << Dt << Sp << Dt << Sp;
+			dashArray << Da << Sp << Dt << Sp << Dt << Sp;
 			break;
 // Additional line styles taken from Inkscape
 		case 6:
-			m_array << qMax(1.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(1.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
 			break;
 		case 7:
-			m_array << qMax(1.0 * linewidth, 0.01) << qMax(3.0 * linewidth, 0.01);
+			dashArray << qMax(1.0 * linewidth, 0.01) << qMax(3.0 * linewidth, 0.01);
 			break;
 		case 8:
-			m_array << qMax(1.0 * linewidth, 0.01) << qMax(4.0 * linewidth, 0.01);
+			dashArray << qMax(1.0 * linewidth, 0.01) << qMax(4.0 * linewidth, 0.01);
 			break;
 		case 9:
-			m_array << qMax(1.0 * linewidth, 0.01) << qMax(6.0 * linewidth, 0.01);
+			dashArray << qMax(1.0 * linewidth, 0.01) << qMax(6.0 * linewidth, 0.01);
 			break;
 		case 10:
-			m_array << qMax(1.0 * linewidth, 0.01) << qMax(8.0 * linewidth, 0.01);
+			dashArray << qMax(1.0 * linewidth, 0.01) << qMax(8.0 * linewidth, 0.01);
 			break;
 		case 11:
-			m_array << qMax(1.0 * linewidth, 0.01) << qMax(12.0 * linewidth, 0.01);
+			dashArray << qMax(1.0 * linewidth, 0.01) << qMax(12.0 * linewidth, 0.01);
 			break;
 		case 12:
-			m_array << qMax(1.0 * linewidth, 0.01) << qMax(24.0 * linewidth, 0.01);
+			dashArray << qMax(1.0 * linewidth, 0.01) << qMax(24.0 * linewidth, 0.01);
 			break;
 		case 13:
-			m_array << qMax(1.0 * linewidth, 0.01) << qMax(48.0 * linewidth, 0.01);
+			dashArray << qMax(1.0 * linewidth, 0.01) << qMax(48.0 * linewidth, 0.01);
 			break;
 		case 14:
-			m_array << qMax(2.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(2.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
 			break;
 		case 15:
-			m_array << qMax(3.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(3.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
 			break;
 		case 16:
-			m_array << qMax(4.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(4.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
 			break;
 		case 17:
-			m_array << qMax(6.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(6.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
 			break;
 		case 18:
-			m_array << qMax(8.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(8.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
 			break;
 		case 19:
-			m_array << qMax(10.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(10.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
 			break;
 		case 20:
-			m_array << qMax(12.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(12.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
 			break;
 		case 21:
-			m_array << qMax(2.0 * linewidth, 0.01) << qMax(2.0 * linewidth, 0.01);
+			dashArray << qMax(2.0 * linewidth, 0.01) << qMax(2.0 * linewidth, 0.01);
 			break;
 		case 22:
-			m_array << qMax(3.0 * linewidth, 0.01) << qMax(3.0 * linewidth, 0.01);
+			dashArray << qMax(3.0 * linewidth, 0.01) << qMax(3.0 * linewidth, 0.01);
 			break;
 		case 23:
-			m_array << qMax(4.0 * linewidth, 0.01) << qMax(4.0 * linewidth, 0.01);
+			dashArray << qMax(4.0 * linewidth, 0.01) << qMax(4.0 * linewidth, 0.01);
 			break;
 		case 24:
-			m_array << qMax(6.0 * linewidth, 0.01) << qMax(6.0 * linewidth, 0.01);
+			dashArray << qMax(6.0 * linewidth, 0.01) << qMax(6.0 * linewidth, 0.01);
 			break;
 		case 25:
-			m_array << qMax(8.0 * linewidth, 0.01) << qMax(8.0 * linewidth, 0.01);
+			dashArray << qMax(8.0 * linewidth, 0.01) << qMax(8.0 * linewidth, 0.01);
 			break;
 		case 26:
-			m_array << qMax(10.0 * linewidth, 0.01) << qMax(10.0 * linewidth, 0.01);
+			dashArray << qMax(10.0 * linewidth, 0.01) << qMax(10.0 * linewidth, 0.01);
 			break;
 		case 27:
-			m_array << qMax(12.0 * linewidth, 0.01) << qMax(12.0 * linewidth, 0.01);
+			dashArray << qMax(12.0 * linewidth, 0.01) << qMax(12.0 * linewidth, 0.01);
 			break;
 		case 28:
-			m_array << qMax(2.0 * linewidth, 0.01) << qMax(4.0 * linewidth, 0.01);
+			dashArray << qMax(2.0 * linewidth, 0.01) << qMax(4.0 * linewidth, 0.01);
 			break;
 		case 29:
-			m_array << qMax(2.0 * linewidth, 0.01) << qMax(6.0 * linewidth, 0.01);
+			dashArray << qMax(2.0 * linewidth, 0.01) << qMax(6.0 * linewidth, 0.01);
 			break;
 		case 30:
-			m_array << qMax(6.0 * linewidth, 0.01) << qMax(2.0 * linewidth, 0.01);
+			dashArray << qMax(6.0 * linewidth, 0.01) << qMax(2.0 * linewidth, 0.01);
 			break;
 		case 31:
-			m_array << qMax(4.0 * linewidth, 0.01) << qMax(8.0 * linewidth, 0.01);
+			dashArray << qMax(4.0 * linewidth, 0.01) << qMax(8.0 * linewidth, 0.01);
 			break;
 		case 32:
-			m_array << qMax(8.0 * linewidth, 0.01) << qMax(4.0 * linewidth, 0.01);
+			dashArray << qMax(8.0 * linewidth, 0.01) << qMax(4.0 * linewidth, 0.01);
 			break;
 		case 33:
-			m_array << qMax(2.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
-			m_array << qMax(0.5 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(2.0 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
+			dashArray << qMax(0.5 * linewidth, 0.01) << qMax(1.0 * linewidth, 0.01);
 			break;
 		case 34:
-			m_array << qMax(8.0 * linewidth, 0.01) << qMax(2.0 * linewidth, 0.01);
-			m_array << qMax(1.0 * linewidth, 0.01) << qMax(2.0 * linewidth, 0.01);
+			dashArray << qMax(8.0 * linewidth, 0.01) << qMax(2.0 * linewidth, 0.01);
+			dashArray << qMax(1.0 * linewidth, 0.01) << qMax(2.0 * linewidth, 0.01);
 			break;
 		case 35:
-			m_array << qMax(0.5 * linewidth, 0.01) << qMax(0.5 * linewidth, 0.01);
+			dashArray << qMax(0.5 * linewidth, 0.01) << qMax(0.5 * linewidth, 0.01);
 			break;
 		case 36:
-			m_array << qMax(0.25 * linewidth, 0.01) << qMax(0.25 * linewidth, 0.01);
+			dashArray << qMax(0.25 * linewidth, 0.01) << qMax(0.25 * linewidth, 0.01);
 			break;
 		case 37:
-			m_array << qMax(0.1 * linewidth, 0.01) << qMax(0.1 * linewidth, 0.01);
+			dashArray << qMax(0.1 * linewidth, 0.01) << qMax(0.1 * linewidth, 0.01);
 			break;
 		default:
 			break;
 	}
 }
-
-/**
- * Print a backtrace
- * Please never commit code that uses it.
- * @param nFrames specify how much frames you want to be printed
- */
-void printBacktrace ( int nFrames )
-{
-#if !defined(_WIN32) && !defined(Q_OS_MAC) && !defined(Q_OS_OPENBSD) && !defined(Q_OS_FREEBSD)
-	void ** trace = new void*[nFrames + 1];
-	char **messages = ( char ** ) NULL;
-	int i, trace_size = 0;
-
-	trace_size = backtrace ( trace, nFrames + 1 );
-	messages = backtrace_symbols ( trace, trace_size );
-	if ( messages )
-	{
-		for ( i=1; i < trace_size; ++i )
-		{
-			QString msg ( messages[i] );
-			int sep1 ( msg.indexOf ( "(" ) );
-			int sep2 ( msg.indexOf ( "+" ) );
-			QString mName (	msg.mid ( sep1 + 1,sep2-sep1 -1) );
-			
-			QString name;
-			if(mName.startsWith("_Z"))
-			{
-				char* outbuf = 0; 
-				size_t length = 0;
-				int status = 0; 
-				outbuf = abi::__cxa_demangle(mName.trimmed().toLatin1().data(), outbuf, &length, &status);
-				name = QString::fromLatin1( outbuf );
-				if(0 == status)
-				{
-//					qDebug()<<"Demangle success["<< length <<"]"<<name;
-					free(outbuf);
-				}
-//				else
-//				{
-//					qDebug()<<"Demangle failed ["<<status<<"]["<< mName.trimmed() <<"]";
-//					continue;
-//				}
-			}
-			else
-				name = mName;
-			if(name.isEmpty())
-				name = mName;
-			QString bts ( "[ScBT] %1. %2" );
-			qDebug ("%s", bts.arg( i ).arg( name ).toUtf8().data() );
-		}
-		free ( messages );
-	}
-	delete[] trace;
-#endif
-}
-
 
 bool convertOldTable(ScribusDoc *m_Doc, PageItem* gItem, QList<PageItem*> &gpL, QStack<QList<PageItem *> > *groupStackT, QList<PageItem *> *target)
 {
@@ -1190,4 +1130,96 @@ void getUniqueName(QString &name, QStringList list, QString separator, bool prep
 			newName = name + separator + QString::number(token);
 	} while (list.contains(newName));
 	name = newName;
+}
+
+
+const QString arabicToCJK(uint i)
+{
+	QString result;
+	if (i<10)
+		result = QString(cjkDigit(i));
+
+	if (i>9 && i<=99)
+	{
+		int tens=i/10;
+		int ones=i%10;
+		if (tens!=1)
+			result.append(cjkDigit(tens));
+		result.append(cjkDigit(10));
+		if (ones!=0)
+			result.append(cjkDigit(ones));
+	}
+
+	if (i>99 && i<=999)
+	{
+		int hundreds=i/100;
+		int tens=(i-hundreds*100)/10;
+		int ones=i%10;
+		result.append(cjkDigit(hundreds));
+		result.append(cjkDigit(100));
+		if (tens!=0)
+		{
+			result.append(cjkDigit(tens));
+			result.append(cjkDigit(10));
+		}
+		else if (ones!=0)
+			result.append(cjkDigit(0));
+		if (ones!=0)
+			result.append(cjkDigit(ones));
+	}
+	return result;
+}
+
+
+QChar cjkDigit(uint i)
+{
+	switch (i)
+	{
+		case 0:
+			return QChar(0x96f6);
+			break;
+		case 1:
+			return QChar(0x4e00);
+			break;
+		case 2:
+			return QChar(0x4e8c);
+			break;
+		case 3:
+			return QChar(0x4e09);
+			break;
+		case 4:
+			return QChar(0x56db);
+			break;
+		case 5:
+			return QChar(0x4e94);
+			break;
+		case 6:
+			return QChar(0x516d);
+			break;
+		case 7:
+			return QChar(0x4e03);
+			break;
+		case 8:
+			return QChar(0x516b);
+			break;
+		case 9:
+			return QChar(0x4e5d);
+			break;
+		case 10:
+			return QChar(0x5341);
+			break;
+		case 100:
+			return QChar(0x767e);
+			break;
+		case 1000:
+			return QChar(0x5343);
+			break;
+		case 10000:
+			return QChar(0x842c);
+			break;
+		case 100000000:
+			return QChar(0x5104);
+			break;
+	}
+	return QChar::Null;
 }

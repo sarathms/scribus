@@ -11,28 +11,29 @@ for which a new license (GPL+exception) is in place.
 #define _USE_MATH_DEFINES
 #endif
 #include <cmath>
+
+#include "appmodes.h"
 #include "autoform.h"
 #include "commonstrings.h"
-#include "sccolorengine.h"
 #include "pageitem_arc.h"
-#include "pageitem_textframe.h"
 #include "pageitem_regularpolygon.h"
+#include "pageitem_textframe.h"
 #include "polyprops.h"
+#include "sccolorengine.h"
 #include "sccombobox.h"
-#include "scribus.h"
-#include "scribuscore.h"
 #include "scraction.h"
+#include "scribuscore.h"
+#include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
-#include "units.h"
-#include "undomanager.h"
-#include "util.h"
-#include "util_icon.h"
-#include "util_math.h"
-
 #include "ui/nodeeditpalette.h"
 #include "ui/propertiespalette_utils.h"
 #include "ui/propertiespalette_xyz.h"
+#include "undomanager.h"
+#include "units.h"
+#include "util.h"
+#include "util_icon.h"
+#include "util_math.h"
 
 PropertiesPalette_Shape::PropertiesPalette_Shape( QWidget* parent) : QWidget(parent)
 {
@@ -187,6 +188,7 @@ void PropertiesPalette_Shape::enableCustomShape()
 		enabled  = true;
 		enabled &= !m_item->isArc();
 		enabled &= !m_item->isLine();
+		enabled &= !m_item->isOSGFrame();
 		enabled &= !m_item->isPathText();
 		enabled &= !m_item->isPolyLine();
 		enabled &= !m_item->isSpiral();
@@ -206,6 +208,7 @@ void PropertiesPalette_Shape::enableEditShape()
 		enabled  = true;
 		enabled &= !m_item->locked();
 		enabled &= !m_item->sizeLocked();
+		enabled &= !m_item->isOSGFrame();
 		enabled &= !m_item->isTable();
 	}
 	editShape->setEnabled(enabled);
@@ -226,20 +229,12 @@ void PropertiesPalette_Shape::handleSelectionChanged()
 		int itemType = currItem ? (int) currItem->itemType() : -1;
 
 		m_haveItem = (itemType != -1);
-		if (itemType != -1)
-		{
-			enableEditShape();
-			enableCustomShape();
-		}
-		else
-		{
-			editShape->setEnabled(false);
-			customShape->setEnabled(false);
-		}
 		switch (itemType)
 		{
 		case -1:
 			setEnabled(false);
+			editShape->setEnabled(false);
+			customShape->setEnabled(false);
 			roundRect->setEnabled(false);
 			roundRect->showValue(0);
 			break;
@@ -342,6 +337,9 @@ void PropertiesPalette_Shape::setCurrentItem(PageItem *item)
 
 	if (!m_item) return;
 
+	enableEditShape();
+	enableCustomShape();
+
 	if (m_item->FrameType == 0)
 		customShape->setIcon(customShape->getIconPixmap(0));
 	if (m_item->FrameType == 1)
@@ -350,7 +348,7 @@ void PropertiesPalette_Shape::setCurrentItem(PageItem *item)
 		customShape->setIcon(customShape->getIconPixmap(m_item->FrameType-2));
 
 	roundRect->setValue(m_item->cornerRadius()*m_unitRatio);
-	displayTextFlowMode(m_item->textFlowMode());
+	showTextFlowMode(m_item->textFlowMode());
 
 	if (m_item->asPathText())
 	{
@@ -397,7 +395,7 @@ void PropertiesPalette_Shape::setCurrentItem(PageItem *item)
 		customShape->setEnabled(false);
 	}
 	m_haveItem = true;
-	displayTextFlowMode(m_item->textFlowMode());
+	showTextFlowMode(m_item->textFlowMode());
 }
 
 void PropertiesPalette_Shape::handleTextFlow()
@@ -478,8 +476,9 @@ void PropertiesPalette_Shape::handleCornerRadius()
 	if (!m_haveDoc || !m_haveItem || !m_ScMW || m_ScMW->scriptIsRunning())
 		return;
 	m_item->setCornerRadius(roundRect->value() / m_unitRatio);
-	m_ScMW->view->SetFrameRounded();
+	m_doc->setFrameRounded();
 	m_doc->changed();
+	//called from setFrameRounded already!
 	m_doc->regionsChanged()->update(QRect());
 }
 
@@ -519,7 +518,7 @@ void PropertiesPalette_Shape::handleNewShape(int f, int c, qreal *vals)
 	}
 }
 
-void PropertiesPalette_Shape::displayTextFlowMode(PageItem::TextFlowMode mode)
+void PropertiesPalette_Shape::showTextFlowMode(PageItem::TextFlowMode mode)
 {
 	if (!m_ScMW || m_ScMW->scriptIsRunning() || !m_haveItem)
 		return;

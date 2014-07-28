@@ -13,6 +13,8 @@ for which a new license (GPL+exception) is in place.
 #define _USE_MATH_DEFINES
 #endif
 #include <cmath>
+
+#include "appmodes.h"
 #include "autoform.h"
 #include "basepointwidget.h"
 #include "commonstrings.h"
@@ -25,9 +27,10 @@ for which a new license (GPL+exception) is in place.
 #include "pageitem_textframe.h"
 #include "propertiespalette_utils.h"
 #include "sccombobox.h"
-#include "scribus.h"
+
 #include "scribuscore.h"
 #include "scraction.h"
+#include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
 #include "tabmanager.h"
@@ -315,16 +318,16 @@ void PropertiesPalette_XYZ::setCurrentItem(PageItem *i)
 	double selH = m_item->height();
 	if (m_doc->m_Selection->count() > 1)
 		m_doc->m_Selection->getGroupRect(&selX, &selY, &selW, &selH);
-//	displayXY(selX, selY);
-//	displayWH(selW, selH);
+//	showXY(selX, selY);
+//	showWH(selW, selH);
 	
 	bool checkableFlip = (i->isImageFrame() || i->isTextFrame() || i->isLatexFrame() || i->isOSGFrame() || i->isSymbol() || i->isGroup() || i->isSpiral());
 	flipH->setCheckable(checkableFlip);
 	flipV->setCheckable(checkableFlip);
 
 	noPrint->setChecked(!i->printEnabled());
-	displayFlippedH(i->imageFlippedH());
-	displayFlippedV(i->imageFlippedV());
+	showFlippedH(i->imageFlippedH());
+	showFlippedV(i->imageFlippedV());
 	m_oldRotation = i->rotation();
 	double rr = i->rotation();
 	if (i->rotation() > 0)
@@ -379,10 +382,10 @@ void PropertiesPalette_XYZ::setCurrentItem(PageItem *i)
 		heightSpin->setEnabled(true);
 		keepFrameWHRatioButton->setEnabled(true);
 	}
-	displayXY(selX, selY);
-	displayWH(selW, selH);
-	displayLocked(i->locked());
-	displaySizeLocked(i->sizeLocked());
+	showXY(selX, selY);
+	showWH(selW, selH);
+	showLocked(i->locked());
+	showSizeLocked(i->sizeLocked());
 	double rrR = i->imageRotation();
 	if (i->imageRotation() > 0)
 		rrR = 360 - rrR;
@@ -559,7 +562,7 @@ void PropertiesPalette_XYZ::unitChange()
 	m_haveItem = tmp;
 }
 
-void PropertiesPalette_XYZ::displayXY(double x, double y)
+void PropertiesPalette_XYZ::showXY(double x, double y)
 {
 	if (!m_ScMW || m_ScMW->scriptIsRunning())
 		return;
@@ -623,13 +626,13 @@ void PropertiesPalette_XYZ::displayXY(double x, double y)
 	xposSpin->setValue(inX*m_unitRatio);
 	yposSpin->setValue(inY*m_unitRatio);
 	if (useLineMode)
-		displayWH(m_item->width(), m_item->height());
+		showWH(m_item->width(), m_item->height());
 	m_haveItem = tmp;
 	connect(xposSpin, SIGNAL(valueChanged(double)), this, SLOT(handleNewX()));
 	connect(yposSpin, SIGNAL(valueChanged(double)), this, SLOT(handleNewY()));
 }
 
-void PropertiesPalette_XYZ::displayWH(double x, double y)
+void PropertiesPalette_XYZ::showWH(double x, double y)
 {
 	if (!m_ScMW || m_ScMW->scriptIsRunning())
 		return;
@@ -654,7 +657,7 @@ void PropertiesPalette_XYZ::displayWH(double x, double y)
 	heightSpin->blockSignals(sigBlocked2);
 }
 
-void PropertiesPalette_XYZ::displayRotation(double r)
+void PropertiesPalette_XYZ::showRotation(double r)
 {
 	if (!m_ScMW || m_ScMW->scriptIsRunning())
 		return;
@@ -698,13 +701,13 @@ void PropertiesPalette_XYZ::handleNewX()
 				base = gx + gw;
 			if (!_userActionOn)
 				m_ScMW->view->startGroupTransaction();
-			m_doc->moveGroup(x - base, 0, true);
+			m_doc->moveGroup(x - base, 0);
 			if (!_userActionOn)
 			{
 				m_ScMW->view->endGroupTransaction();
 			}
 			m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
-			displayXY(gx, gy);
+			showXY(gx, gy);
 		}
 		else
 		{
@@ -738,7 +741,7 @@ void PropertiesPalette_XYZ::handleNewX()
 					base = ma.m11() * m_item->width() + ma.m21() * m_item->height() + ma.dx();
 				else if (bp == 3)
 					base = ma.m11() * 0.0 + ma.m21() * m_item->height() + ma.dx();
-				m_doc->MoveItem(x - base, 0, m_item, true);
+				m_doc->MoveItem(x - base, 0, m_item);
 			}
 		}
 		m_doc->regionsChanged()->update(QRect());
@@ -777,13 +780,13 @@ void PropertiesPalette_XYZ::handleNewY()
 			base = gy + gh;
 		if (!_userActionOn)
 			m_ScMW->view->startGroupTransaction();
-		m_doc->moveGroup(0, y - base, true);
+		m_doc->moveGroup(0, y - base);
 		if (!_userActionOn)
 		{
 			m_ScMW->view->endGroupTransaction();
 		}
 		m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
-		displayXY(gx, gy);
+		showXY(gx, gy);
 	}
 	else
 	{
@@ -798,7 +801,7 @@ void PropertiesPalette_XYZ::handleNewY()
 			}
 			double r = atan2(h-y,w-x)*(180.0/M_PI);
 			w = sqrt(pow(w-x,2)+pow(h-y,2));
-			m_doc->MoveItem(0, y - m_item->yPos(), m_item, true);
+			m_doc->MoveItem(0, y - m_item->yPos(), m_item);
 			m_item->setXYPos(m_item->xPos(), y, true);
 			m_item->setRotation(r, true);
 			m_doc->SizeItem(w, m_item->height(), m_item, true);
@@ -819,7 +822,7 @@ void PropertiesPalette_XYZ::handleNewY()
 				base = ma.m22() * m_item->height() + ma.m12() * m_item->width() + ma.dy();
 			else if (bp == 3)
 				base = ma.m22() * m_item->height() + ma.m12() * 0.0 + ma.dy();
-			m_doc->MoveItem(0, y - base, m_item, true);
+			m_doc->MoveItem(0, y - base, m_item);
 		}
 	}
 	m_doc->regionsChanged()->update(QRect());
@@ -846,13 +849,13 @@ void PropertiesPalette_XYZ::handleNewW()
 		if (keepFrameWHRatioButton->isChecked())
 		{
 			m_doc->scaleGroup(w / gw, w / gw, false);
-			displayWH(w, (w / gw) * gh);
+			showWH(w, (w / gw) * gh);
 		}
 		else
 		{
 			m_doc->scaleGroup(w / gw, 1.0, false);
 			m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
-			displayWH(gw, gh);
+			showWH(gw, gh);
 		}
 		if (!_userActionOn)
 		{
@@ -879,7 +882,7 @@ void PropertiesPalette_XYZ::handleNewW()
 		{
 			if (keepFrameWHRatioButton->isChecked())
 			{
-				displayWH(w, (w / oldW) * m_item->height());
+				showWH(w, (w / oldW) * m_item->height());
 				m_doc->SizeItem(w, (w / oldW) * m_item->height(), m_item, true, true, false);
 			}
 			else
@@ -928,13 +931,13 @@ void PropertiesPalette_XYZ::handleNewH()
 			if (keepFrameWHRatioButton->isChecked())
 			{
 				m_doc->scaleGroup(h / gh, h / gh, false);
-				displayWH((h / gh) * gw, h);
+				showWH((h / gh) * gw, h);
 			}
 			else
 			{
 				m_doc->scaleGroup(1.0, h / gh, false);
 				m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
-				displayWH(gw, gh);
+				showWH(gw, gh);
 			}
 			if (!_userActionOn)
 			{
@@ -961,7 +964,7 @@ void PropertiesPalette_XYZ::handleNewH()
 			{
 				if (keepFrameWHRatioButton->isChecked())
 				{
-					displayWH((h / oldH) * m_item->width(), h);
+					showWH((h / oldH) * m_item->width(), h);
 					m_doc->SizeItem((h / oldH) * m_item->width(), h, m_item, true, true, false);
 				}
 				else
@@ -1003,7 +1006,7 @@ void PropertiesPalette_XYZ::handleRotation()
 		{
 			m_doc->rotateGroup((rotationSpin->value() - m_oldRotation)*(-1), m_ScMW->view->RCenter);
 			m_doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
-			displayXY(gx, gy);
+			showXY(gx, gy);
 		}
 		else
 			m_doc->RotateItem(rotationSpin->value()*(-1), m_item);
@@ -1340,7 +1343,7 @@ void PropertiesPalette_XYZ::updateSpinBoxConstants()
 
 }
 
-void PropertiesPalette_XYZ::displayLocked(bool isLocked)
+void PropertiesPalette_XYZ::showLocked(bool isLocked)
 {
 	xposSpin->setReadOnly(isLocked);
 	yposSpin->setReadOnly(isLocked);
@@ -1360,7 +1363,7 @@ void PropertiesPalette_XYZ::displayLocked(bool isLocked)
 	doLock->setChecked(isLocked);
 }
 
-void PropertiesPalette_XYZ::displaySizeLocked(bool isSizeLocked)
+void PropertiesPalette_XYZ::showSizeLocked(bool isSizeLocked)
 {
 	bool b=isSizeLocked;
 	if (m_haveItem && m_item->locked())
@@ -1377,17 +1380,17 @@ void PropertiesPalette_XYZ::displaySizeLocked(bool isSizeLocked)
 	noResize->setChecked(isSizeLocked);
 }
 
-void PropertiesPalette_XYZ::displayPrintingEnabled(bool isPrintingEnabled)
+void PropertiesPalette_XYZ::showPrintingEnabled(bool isPrintingEnabled)
 {
 	noPrint->setChecked(!isPrintingEnabled);
 }
 
-void PropertiesPalette_XYZ::displayFlippedH(bool isFlippedH)
+void PropertiesPalette_XYZ::showFlippedH(bool isFlippedH)
 {
 	flipH->setChecked(isFlippedH);
 }
 
-void PropertiesPalette_XYZ::displayFlippedV(bool isFlippedV)
+void PropertiesPalette_XYZ::showFlippedV(bool isFlippedV)
 {
 	flipV->setChecked(isFlippedV);
 }

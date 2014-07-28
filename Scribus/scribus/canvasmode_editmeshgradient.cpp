@@ -37,28 +37,30 @@
 #include <QWidgetAction>
 #include <QDebug>
 
-#include "ui/aligndistribute.h"
+#include "appmodes.h"
 #include "canvas.h"
-#include "ui/contextmenu.h"
 #include "fpoint.h"
 #include "fpointarray.h"
 #include "hyphenator.h"
 #include "pageitem_textframe.h"
-#include "ui/pageselector.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
-#include "ui/propertiespalette.h"
 #include "scribus.h"
+#include "scribusXml.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
-#include "scribusXml.h"
 #include "selection.h"
+#include "ui/aligndistribute.h"
+#include "ui/contextmenu.h"
+#include "ui/pageselector.h"
+#include "ui/propertiespalette.h"
 #include "undomanager.h"
 #include "units.h"
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
+
 
 CanvasMode_EditMeshGradient::CanvasMode_EditMeshGradient(ScribusView* view) : CanvasMode(view), m_ScMW(view->m_ScMW) 
 {
@@ -394,7 +396,7 @@ void CanvasMode_EditMeshGradient::keyPressEvent(QKeyEvent *e)
 	m_keyRepeat = true;
 	e->accept();
 	Qt::KeyboardModifiers buttonModifiers = e->modifiers();
-	if ((!m_view->zoomSpinBox->hasFocus()) && (!m_view->pageSelector->hasFocus()))
+	if ((!m_view->m_ScMW->zoomSpinBox->hasFocus()) && (!m_view->m_ScMW->pageSelector->hasFocus()))
 	{
 		if (m_doc->m_Selection->count() != 0)
 		{

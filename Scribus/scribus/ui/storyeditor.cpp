@@ -45,6 +45,7 @@ for which a new license (GPL+exception) is in place.
 #include <QPixmap>
 #include <QRegExp>
 #include <QShowEvent>
+#include <QScrollBar>
 #include <QTextBlock>
 #include <QTextCodec>
 #include <QTextLayout>
@@ -52,12 +53,11 @@ for which a new license (GPL+exception) is in place.
 
 #include "actionmanager.h"
 #include "alignselect.h"
-#include "ui/charselect.h"
 #include "colorcombo.h"
 #include "colorlistbox.h"
 #include "commonstrings.h"
-#include "ui/customfdialog.h"
 #include "fontcombo.h"
+#include "loremipsum.h"
 #include "menumanager.h"
 #include "pageitem.h"
 #include "pageitem_textframe.h"
@@ -69,20 +69,22 @@ for which a new license (GPL+exception) is in place.
 #include "scplugin.h"
 #include "scraction.h"
 #include "scribuscore.h"
+#include "scribusview.h"
 #include "scrspinbox.h"
 #include "search.h"
 #include "serializer.h"
 #include "shadebutton.h"
-#include "ui/spalette.h"
 #include "storyeditor.h"
 #include "styleitem.h"
-//#include "ui/stylemanager.h"
 #include "styleselect.h"
+#include "ui/charselect.h"
+#include "ui/customfdialog.h"
+#include "ui/spalette.h"
+#include "ui/stylemanager.h"
 #include "units.h"
 #include "util.h"
+#include "util_debug.h"
 #include "util_icon.h"
-#include "loremipsum.h"
-
 
 class StyledTextMimeData : public QMimeData
 {
@@ -337,9 +339,7 @@ void SEditor::keyPressEvent(QKeyEvent *k)
 	if (k->modifiers() & Qt::AltModifier)
 		keyMod |= Qt::ALT;
 
-	QKeySequence currKeySeq = QKeySequence(k->key() | keyMod);
-	QKeySequence uniKeySeq  = doc->scMW()->scrActions["specialUnicodeSequenceBegin"]->shortcut();
-	if(currKeySeq.matches(uniKeySeq)==QKeySequence::ExactMatch)
+	if(ScCore->primaryMainWindow()->actionManager->compareKeySeqToShortcut(k->key(), k->modifiers(), "specialUnicodeSequenceBegin"))
 	{
 		unicodeTextEditMode = true;
 		unicodeInputCount = 0;
@@ -924,7 +924,7 @@ void SEditor::setEffects(int effects)
 {
 	QTextCursor tCursor = textCursor();
 	setEffects(tCursor, effects);
-	//setTextCursor(tCursor);
+	setTextCursor(tCursor);
 }
 
 void SEditor::setEffects(QTextCursor& tCursor, int effects)
@@ -2093,9 +2093,10 @@ void StoryEditor::setCurrentDocumentAndItem(ScribusDoc *doc, PageItem *item)
 	m_doc=doc;
 	m_textChanged=false;
 	AlignTools->paraStyleCombo->setDoc(m_doc);
-	StrokeTools->setCurrentDocument(m_doc);
 	FillTools->setCurrentDocument(m_doc);
+	StrokeTools->setCurrentDocument(m_doc);
 	Editor->setCurrentDocument(m_doc);
+	StyleTools->SetStyle(0);
 	m_item = item;
 	if (m_item != NULL)
 	{
@@ -2585,7 +2586,7 @@ void StoryEditor::updateProps(int p, int ch)
 		Editor->prevFont = Editor->CurrFont;
 		Editor->CurrFont = charStyle.font().scName();
 		Editor->CurrFontSize = charStyle.fontSize();
-		Editor->CurrentEffects = charStyle.effects() & static_cast<StyleFlag>(1919);
+		Editor->CurrentEffects = charStyle.effects() & static_cast<StyleFlag>(ScStyle_UserStyles);
 		Editor->CurrTextKern   = charStyle.tracking();
 		Editor->CurrTextScale  = charStyle.scaleH();
 		Editor->CurrTextScaleV = charStyle.scaleV();
@@ -2892,7 +2893,7 @@ void StoryEditor::updateTextFrame()
 	if (!m_textChanged)
 		return;
 	PageItem *nextItem = m_item;
-#if 0
+//#if 0
 	if (m_item->asTextFrame())
 	{
 		while (nextItem != 0)
@@ -2903,7 +2904,7 @@ void StoryEditor::updateTextFrame()
 				break;
 		}
 	}
-#endif
+//#endif
 	m_item->invalidateLayout();
 	PageItem* nb2 = nextItem;
 	nb2->itemText.clear();
@@ -2952,7 +2953,8 @@ void StoryEditor::updateTextFrame()
 	Editor->saveItemText(nextItem);
 	// #9180 : force relayout here, it appears that relayout is sometime disabled
 	// to speed up selection, but re layout() cannot be avoided here
-	nextItem->invalidateLayout();
+	if (nextItem->asTextFrame())
+        nextItem->asTextFrame()->invalidateLayout(true);
 	nextItem->layout();
 #if 0
 	QList<PageItem*> FrameItemsDel;
@@ -3259,7 +3261,7 @@ void StoryEditor::LoadTextFile()
 		QString fileName = "";
 		PrefsContext* dirs = prefsManager->prefsFile->getContext("dirs");
 		QString wdir = dirs->get("story_load", prefsManager->documentDir());
-		CustomFDialog dia(this, wdir, tr("Open"), tr("Text Files (*.txt);;All Files(*)"), fdExistingFiles | fdShowCodecs);
+		CustomFDialog dia(this, wdir, tr("Open"), tr("Text Files (*.txt);;All Files (*)"), fdExistingFiles | fdShowCodecs);
 		if (dia.exec() != QDialog::Accepted)
 			return;
 		LoadEnc = dia.TxCodeM->currentText();
@@ -3328,7 +3330,7 @@ ScribusDoc* StoryEditor::currentDocument() const
 	return m_doc;
 }
 
-void StoryEditor::specialActionKeyEvent(const QString& /*actionName*/, int unicodevalue)
+void StoryEditor::specialActionKeyEvent(int unicodevalue)
 {
 	QString guiInsertString=QChar(unicodevalue);
 	bool setColor=false;

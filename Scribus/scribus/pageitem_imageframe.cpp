@@ -37,7 +37,7 @@ for which a new license (GPL+exception) is in place.
 #include "scpage.h"
 #include "scpaths.h"
 #include "scpainter.h"
-#include "scribus.h"
+
 #include "scribusstructs.h"
 #include "scribuscore.h"
 #include "scribusdoc.h"
@@ -241,8 +241,8 @@ void PageItem_ImageFrame::clearContents()
 	setImageFlippedH(false);
 	setImageFlippedV(false);
 	EmProfile = "";
-	ScaleType = true;
-	AspectRatio = false;
+	ScaleType = m_Doc->prefsData().itemToolPrefs.imageScaleType;;
+	AspectRatio = m_Doc->prefsData().itemToolPrefs.imageAspectRatio;
 	setFillTransparency(0.0);
 	setLineTransparency(0.0);
 	imageClip.resize(0);

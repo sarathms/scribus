@@ -10,6 +10,7 @@ for which a new license (GPL+exception) is in place.
 #include "nodeeditpalette.h"
 #include "pageitem.h"
 #include "scpage.h"
+#include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
 #include "undomanager.h"
@@ -320,8 +321,8 @@ void NodePalette::connectSignals()
 	connect(YSpin, SIGNAL(valueChanged(double)), this, SLOT(MovePoint()));
 	connect(PolyMirrorH, SIGNAL(clicked()), this, SLOT(MirrorH()));
 	connect(PolyMirrorV, SIGNAL(clicked()), this, SLOT(MirrorV()));
-	connect(PolyShearR, SIGNAL(clicked()), this, SLOT(ShearR()));
-	connect(PolyShearL, SIGNAL(clicked()), this, SLOT(ShearL()));
+	connect(PolyShearR, SIGNAL(clicked()), this, SLOT(ShearL()));
+	connect(PolyShearL, SIGNAL(clicked()), this, SLOT(ShearR()));
 	connect(PolyShearU, SIGNAL(clicked()), this, SLOT(ShearU()));
 	connect(PolyShearD, SIGNAL(clicked()), this, SLOT(ShearD()));
 	connect(RotateCCW, SIGNAL(clicked()), this, SLOT(doRotCCW()));
@@ -810,7 +811,7 @@ void NodePalette::MoveK()
 		m_doc->m_Selection->itemAt(0)->update();
 	SymMove->setEnabled(true);
 	AsymMove->setEnabled(true);
-	Res1Node->setEnabled(true);
+	Res1Node->setEnabled(false);
 	ResNode->setEnabled(false);
 	AddNode->setEnabled(false);
 	DeleteNode->setEnabled(false);
@@ -832,7 +833,7 @@ void NodePalette::MoveN()
 	m_doc->nodeEdit.SegP2 = -1;
 	if (m_doc->m_Selection->count() > 0)
 		m_doc->m_Selection->itemAt(0)->update();
-	ResNode->setEnabled(true);
+	ResNode->setEnabled(false);
 	AddNode->setEnabled(true);
 	DeleteNode->setEnabled(true);
 	SymMove->setEnabled(false);
@@ -905,7 +906,7 @@ void NodePalette::EndEdit()
 		EditCont->setChecked(false);
 		ToggleConMode();
 		PageItem *currItem = m_doc->m_Selection->itemAt(0);
-		if (currItem->itemType() == PageItem::PathText)
+		if (currItem && currItem->itemType() == PageItem::PathText)
 			currItem->updatePolyClip();
 	}
 	PolySplit->setEnabled( false );

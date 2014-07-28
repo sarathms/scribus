@@ -72,7 +72,7 @@ for which a new license (GPL+exception) is in place.
 #include "scpage.h"
 #include "scpaths.h"
 #include "scpattern.h"
-#include "scribus.h"
+
 #include "scribuscore.h"
 #include "scribusdoc.h"
 #include "scstreamfilter_flate.h"
@@ -172,6 +172,28 @@ static inline QString FToStr(double c)
 	return QString::number(v, 'f', 5);
 };
 
+bool PDFLibCore::PDF_IsPDFX()
+{
+	if (Options.Version == PDFOptions::PDFVersion_X1a)
+		return true;
+	if (Options.Version == PDFOptions::PDFVersion_X3)
+		return true;
+	if (Options.Version == PDFOptions::PDFVersion_X4)
+		return true;
+	return false;
+}
+
+bool PDFLibCore::PDF_IsPDFX(PDFOptions::PDFVersion ver)
+{
+	if (ver == PDFOptions::PDFVersion_X1a)
+		return true;
+	if (ver == PDFOptions::PDFVersion_X3)
+		return true;
+	if (ver == PDFOptions::PDFVersion_X4)
+		return true;
+	return false;
+}
+
 bool PDFLibCore::doExport(const QString& fn, const QString& nam, int Components,
 					  const std::vector<int> & pageNs, const QMap<int,QPixmap> & thumbs)
 {
@@ -253,7 +275,7 @@ bool PDFLibCore::doExport(const QString& fn, const QString& nam, int Components,
 		ret = true;//Even when aborting we return true. Dont want that "couldnt write msg"
 		if (!abortExport)
 		{
-			if ((doc.pdfOptions().Version == PDFOptions::PDFVersion_X3) || (doc.pdfOptions().Version == PDFOptions::PDFVersion_X1a) || (doc.pdfOptions().Version == PDFOptions::PDFVersion_X4))
+			if (PDF_IsPDFX(doc.pdfOptions().Version))
 				ret = PDF_End_Doc(ScCore->PrinterProfiles[doc.pdfOptions().PrintProf], nam, Components);
 			else
 				ret = PDF_End_Doc();
@@ -783,14 +805,14 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 			PutDoc("%PDF-1.5\n");
 			break;
 	}
-	if ((Options.Version == PDFOptions::PDFVersion_X3) || (Options.Version == PDFOptions::PDFVersion_X1a) || (Options.Version == PDFOptions::PDFVersion_X4))
+	if (PDF_IsPDFX())
 		ObjCounter++;
 	PutDoc("%\xc7\xec\x8f\xa2\n");
 	StartObj(1);
 	PutDoc("<<\n/Type /Catalog\n/Outlines 3 0 R\n/Pages 4 0 R\n/Dests 5 0 R\n/AcroForm 6 0 R\n/Names 7 0 R\n/Threads 8 0 R\n");
 	if (((Options.Version == PDFOptions::PDFVersion_15) || (Options.Version == PDFOptions::PDFVersion_X4)) && (Options.useLayers))
 		PutDoc("/OCProperties 9 0 R\n");
-	if ((Options.Version == PDFOptions::PDFVersion_X3) || (Options.Version == PDFOptions::PDFVersion_X1a) || (Options.Version == PDFOptions::PDFVersion_X4))
+	if (PDF_IsPDFX())
 		PutDoc("/OutputIntents [ "+QString::number(ObjCounter-1)+" 0 R ]\n");
 	if ((Options.Version == PDFOptions::PDFVersion_X4))
 	{
@@ -918,7 +940,7 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 	PutDoc("<<\n/Creator " + EncString("Scribus "+QString(VERSION), 2) + "\n");
 	PutDoc("/Producer " + EncString("Scribus PDF Library "+QString(VERSION), 2) + "\n");
 	QString docTitle = doc.documentInfo().title();
-	if (((Options.Version == PDFOptions::PDFVersion_X3) || (Options.Version == PDFOptions::PDFVersion_X1a) || (Options.Version == PDFOptions::PDFVersion_X4)) && (docTitle.isEmpty()))
+	if ((PDF_IsPDFX()) && (docTitle.isEmpty()))
 		PutDoc("/Title " + EncStringUTF16(doc.DocName, 2) + "\n");
 	else
 		PutDoc("/Title " + EncStringUTF16(doc.documentInfo().title(), 2) + "\n");
@@ -927,13 +949,13 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 	PutDoc("/Keywords " + EncStringUTF16(doc.documentInfo().keywords(), 2) + "\n");
 	PutDoc("/CreationDate " + EncString(Datum, 2) + "\n");
 	PutDoc("/ModDate " + EncString(Datum, 2) + "\n");
-	if (Options.Version == PDFOptions::PDFVersion_X3)
-		PutDoc("/GTS_PDFXVersion (PDF/X-3:2002)\n");
 	if (Options.Version == PDFOptions::PDFVersion_X1a)
 	{
 		PutDoc("/GTS_PDFXVersion (PDF/X-1:2001)\n");
 		PutDoc("/GTS_PDFXConformance (PDF/X-1a:2001)\n");
 	}
+	if (Options.Version == PDFOptions::PDFVersion_X3)
+		PutDoc("/GTS_PDFXVersion (PDF/X-3:2002)\n");
 	if (Options.Version == PDFOptions::PDFVersion_X4)
 		PutDoc("/GTS_PDFXVersion (PDF/X-4)\n");
 	PutDoc("/Trapped /False\n>>\nendobj\n");
@@ -941,7 +963,7 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 		XRef.append(bytesWritten());
 	if (((Options.Version == PDFOptions::PDFVersion_15) || (Options.Version == PDFOptions::PDFVersion_X4)) && (Options.useLayers))
 		XRef.append(bytesWritten());
-	if ((Options.Version == PDFOptions::PDFVersion_X3) || (Options.Version == PDFOptions::PDFVersion_X1a) || (Options.Version == PDFOptions::PDFVersion_X4))
+	if (PDF_IsPDFX())
 		XRef.append(bytesWritten());
 	if (Options.Version == PDFOptions::PDFVersion_X4)
 		XRef.append(bytesWritten());
@@ -1225,10 +1247,10 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 				UsedFontsP.insert(it.key(), "/Fo"+QString::number(a));
 				uint SubFonts = 0;
 				int glyphCount = 0;
-				double minx = 999999.9;
-				double miny = 999999.9;
-				double maxx = -999999.9;
-				double maxy = -999999.9;
+				double minx =  std::numeric_limits<double>::max();
+				double miny =  std::numeric_limits<double>::max();
+				double maxx = -std::numeric_limits<double>::max();
+				double maxy = -std::numeric_limits<double>::max();
 				QList<uint> glyphWidths;
 				QStringList charProcs;
 				QString encoding = "<< /Type /Encoding\n/Differences [ 0\n";
@@ -1252,7 +1274,7 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 						gly.translate(0, 1000);
 						for (int poi = 0; poi < gly.size()-3; poi += 4)
 						{
-							if (gly.point(poi).x() > 900000)
+							if (gly.isMarker(poi))
 							{
 								fon += "h\n";
 								nPath = true;
@@ -1339,10 +1361,10 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 //						glyphMapping.clear();
 						glyphCount = 0;
 						++SubFonts;
-						minx = 999999.9;
-						miny = 999999.9;
-						maxx = -999999.9;
-						maxy = -999999.9;
+						minx =  std::numeric_limits<double>::max();
+						miny =  std::numeric_limits<double>::max();
+						maxx = -std::numeric_limits<double>::max();
+						maxy = -std::numeric_limits<double>::max();
 						encoding = "<< /Type /Encoding\n/Differences [ 0\n";
 					}
 				}
@@ -1366,7 +1388,7 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 						gly.map(mat);
 						for (int poi = 0; poi < gly.size()-3; poi += 4)
 						{
-							if (gly.point(poi).x() > 900000)
+							if (gly.isMarker(poi))
 							{
 								fon += "h\n";
 								nPath = true;
@@ -1561,7 +1583,8 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 			++nglyphs;
 //			qDebug() << QString("pdflib: nglyphs %1 max %2").arg(nglyphs).arg(face.maxGlyph());
 			uint FontDes = fontDescriptor;
-			if (Options.Version == PDFOptions::PDFVersion_X4 && (fformat == ScFace::SFNT || fformat == ScFace::TTCF))
+			if ((face.isSymbolic() || Options.Version == PDFOptions::PDFVersion_X4) && 
+				(fformat == ScFace::SFNT || fformat == ScFace::TTCF))
 			{
 				uint fontWidths2 = newObject();
 				StartObj(fontWidths2);
@@ -1849,7 +1872,7 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 		Transpar[HTName] = writeGState("/HT "+QString::number(halftones)+" 0 R\n");
 		ResCount++;
 	}
-	if ((doc.HasCMS) && (Options.UseProfiles) && (Options.Version != PDFOptions::PDFVersion_X1a ))
+	if ((doc.HasCMS) && (Options.UseProfiles) && (Options.Version != PDFOptions::PDFVersion_X1a))
 	{
 		uint iccProfileObject = newObject();
 		StartObj(iccProfileObject);
@@ -1975,7 +1998,7 @@ bool PDFLibCore::PDF_Begin_Doc(const QString& fn, SCFonts &AllFonts, QMap<QStrin
 				PutDoc("/ON");
 			else
 				PutDoc("/OFF");
-			PutDoc(">>>>>>");
+			PutDoc(">>>>");
 			PutDoc("\n");
 			PutDoc(">>\nendobj\n");
 			Lnr++;
@@ -2107,6 +2130,7 @@ bool PDFLibCore::PDF_TemplatePage(const ScPage* pag, bool )
 						sr = 0;
 					PutPage(FToStr(cr)+" "+FToStr(sr)+" "+FToStr(-sr)+" "+FToStr(cr)+" 0 0 cm\n");
 				}
+				PutPage(PDF_PutSoftShadow(ite,pag));
 				switch (ite->itemType())
 				{
 					case PageItem::ImageFrame:
@@ -2126,15 +2150,27 @@ bool PDFLibCore::PDF_TemplatePage(const ScPage* pag, bool )
 									if (!PDF_PatternFillStroke(tmpOut, ite))
 										return false;
 								}
+								else if (ite->GrType == 14)
+								{
+									if (!PDF_HatchFill(tmpOut, ite))
+										return false;
+								}
 								else
 								{
 									if (!PDF_GradientFillStroke(tmpOut, ite))
 										return false;
 								}
-								PutPage(tmpOut);
+								if (ite->GrType != 14)
+									PutPage(tmpOut);
 							}
-							PutPage(SetClipPath(ite));
-							PutPage(ite->fillRule ? "h\nf*\n" : "h\nf\n");
+							else
+							{
+								if (ite->fillColor() != CommonStrings::None)
+								{
+									PutPage(SetClipPath(ite));
+									PutPage(ite->fillRule ? "h\nf*\n" : "h\nf\n");
+								}
+							}
 						}
 						PutPage("q\n");
 						if (ite->imageFlippedH())
@@ -2253,13 +2289,13 @@ bool PDFLibCore::PDF_TemplatePage(const ScPage* pag, bool )
 							multiLine ml = doc.MLineStyles[ite->NamedLStyle];
 							for (int it = ml.size()-1; it > -1; it--)
 							{
-									if ((ml[it].Color != CommonStrings::None) && (ml[it].Width != 0))
-									{
-										PutPage(setStrokeMulti(&ml[it]));
-										PutPage("0 0 m\n");
-										PutPage(FToStr(ite->width())+" 0 l\n");
-										PutPage("S\n");
-									}
+								if ((ml[it].Color != CommonStrings::None) && (ml[it].Width != 0))
+								{
+									PutPage(setStrokeMulti(&ml[it]));
+									PutPage("0 0 m\n");
+									PutPage(FToStr(ite->width())+" 0 l\n");
+									PutPage("S\n");
+								}
 							}
 						}
 						if (ite->startArrowIndex() != 0)
@@ -2294,6 +2330,11 @@ bool PDFLibCore::PDF_TemplatePage(const ScPage* pag, bool )
 								if (!PDF_PatternFillStroke(tmpOut, ite))
 									return false;
 							}
+							else if (ite->GrType == 14)
+							{
+								if (!PDF_HatchFill(tmpOut, ite))
+									return false;
+							}
 							else
 							{
 								if (!PDF_GradientFillStroke(tmpOut, ite))
@@ -2301,9 +2342,14 @@ bool PDFLibCore::PDF_TemplatePage(const ScPage* pag, bool )
 							}
 							if (!tmpOut.isEmpty())
 							{
-								PutPage(tmpOut);
-								PutPage(SetClipPath(ite));
-								PutPage(ite->fillRule ? "h\nf*\n" : "h\nf\n");
+								if (ite->GrType == 14)
+									PutPage(tmpOut);
+								else
+								{
+									PutPage(tmpOut);
+									PutPage(SetClipPath(ite));
+									PutPage(ite->fillRule ? "h\nf*\n" : "h\nf\n");
+								}
 							}
 						}
 						else
@@ -2369,7 +2415,7 @@ bool PDFLibCore::PDF_TemplatePage(const ScPage* pag, bool )
 						break;
 					case PageItem::PolyLine:
 					case PageItem::Spiral:
-						if (ite->PoLine.size() > 4) // && ((ite->PoLine.point(0) != ite->PoLine.point(1)) || (ite->PoLine.point(2) != ite->PoLine.point(3))))
+						if (ite->PoLine.size() > 3) // && ((ite->PoLine.point(0) != ite->PoLine.point(1)) || (ite->PoLine.point(2) != ite->PoLine.point(3))))
 						{
 							PutPage("q\n");
 							if (((ite->GrMask > 0) || (ite->fillTransparency() != 0) || (ite->fillBlendmode() != 0)) && ((Options.Version >= PDFOptions::PDFVersion_14) || (Options.Version == PDFOptions::PDFVersion_X4)))
@@ -2383,6 +2429,11 @@ bool PDFLibCore::PDF_TemplatePage(const ScPage* pag, bool )
 									if (!PDF_PatternFillStroke(tmpOut, ite))
 										return false;
 								}
+								else if (ite->GrType == 14)
+								{
+									if (!PDF_HatchFill(tmpOut, ite))
+										return false;
+								}
 								else
 								{
 									if (!PDF_GradientFillStroke(tmpOut, ite))
@@ -2390,9 +2441,14 @@ bool PDFLibCore::PDF_TemplatePage(const ScPage* pag, bool )
 								}
 								if (!tmpOut.isEmpty())
 								{
-									PutPage(tmpOut);
-									PutPage(SetClipPath(ite));
-									PutPage(ite->fillRule ? "h\nf*\n" : "h\nf\n");
+									if (ite->GrType == 14)
+										PutPage(tmpOut);
+									else
+									{
+										PutPage(tmpOut);
+										PutPage(SetClipPath(ite));
+										PutPage(ite->fillRule ? "h\nf*\n" : "h\nf\n");
+									}
 								}
 							}
 							else
@@ -3460,14 +3516,11 @@ QString PDFLibCore::PDF_PutSoftShadow(PageItem* ite, const ScPage *pag)
 	tmp += "1 0 0 1 0 " + FToStr(-(ite->height() + ite->visualLineWidth()))+" cm\n";
 	tmp += FToStr(ite->width() + ite->visualLineWidth() + 2 * ite->softShadowBlurRadius()) + " 0 0 " + FToStr(ite->height() + ite->visualLineWidth() + 2 * ite->softShadowBlurRadius())+" 0 0 cm\n" ;
 
-	double savRot = ite->rotation();
-	ite->setRotation(0, true);
 	double maxSize = qMax(ite->visualWidth(), ite->visualHeight());
 	maxSize = qMin(3000.0, maxSize * (softShadowDPI / 72.0));
 	bool savedShadow = ite->hasSoftShadow();
 	ite->setHasSoftShadow(false);
-	QImage imgC = ite->DrawObj_toImage(maxSize);
-	ite->setRotation(savRot, true);
+	QImage imgC = ite->DrawObj_toImage(maxSize, PageItem::NoRotation);
 	ite->setHasSoftShadow(savedShadow);
 
 	imgC = imgC.copy(-pixelRadius,-pixelRadius,imgC.width()+2*pixelRadius,imgC.height()+2*pixelRadius); // Add border
@@ -3740,6 +3793,11 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 						if (!PDF_PatternFillStroke(tmpOut, ite))
 							return false;
 					}
+					else if (ite->GrType == 14)
+					{
+						if (!PDF_HatchFill(tmpOut, ite))
+							return false;
+					}
 					else
 					{
 						if (!PDF_GradientFillStroke(tmpOut, ite))
@@ -3747,15 +3805,23 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 					}
 					if (!tmpOut.isEmpty())
 					{
-						tmp += tmpOut;
-						tmp += SetClipPath(ite);
-						tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+						if (ite->GrType == 14)
+							tmp += tmpOut;
+						else
+						{
+							tmp += tmpOut;
+							tmp += SetClipPath(ite);
+							tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+						}
 					}
 				}
 				else
 				{
-					tmp += SetClipPath(ite);
-					tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+					if (ite->fillColor() != CommonStrings::None)
+					{
+						tmp += SetClipPath(ite);
+						tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+					}
 				}
 			}
 			tmp += "q\n";
@@ -3828,7 +3894,7 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 			}
 			break;
 		case PageItem::TextFrame:
-			if ((ite->isAnnotation()) && (Options.Version != PDFOptions::PDFVersion_X3) && (Options.Version != PDFOptions::PDFVersion_X1a) && (Options.Version != PDFOptions::PDFVersion_X4))
+			if ((ite->isAnnotation()) && (!PDF_IsPDFX()))
 			{
 				if (ite->annotation().Type() == Annotation::RadioButton)
 				{
@@ -3853,6 +3919,11 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 						if (!PDF_PatternFillStroke(tmpOut, ite))
 							return false;
 					}
+					else if (ite->GrType == 14)
+					{
+						if (!PDF_HatchFill(tmpOut, ite))
+							return false;
+					}
 					else
 					{
 						if (!PDF_GradientFillStroke(tmpOut, ite))
@@ -3860,15 +3931,23 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 					}
 					if (!tmpOut.isEmpty())
 					{
-						tmp += tmpOut;
-						tmp += SetClipPath(ite);
-						tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+						if (ite->GrType == 14)
+							tmp += tmpOut;
+						else
+						{
+							tmp += tmpOut;
+							tmp += SetClipPath(ite);
+							tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+						}
 					}
 				}
 				else
 				{
-					tmp += SetClipPath(ite);
-					tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+					if (ite->fillColor() != CommonStrings::None)
+					{
+						tmp += SetClipPath(ite);
+						tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+					}
 				}
 			}
 			tmp += "q\n";
@@ -4020,6 +4099,11 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 					if (!PDF_PatternFillStroke(tmpOut, ite))
 						return false;
 				}
+				else if (ite->GrType == 14)
+				{
+					if (!PDF_HatchFill(tmpOut, ite))
+						return false;
+				}
 				else
 				{
 					if (!PDF_GradientFillStroke(tmpOut, ite))
@@ -4027,9 +4111,14 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 				}
 				if (!tmpOut.isEmpty())
 				{
-					tmp += tmpOut;
-					tmp += SetClipPath(ite);
-					tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+					if (ite->GrType == 14)
+						tmp += tmpOut;
+					else
+					{
+						tmp += tmpOut;
+						tmp += SetClipPath(ite);
+						tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+					}
 				}
 			}
 			else
@@ -4096,7 +4185,7 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 			break;
 		case PageItem::PolyLine:
 		case PageItem::Spiral:
-			if (ite->PoLine.size() > 4)  // && ((ite->PoLine.point(0) != ite->PoLine.point(1)) || (ite->PoLine.point(2) != ite->PoLine.point(3))))
+			if (ite->PoLine.size() > 3)  // && ((ite->PoLine.point(0) != ite->PoLine.point(1)) || (ite->PoLine.point(2) != ite->PoLine.point(3))))
 			{
 				tmp += "q\n";
 				if (((ite->GrMask > 0) || (ite->fillTransparency() != 0) || (ite->fillBlendmode() != 0)) && ((Options.Version >= PDFOptions::PDFVersion_14) || (Options.Version == PDFOptions::PDFVersion_X4)))
@@ -4110,6 +4199,11 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 						if (!PDF_PatternFillStroke(tmpOut, ite))
 							return false;
 					}
+					else if (ite->GrType == 14)
+					{
+						if (!PDF_HatchFill(tmpOut, ite))
+							return false;
+					}
 					else
 					{
 						if (!PDF_GradientFillStroke(tmpOut, ite))
@@ -4117,9 +4211,14 @@ bool PDFLibCore::PDF_ProcessItem(QString& output, PageItem* ite, const ScPage* p
 					}
 					if (!tmpOut.isEmpty())
 					{
-						tmp += tmpOut;
-						tmp += SetClipPath(ite);
-						tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+						if (ite->GrType == 14)
+							tmp += tmpOut;
+						else
+						{
+							tmp += tmpOut;
+							tmp += SetClipPath(ite);
+							tmp += (ite->fillRule ? "h\nf*\n" : "h\nf\n");
+						}
 					}
 				}
 				else
@@ -5019,107 +5118,112 @@ QString PDFLibCore::setTextSt(PageItem *ite, uint PNr, const ScPage* pag)
 	// Loop over each character (!) in the pageItem...
 	if (ite->itemType() == PageItem::TextFrame)
 	{
+		PathData straightPath;
+		straightPath.PtransX = 0;
+		straightPath.PtransY = 0;
+		straightPath.PRot = 0;
+		straightPath.PDx = 0;
 		tmp += "BT\n";
-		for (uint ll=0; ll < ite->itemText.lines(); ++ll)
+		for (uint ll=0; ll < ite->textLayout.lines(); ++ll)
 		{
-			LineSpec ls = ite->itemText.line(ll);
+			LineSpec ls = ite->textLayout.line(ll);
 			tabDist = ls.x;
 			double CurX = ls.x;
 			for (int d = ls.firstItem; d <= ls.lastItem; ++d)
 			{
-				ScText *hl = ite->itemText.item_p(d);
-				const QChar ch = hl->ch;
+				GlyphLayout* glyphs = ite->itemText.getGlyphs(d);
+				PathData* pdata = &straightPath;
+				const QChar ch = ite->itemText.text(d);
 				const CharStyle& chstyle(ite->itemText.charStyle(d));
 				const ParagraphStyle& pstyle(ite->itemText.paragraphStyle(d));
 				if (SpecialChars::isBreak(ch, true) || (ch == QChar(10)))
 					continue;
-				if (chstyle.effects() & ScLayout_SuppressSpace)
+				if (ite->itemText.hasFlag(d, ScLayout_SuppressSpace))
 					continue;
 				tTabValues = pstyle.tabValues();
-				if (chstyle.effects() & ScLayout_StartOfLine)
+				if (ite->itemText.hasFlag(d, ScLayout_StartOfLine))
 					tabCc = 0;
 				if ((ch == SpecialChars::TAB) && (tTabValues.count() != 0))
 				{
 					QChar tabFillChar;
-					const TabLayout* tabLayout = dynamic_cast<const TabLayout*>(hl->glyph.more);
+					const TabLayout* tabLayout = dynamic_cast<const TabLayout*>(glyphs->more);
 					if (tabLayout)
 						tabFillChar = tabLayout->fillChar;
 					if (!tabFillChar.isNull())
 					{
-						ScText hl2;
-						static_cast<CharStyle&>(hl2) = static_cast<const CharStyle&>(*hl);
-						const GlyphLayout * const gl = hl->glyph.more;
+						GlyphLayout gl2;
+						CharStyle cl2(chstyle);
+						const GlyphLayout * const gl = glyphs->more;
 						double scale = gl ? gl->scaleV : 1.0;
 						double wt    = chstyle.font().charWidth(tabFillChar, chstyle.fontSize() * scale / 10.0);
-						double len   = hl->glyph.xadvance;
+						double len   = glyphs->xadvance;
 						int coun     = static_cast<int>(len / wt);
 						// #6728 : update code according to fillInTabLeaders() and PageItem::layout() - JG
 						double sPos  = 0.0 /*CurX - len + chstyle.fontSize() / 10.0 * 0.7 + 1*/;
-						hl2.ch = tTabValues[tabCc].tabFillChar;
-						hl2.setTracking(0);
-						hl2.setScaleH(1000);
-						hl2.setScaleV(1000);
-						hl2.glyph.glyph   = chstyle.font().char2CMap(tabFillChar);
-						hl2.glyph.yoffset = hl->glyph.yoffset;
+						//hl2.ch = tTabValues[tabCc].tabFillChar;
+						cl2.setTracking(0);
+						cl2.setScaleH(1000);
+						cl2.setScaleV(1000);
+						gl2.glyph   = chstyle.font().char2CMap(tabFillChar);
+						gl2.yoffset = glyphs->yoffset;
 						for (int cx = 0; cx < coun; ++cx)
 						{
-							hl2.glyph.xoffset =  sPos + wt * cx;
+							gl2.xoffset =  sPos + wt * cx;
 							if ((chstyle.effects() & ScStyle_Shadowed) && (chstyle.strokeColor() != CommonStrings::None))
 							{
-								ScText hl3;
-								static_cast<CharStyle&>(hl3) = static_cast<const CharStyle&>(hl2);
+								GlyphLayout gl3;
+								CharStyle cl3(cl2);
 								//<< HACK to fix Bug #8446
-								hl3.setEffects(hl3.effects() & (~(ScStyle_Outline)));
+								cl3.setEffects(cl3.effects() & (~(ScStyle_Outline)));
 								//>>
-								hl3.ch = hl2.ch;
-								hl3.glyph.glyph = hl2.glyph.glyph;
-								hl3.setFillColor(hl2.strokeColor());
-								hl3.setFillShade(hl2.strokeShade());
-								hl3.glyph.yoffset = hl2.glyph.yoffset - (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
-								hl3.glyph.xoffset = hl2.glyph.xoffset + (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
-								setTextCh(ite, PNr, CurX, ls.y, d, tmp, tmp2, &hl3, pstyle, pag);
+								gl3.glyph = gl2.glyph;
+								cl3.setFillColor(cl2.strokeColor());
+								cl3.setFillShade(cl2.strokeShade());
+								gl3.yoffset = gl2.yoffset - (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
+								gl3.xoffset = gl2.xoffset + (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
+								setTextCh(ite, PNr, CurX, ls.y, d, tmp, tmp2, cl3, &gl3, pdata, pstyle, pag);
 							}
-							setTextCh(ite, PNr, CurX, ls.y, d, tmp, tmp2, &hl2, pstyle, pag);
+							setTextCh(ite, PNr, CurX, ls.y, d, tmp, tmp2, cl2, &gl2, pdata, pstyle, pag);
 						}
 					}
 					tabCc++;
 				}
 				if (ch == SpecialChars::TAB)
 				{
-					CurX += hl->glyph.wide();
+					CurX += glyphs->wide();
 					continue;
 				}
 				if ((chstyle.effects() & ScStyle_Shadowed) && (chstyle.strokeColor() != CommonStrings::None))
 				{
-					ScText hl2;
-					hl2.ch = ch;
-					hl2.glyph.glyph = hl->glyph.glyph;
-					const GlyphLayout *gl1 = &hl->glyph;
-					GlyphLayout	*gl2 = &hl2.glyph;
+					GlyphLayout gl2(*glyphs);
+					gl2.glyph = glyphs->glyph;
+					const GlyphLayout *gl1 = glyphs;
+					GlyphLayout* glx = &gl2;
 					while (gl1->more)
 					{
-						gl2->more = new GlyphLayout(*gl1->more);
-						gl2->more->yoffset -= (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
-						gl2->more->xoffset += (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
-						gl2->more->more = NULL;
+						glx->more = new GlyphLayout(*gl1->more);
+						glx->more->yoffset -= (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
+						glx->more->xoffset += (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
+						glx->more->more = NULL;
 						gl1 = gl1->more;
-						gl2 = gl2->more;
+						glx = glx->more;
 					}
-					static_cast<CharStyle&>(hl2) = static_cast<const CharStyle&>(*hl);
+					CharStyle cl2(chstyle);
 					//<< HACK to fix Bug #8446
-					hl2.setEffects(hl2.effects() & (~(ScStyle_Outline)));
+					cl2.setEffects(cl2.effects() & (~(ScStyle_Outline)));
 					//>>
-					hl2.setFillColor(hl->strokeColor());
-					hl2.setFillShade(hl->strokeShade());
-					hl2.glyph.xadvance = hl->glyph.xadvance;
-					hl2.glyph.yadvance = hl->glyph.yadvance;
-					hl2.glyph.yoffset = hl->glyph.yoffset - (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
-					hl2.glyph.xoffset = hl->glyph.xoffset + (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
-					hl2.glyph.scaleH = hl->glyph.scaleH;
-					hl2.glyph.scaleV = hl->glyph.scaleV;
-					setTextCh(ite, PNr, CurX, ls.y, d, tmp, tmp2, &hl2, pstyle, pag);
+					cl2.setFillColor(chstyle.strokeColor());
+					cl2.setFillShade(chstyle.strokeShade());
+					gl2.xadvance = glyphs->xadvance;
+					gl2.yadvance = glyphs->yadvance;
+					gl2.yoffset = glyphs->yoffset - (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
+					gl2.xoffset = glyphs->xoffset + (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
+					gl2.scaleH = glyphs->scaleH;
+					gl2.scaleV = glyphs->scaleV;
+					setTextCh(ite, PNr, CurX, ls.y, d, tmp, tmp2, cl2, &gl2, pdata, pstyle, pag);
+					gl2.shrink();
 				}
-				setTextCh(ite, PNr, CurX, ls.y, d, tmp, tmp2, hl, pstyle, pag);
+				setTextCh(ite, PNr, CurX, ls.y, d, tmp, tmp2, chstyle, glyphs, pdata, pstyle, pag);
 				// Unneeded now that glyph xadvance is set appropriately for inline objects by PageItem_TextFrame::layout() - JG
 				/*if (hl->ch == SpecialChars::OBJECT)
 				{
@@ -5127,7 +5231,7 @@ QString PDFLibCore::setTextSt(PageItem *ite, uint PNr, const ScPage* pag)
 					CurX += (embedded.getItem()->gWidth + embedded.getItem()->lineWidth()) * hl->glyph.scaleH;
 				}
 				else*/
-				CurX += hl->glyph.wide();
+				CurX += glyphs->wide();
 				tabDist = CurX;
 			}
 		}
@@ -5140,51 +5244,51 @@ QString PDFLibCore::setTextSt(PageItem *ite, uint PNr, const ScPage* pag)
 		double CurX = 0;
 		for (int d = 0; d < ite->maxCharsInFrame(); ++d)
 		{
-			ScText *hl = ite->asPathText()->itemRenderText.item_p(d);
-			const QChar ch = hl->ch;
+			GlyphLayout* glyphs = ite->asPathText()->itemRenderText.getGlyphs(d);
+			PathData* pdata = &ite->textLayout.point(d);
+			const QChar ch = ite->asPathText()->itemRenderText.text(d);
 			const CharStyle& chstyle(ite->asPathText()->itemRenderText.charStyle(d));
 			const ParagraphStyle& pstyle(ite->asPathText()->itemRenderText.paragraphStyle(d));
 			if (SpecialChars::isBreak(ch, true) || (ch == QChar(10)))
 				continue;
-			if (chstyle.effects() & ScLayout_SuppressSpace)
+			if (ite->asPathText()->itemRenderText.hasFlag(d,  ScLayout_SuppressSpace))
 				continue;
 			tTabValues = pstyle.tabValues();
-			if (chstyle.effects() & ScLayout_StartOfLine)
+			if (ite->asPathText()->itemRenderText.hasFlag(d,  ScLayout_StartOfLine))
 				tabCc = 0;
 			if ((ch == SpecialChars::TAB) && (tTabValues.count() != 0))
 			{
 				if ((tabCc < tTabValues.count()) && (!tTabValues[tabCc].tabFillChar.isNull()))
 				{
-					ScText hl2;
-					static_cast<CharStyle&>(hl2) = static_cast<const CharStyle&>(*hl);
+					GlyphLayout gl2;
+					CharStyle cl2(chstyle);
 					double wt = chstyle.font().charWidth(tTabValues[tabCc].tabFillChar, chstyle.fontSize());
-					int coun = static_cast<int>((CurX+hl->glyph.xoffset - tabDist) / wt);
+					int coun = static_cast<int>((CurX+ glyphs->xoffset - tabDist) / wt);
 					// #6728 : update code according to fillInTabLeaders() and PageItem::layout() - JG
 					double sPos = 0.0 /* CurX+hl->glyph.xoffset - (CurX+hl->glyph.xoffset - tabDist) + 1 */;
-					hl2.ch = tTabValues[tabCc].tabFillChar;
-					hl2.setTracking(0);
-					hl2.setScaleH(1000);
-					hl2.setScaleV(1000);
-					hl2.glyph.yoffset = hl->glyph.yoffset;
+					gl2.glyph = chstyle.font().char2CMap(tTabValues[tabCc].tabFillChar);
+					cl2.setTracking(0);
+					cl2.setScaleH(1000);
+					cl2.setScaleV(1000);
+					gl2.yoffset = glyphs->yoffset;
 					for (int cx = 0; cx < coun; ++cx)
 					{
-						hl2.glyph.xoffset =  sPos + wt * cx;
+						glyphs->xoffset =  sPos + wt * cx;
 						if ((chstyle.effects() & ScStyle_Shadowed) && (chstyle.strokeColor() != CommonStrings::None))
 						{
-							ScText hl3;
-							static_cast<CharStyle&>(hl3) = static_cast<const CharStyle&>(hl2);
+							GlyphLayout gl3;
+							CharStyle cl3(cl2);
 							//<< HACK to fix Bug #8446
-							hl3.setEffects(hl3.effects() & (~(ScStyle_Outline)));
+							cl3.setEffects(cl3.effects() & (~(ScStyle_Outline)));
 							//>>
-							hl3.ch = hl2.ch;
-							hl3.glyph.glyph = hl2.glyph.glyph;
-							hl3.setFillColor(hl2.strokeColor());
-							hl3.setFillShade(hl2.strokeShade());
-							hl3.glyph.yoffset = hl2.glyph.yoffset - (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
-							hl3.glyph.xoffset = hl2.glyph.xoffset + (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
-							setTextCh(ite, PNr, 0, 0, d, tmp, tmp2, &hl3, pstyle, pag);
+							gl3.glyph = gl2.glyph;
+							cl3.setFillColor(cl2.strokeColor());
+							cl3.setFillShade(cl2.strokeShade());
+							gl3.yoffset = gl2.yoffset - (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
+							gl3.xoffset = gl2.xoffset + (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
+							setTextCh(ite, PNr, 0, 0, d, tmp, tmp2, cl3, &gl3, pdata, pstyle, pag);
 						}
-						setTextCh(ite, PNr, 0, 0, d, tmp, tmp2, &hl2, pstyle, pag);
+						setTextCh(ite, PNr, 0, 0, d, tmp, tmp2, cl2, &gl2, pdata, pstyle, pag);
 					}
 					tabCc++;
 				}
@@ -5195,32 +5299,27 @@ QString PDFLibCore::setTextSt(PageItem *ite, uint PNr, const ScPage* pag)
 			}
 			if (ch == SpecialChars::TAB)
 			{
-				CurX += hl->glyph.wide();
+				CurX += glyphs->wide();
 				continue;
 			}
 			if ((chstyle.effects() & ScStyle_Shadowed) && (chstyle.strokeColor() != CommonStrings::None))
 			{
-				ScText hl2;
-				hl2.ch = ch;
-				hl2.glyph.glyph = hl->glyph.glyph;
-				static_cast<CharStyle&>(hl2) = static_cast<const CharStyle&>(*hl);
+				GlyphLayout gl2;
+				gl2.glyph = glyphs->glyph;
+				CharStyle cl2(chstyle);
 				//<< HACK to fix Bug #8446
-				hl2.setEffects(hl2.effects() & (~(ScStyle_Outline)));
+				cl2.setEffects(cl2.effects() & (~(ScStyle_Outline)));
 				//>>
-				hl2.setFillColor(hl->strokeColor());
-				hl2.setFillShade(hl->strokeShade());
-				hl2.glyph.yoffset = hl->glyph.yoffset - (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
-				hl2.glyph.xoffset = hl->glyph.xoffset + (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
-				hl2.glyph.scaleH = hl->glyph.scaleH;
-				hl2.glyph.scaleV = hl->glyph.scaleV;
-				hl2.PtransX = hl->PtransX;
-				hl2.PtransY = hl->PtransY;
-				hl2.PRot = hl->PRot;
-				hl2.PDx = hl->PDx;
-				setTextCh(ite, PNr, 0, 0, d, tmp, tmp2, &hl2, pstyle, pag);
+				cl2.setFillColor(chstyle.strokeColor());
+				cl2.setFillShade(chstyle.strokeShade());
+				gl2.yoffset = glyphs->yoffset - (chstyle.fontSize() * chstyle.shadowYOffset() / 10000.0);
+				gl2.xoffset = glyphs->xoffset + (chstyle.fontSize() * chstyle.shadowXOffset() / 10000.0);
+				gl2.scaleH = glyphs->scaleH;
+				gl2.scaleV = glyphs->scaleV;
+				setTextCh(ite, PNr, 0, 0, d, tmp, tmp2, cl2, &gl2, pdata, pstyle, pag);
 			}
-			setTextCh(ite, PNr, 0, 0, d, tmp, tmp2, hl, pstyle, pag);
-			CurX += hl->glyph.wide();
+			setTextCh(ite, PNr, 0, 0, d, tmp, tmp2, chstyle, glyphs, pdata, pstyle, pag);
+			CurX += glyphs->wide();
 			tabDist = CurX;
 		}
 	}
@@ -5229,7 +5328,7 @@ QString PDFLibCore::setTextSt(PageItem *ite, uint PNr, const ScPage* pag)
 	return tmp;
 }
 
-bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, QString &tmp, QString &tmp2, ScText *hl, const ParagraphStyle& pstyle, const ScPage* pag)
+bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, QString &tmp, QString &tmp2, const CharStyle& style, GlyphLayout *glyphs, PathData* pdata, const ParagraphStyle& pstyle, const ScPage* pag)
 {
 	QString output;
 	QString FillColor = "";
@@ -5237,14 +5336,14 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 	if (ite->asPathText())
 	{
 		tmp += "q\n";
-		QPointF tangt = QPointF( cos(hl->PRot), sin(hl->PRot) );
-		QTransform trafo = QTransform( 1, 0, 0, -1, -hl->PDx, 0 );
+		QPointF tangt = QPointF( cos(pdata->PRot), sin(pdata->PRot) );
+		QTransform trafo = QTransform( 1, 0, 0, -1, -pdata->PDx, 0 );
 		if (ite->textPathFlipped)
 			trafo *= QTransform(1, 0, 0, -1, 0, 0);
 		if (ite->textPathType == 0)
-			trafo *= QTransform( tangt.x(), -tangt.y(), -tangt.y(), -tangt.x(), hl->PtransX, -hl->PtransY );
+			trafo *= QTransform( tangt.x(), -tangt.y(), -tangt.y(), -tangt.x(), pdata->PtransX, -pdata->PtransY );
 		else if (ite->textPathType == 1)
-			trafo *= QTransform(1, 0, 0, -1, hl->PtransX, -hl->PtransY );
+			trafo *= QTransform(1, 0, 0, -1, pdata->PtransX, -pdata->PtransY );
 		else if (ite->textPathType == 2)
 		{
 			double a = 1;
@@ -5255,21 +5354,20 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 				b = 1;
 			}
 			if (fabs(tangt.x()) > 0.1)
-				trafo *= QTransform( a, (tangt.y() / tangt.x()) * b, 0, -1, hl->PtransX, -hl->PtransY ); // ID's Skew mode
+				trafo *= QTransform( a, (tangt.y() / tangt.x()) * b, 0, -1, pdata->PtransX, -pdata->PtransY ); // ID's Skew mode
 			else
-				trafo *= QTransform( a, 6 * b, 0, -1, hl->PtransX, -hl->PtransY );
+				trafo *= QTransform( a, 6 * b, 0, -1, pdata->PtransX, -pdata->PtransY );
 		}
 		tmp += FToStr(trafo.m11())+" "+FToStr(trafo.m12())+" "+FToStr(trafo.m21())+" "+FToStr(trafo.m22())+" "+FToStr(trafo.dx())+" "+FToStr(trafo.dy())+" cm\n";
 		if (ite->BaseOffs != 0)
 			tmp += "1 0 0 1 0 "+ FToStr( -ite->BaseOffs)+" cm\n";
-		if (hl->glyph.xoffset != 0.0 || hl->glyph.yoffset != 0.0)
-			tmp += "1 0 0 1 " + FToStr( hl->glyph.xoffset)+ " " + FToStr( -hl->glyph.yoffset)+" cm\n";
-		if (hl->ch != SpecialChars::OBJECT)
+		if (glyphs->xoffset != 0.0 || glyphs->yoffset != 0.0)
+			tmp += "1 0 0 1 " + FToStr( glyphs->xoffset)+ " " + FToStr( -glyphs->yoffset)+" cm\n";
+		if (ite->itemText.text(d) != SpecialChars::OBJECT)
 			tmp += "BT\n";
 	}
-	double tsz = hl->fontSize();
-	QChar chstr = hl->ch;
-	const CharStyle& style(*hl);
+	QChar chstr = ite->itemText.text(d);
+	double tsz = style.fontSize();
 
 /*	if (hl->effects() & ScStyle_DropCap)
 	{
@@ -5287,14 +5385,14 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 		}
 	}
 	*/
-	if (hl->hasObject(&doc))
+	if (ite->itemText.hasObject(d))
 	{
 		if (!ite->asPathText())
 		{
 			tmp += "ET\n"+tmp2;
 			tmp2 = "";
 		}
-		PageItem* embedded = hl->getItem(&doc);
+		PageItem* embedded = ite->itemText.object(d);
 		tmp2 += "q\n";
 		if (ite->asPathText())
 			tmp2 +=  FToStr(style.scaleH() / 1000.0)+" 0 0 "+FToStr(style.scaleV() / 1000.0)+" "+FToStr(embedded->gXpos * (style.scaleH() / 1000.0))+" "+FToStr((embedded->height() * (style.scaleV() / 1000.0)) - embedded->gYpos * (style.scaleV() / 1000.0)+embedded->gHeight * (style.baselineOffset() / 1000.0))+" cm\n";
@@ -5303,16 +5401,16 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 			if (d == 0 || ite->itemText.text(d-1) == SpecialChars::PARSEP)
 			{
 				if ((style.baselineOffset() != 0) && (!pstyle.hasDropCap()))
-					tmp2 +=  FToStr(style.scaleH() / 1000.0)+" 0 0 "+FToStr(style.scaleV() / 1000.0)+" "+FToStr(x+hl->glyph.xoffset + embedded->gXpos * (style.scaleH() / 1000.0))+" "+FToStr(-y-hl->glyph.yoffset + (embedded->height() * (style.scaleV() / 1000.0)) - embedded->gYpos * (style.scaleV() / 1000.0)+embedded->height() * (style.baselineOffset() / 1000.0))+" cm\n";
+					tmp2 +=  FToStr(style.scaleH() / 1000.0)+" 0 0 "+FToStr(style.scaleV() / 1000.0)+" "+FToStr(x + glyphs->xoffset + embedded->gXpos * (style.scaleH() / 1000.0))+" "+FToStr(-y- glyphs->yoffset + (embedded->height() * (style.scaleV() / 1000.0)) - embedded->gYpos * (style.scaleV() / 1000.0)+embedded->height() * (style.baselineOffset() / 1000.0))+" cm\n";
 				else
-					tmp2 +=  FToStr(style.scaleH() / 1000.0)+" 0 0 "+FToStr(style.scaleV() / 1000.0)+" "+FToStr(x+hl->glyph.xoffset + embedded->gXpos * (style.scaleH() / 1000.0))+" "+FToStr(-y-hl->glyph.yoffset + (embedded->height() * (style.scaleV() / 1000.0)) - embedded->gYpos * (style.scaleV() / 1000.0))+" cm\n";
+					tmp2 +=  FToStr(style.scaleH() / 1000.0)+" 0 0 "+FToStr(style.scaleV() / 1000.0)+" "+FToStr(x+ glyphs->xoffset + embedded->gXpos * (style.scaleH() / 1000.0))+" "+FToStr(-y- glyphs->yoffset + (embedded->height() * (style.scaleV() / 1000.0)) - embedded->gYpos * (style.scaleV() / 1000.0))+" cm\n";
 			}
 			else
 			{
 				if (style.baselineOffset() != 0)
-					tmp2 +=  FToStr(style.scaleH() / 1000.0)+" 0 0 "+FToStr(style.scaleV() / 1000.0)+" "+FToStr(x+hl->glyph.xoffset + embedded->gXpos * (style.scaleH() / 1000.0))+" "+FToStr(-y-hl->glyph.yoffset + (embedded->height() * (style.scaleV() / 1000.0)) - embedded->gYpos * (style.scaleV() / 1000.0)+embedded->height() * (style.baselineOffset() / 1000.0))+" cm\n";
+					tmp2 +=  FToStr(style.scaleH() / 1000.0)+" 0 0 "+FToStr(style.scaleV() / 1000.0)+" "+FToStr(x+ glyphs->xoffset + embedded->gXpos * (style.scaleH() / 1000.0))+" "+FToStr(-y- glyphs->yoffset + (embedded->height() * (style.scaleV() / 1000.0)) - embedded->gYpos * (style.scaleV() / 1000.0)+embedded->height() * (style.baselineOffset() / 1000.0))+" cm\n";
 				else
-					tmp2 +=  FToStr(style.scaleH() / 1000.0)+" 0 0 "+FToStr(style.scaleV() / 1000.0)+" "+FToStr(x+hl->glyph.xoffset + embedded->gXpos * (style.scaleH() / 1000.0))+" "+FToStr(-y-hl->glyph.yoffset + (embedded->height() * (style.scaleV() / 1000.0)) - embedded->gYpos * (style.scaleV() / 1000.0))+" cm\n";
+					tmp2 +=  FToStr(style.scaleH() / 1000.0)+" 0 0 "+FToStr(style.scaleV() / 1000.0)+" "+FToStr(x+ glyphs->xoffset + embedded->gXpos * (style.scaleH() / 1000.0))+" "+FToStr(-y- glyphs->yoffset + (embedded->height() * (style.scaleV() / 1000.0)) - embedded->gYpos * (style.scaleV() / 1000.0))+" cm\n";
 			}
 		}
 		if (!PDF_ProcessItem(output, embedded, pag, PNr, true))
@@ -5328,7 +5426,7 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 		return true;
 	}
 
-	uint glyph = hl->glyph.glyph;
+	uint glyph = glyphs->glyph;
 
 	if (glyph == (ScFace::CONTROL_GLYPHS + SpecialChars::NBSPACE.unicode()) ||
 		glyph == (ScFace::CONTROL_GLYPHS + 32))
@@ -5357,7 +5455,7 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 		if (((style.effects() & ScStyle_Underline) && (chstr != SpecialChars::PARSEP))  || ((style.effects() & ScStyle_UnderlineWords) && (!chstr.isSpace())))
 		{
 			//		double Ulen = style.font().charWidth(chstr, style.fontSize()) * (hl->glyph.scaleH);
-			double Ulen = hl->glyph.xadvance;
+			double Ulen = glyphs->xadvance;
 			double Upos, Uwid;
 			if ((style.underlineOffset() != -1) || (style.underlineWidth() != -1))
 			{
@@ -5376,7 +5474,7 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 				Uwid = qMax(style.font().strokeWidth(style.fontSize() / 10.0), 1.0);
 			}
 			if (style.baselineOffset() != 0)
-				Upos += (style.fontSize() / 10.0) * hl->glyph.scaleV * (style.baselineOffset() / 1000.0);
+				Upos += (style.fontSize() / 10.0) * glyphs->scaleV * (style.baselineOffset() / 1000.0);
 			if (style.fillColor() != CommonStrings::None)
 				tmp2 += putColor(style.fillColor(), style.fillShade(), false);
 			tmp2 += FToStr(Uwid)+" w\n";
@@ -5384,26 +5482,26 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 			{
 				if (style.effects() & ScStyle_Subscript)
 				{
-					tmp2 += FToStr(x+hl->glyph.xoffset)     +" "+FToStr(-y+Upos)+" m\n";
-					tmp2 += FToStr(x+hl->glyph.xoffset+Ulen)+" "+FToStr(-y+Upos)+" l\n";
+					tmp2 += FToStr(x+ glyphs->xoffset)     +" "+FToStr(-y+Upos)+" m\n";
+					tmp2 += FToStr(x+ glyphs->xoffset+Ulen)+" "+FToStr(-y+Upos)+" l\n";
 				}
 				else
 				{
-					tmp2 += FToStr(x+hl->glyph.xoffset)     +" "+FToStr(-y+hl->glyph.yoffset+Upos)+" m\n";
-					tmp2 += FToStr(x+hl->glyph.xoffset+Ulen)+" "+FToStr(-y+hl->glyph.yoffset+Upos)+" l\n";
+					tmp2 += FToStr(x+ glyphs->xoffset)     +" "+FToStr(-y+ glyphs->yoffset+Upos)+" m\n";
+					tmp2 += FToStr(x+ glyphs->xoffset+Ulen)+" "+FToStr(-y+ glyphs->yoffset+Upos)+" l\n";
 				}
 			}
 			else
 			{
 				if (style.effects() & ScStyle_Subscript)
 				{
-					tmp2 += FToStr(x+hl->glyph.xoffset)     +" "+FToStr(-y-hl->glyph.yoffset+Upos)+" m\n";
-					tmp2 += FToStr(x+hl->glyph.xoffset+Ulen)+" "+FToStr(-y-hl->glyph.yoffset+Upos)+" l\n";
+					tmp2 += FToStr(x+ glyphs->xoffset)     +" "+FToStr(-y- glyphs->yoffset+Upos)+" m\n";
+					tmp2 += FToStr(x+ glyphs->xoffset+Ulen)+" "+FToStr(-y- glyphs->yoffset+Upos)+" l\n";
 				}
 				else
 				{
-					tmp2 += FToStr(x+hl->glyph.xoffset)     +" "+FToStr(-y+Upos)+" m\n";
-					tmp2 += FToStr(x+hl->glyph.xoffset+Ulen)+" "+FToStr(-y+Upos)+" l\n";
+					tmp2 += FToStr(x+ glyphs->xoffset)     +" "+FToStr(-y+Upos)+" m\n";
+					tmp2 += FToStr(x+ glyphs->xoffset+Ulen)+" "+FToStr(-y+Upos)+" l\n";
 				}
 			}
 			tmp2 += "S\n";
@@ -5437,15 +5535,15 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 				{
 					if (ite->reversed())
 					{
-						double wid = style.font().charWidth(chstr, style.fontSize()) * (hl->glyph.scaleH);
-						tmp2 += "1 0 0 1 "+FToStr(x+hl->glyph.xoffset)+" "+FToStr((y+hl->glyph.yoffset - (tsz / 10.0)) * -1 + ((tsz / 10.0) * (style.baselineOffset() / 1000.0)))+" cm\n";
+						double wid = style.font().charWidth(chstr, style.fontSize()) * (glyphs->scaleH);
+						tmp2 += "1 0 0 1 "+FToStr(x+ glyphs->xoffset)+" "+FToStr((y+ glyphs->yoffset - (tsz / 10.0)) * -1 + ((tsz / 10.0) * (style.baselineOffset() / 1000.0)))+" cm\n";
 						tmp2 += "-1 0 0 1 0 0 cm\n";
 						tmp2 += "1 0 0 1 "+FToStr(-wid)+" 0 cm\n";
 						tmp2 += FToStr(tsz / 10.0)+" 0 0 "+FToStr(tsz / 10.0)+" 0 0 cm\n";
 					}
 					else
 					{
-						tmp2 += FToStr(tsz / 10.0)+" 0 0 "+FToStr(tsz / 10.0)+" "+FToStr(x+hl->glyph.xoffset)+" "+FToStr((y+hl->glyph.yoffset - (tsz / 10.0)) * -1 + ((tsz / 10.0) * (style.baselineOffset() / 1000.0)))+" cm\n";
+						tmp2 += FToStr(tsz / 10.0)+" 0 0 "+FToStr(tsz / 10.0)+" "+FToStr(x+ glyphs->xoffset)+" "+FToStr((y+ glyphs->yoffset - (tsz / 10.0)) * -1 + ((tsz / 10.0) * (style.baselineOffset() / 1000.0)))+" cm\n";
 					}
 				}
 				else
@@ -5454,9 +5552,9 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 						tmp2 += "1 0 0 1 0 "+FToStr( -ite->BaseOffs)+" cm\n";
 					tmp2 += FToStr(tsz / 10.0)+" 0 0 "+FToStr(tsz / 10.0)+" 0 "+FToStr(tsz / 10.0)+" cm\n";
 				}
-				if (hl->glyph.scaleV != 1.0)
-					tmp2 += "1 0 0 1 0 "+FToStr( (((tsz / 10.0) - (tsz / 10.0) * (hl->glyph.scaleV)) / (tsz / 10.0)) * -1)+" cm\n";
-				tmp2 += FToStr(qMax(hl->glyph.scaleH, 0.1))+" 0 0 "+FToStr(qMax(hl->glyph.scaleV, 0.1))+" 0 0 cm\n";
+				if (glyphs->scaleV != 1.0)
+					tmp2 += "1 0 0 1 0 "+FToStr( (((tsz / 10.0) - (tsz / 10.0) * (glyphs->scaleV)) / (tsz / 10.0)) * -1)+" cm\n";
+				tmp2 += FToStr(qMax(glyphs->scaleH, 0.1))+" 0 0 "+FToStr(qMax(glyphs->scaleV, 0.1))+" 0 0 cm\n";
 				if (style.fillColor() != CommonStrings::None)
 					tmp2 += "/"+style.font().psName().replace( QRegExp("[\\s\\/\\{\\[\\]\\}\\<\\>\\(\\)\\%]"), "_" )+QString::number(glyph)+" Do\n";
 				if (style.effects() & ScStyle_Outline)
@@ -5471,7 +5569,7 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 					{
 						for (int poi=0; poi<gly.size()-3; poi += 4)
 						{
-							if (gly.point(poi).x() > 900000)
+							if (gly.isMarker(poi))
 							{
 								tmp2 += "h\n";
 								nPath = true;
@@ -5510,14 +5608,14 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 			}
 			if (glyph != style.font().char2CMap(QChar(' ')))
 			{
-				uint idx = hl->glyph.glyph;
+				uint idx = glyphs->glyph;
 				uint idx1;
 				if (Options.SubsetList.contains(style.font().replacementName()))
 					idx1 = Type3Fonts[UsedFontsP[style.font().replacementName()]][idx] / 256;
 				else
 					idx1 = idx / 224;
 				ScFace currentFace = style.font();
-				if (Options.Version == PDFOptions::PDFVersion_X4
+				if ((Options.Version == PDFOptions::PDFVersion_X4 || currentFace.isSymbolic())
 					&& (currentFace.format() == ScFace::SFNT || currentFace.format() == ScFace::TTCF)
 					&& ( !Options.SubsetList.contains(style.font().replacementName()) ) )
 					tmp+= UsedFontsP[currentFace.replacementName()]+" "+FToStr(tsz / 10.0)+" Tf\n";
@@ -5548,24 +5646,24 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 					{
 						if (ite->reversed())
 						{
-							double wid = style.font().charWidth(chstr, style.fontSize()) * (hl->glyph.scaleH);
-							tmp2 += "1 0 0 1 "+FToStr(x+hl->glyph.xoffset)+" "+FToStr((y+hl->glyph.yoffset - (tsz / 10.0)) * -1 + ((tsz / 10.0) * (style.baselineOffset() / 1000.0)))+" cm\n";
+							double wid = style.font().charWidth(chstr, style.fontSize()) * (glyphs->scaleH);
+							tmp2 += "1 0 0 1 "+FToStr(x+ glyphs->xoffset)+" "+FToStr((y+ glyphs->yoffset - (tsz / 10.0)) * -1 + ((tsz / 10.0) * (style.baselineOffset() / 1000.0)))+" cm\n";
 							tmp2 += "-1 0 0 1 0 0 cm\n";
 							tmp2 += "1 0 0 1 "+FToStr(-wid)+" 0 cm\n";
 							tmp2 += FToStr(tsz / 10.0)+" 0 0 "+FToStr(tsz / 10.0)+" 0 0 cm\n";
 						}
 						else
 						{
-							tmp2 += FToStr(tsz / 10.0)+" 0 0 "+FToStr(tsz / 10.0)+" "+FToStr(x+hl->glyph.xoffset)+" "+FToStr((y+hl->glyph.yoffset - (tsz / 10.0)) * -1 + ((tsz / 10.0) * (style.baselineOffset() / 1000.0)))+" cm\n";
+							tmp2 += FToStr(tsz / 10.0)+" 0 0 "+FToStr(tsz / 10.0)+" "+FToStr(x+ glyphs->xoffset)+" "+FToStr((y+ glyphs->yoffset - (tsz / 10.0)) * -1 + ((tsz / 10.0) * (style.baselineOffset() / 1000.0)))+" cm\n";
 						}
 					}
 					else
 					{
 						tmp2 += FToStr(tsz / 10.0)+" 0 0 "+FToStr(tsz / 10.0)+" 0 "+FToStr(tsz / 10.0)+" cm\n";
 					}
-					if (hl->glyph.scaleV != 1.0)
-						tmp2 += "1 0 0 1 0 "+FToStr( (((tsz / 10.0) - (tsz / 10.0) * (hl->glyph.scaleV)) / (tsz / 10.0)) * -1)+" cm\n";
-					tmp2 += FToStr(qMax(hl->glyph.scaleH, 0.1))+" 0 0 "+FToStr(qMax(hl->glyph.scaleV, 0.1))+" 0 0 cm\n";
+					if (glyphs->scaleV != 1.0)
+						tmp2 += "1 0 0 1 0 "+FToStr( (((tsz / 10.0) - (tsz / 10.0) * (glyphs->scaleV)) / (tsz / 10.0)) * -1)+" cm\n";
+					tmp2 += FToStr(qMax(glyphs->scaleH, 0.1))+" 0 0 "+FToStr(qMax(glyphs->scaleV, 0.1))+" 0 0 cm\n";
 					FPointArray gly = style.font().glyphOutline(glyph);
 					QTransform mat;
 					mat.scale(0.1, 0.1);
@@ -5576,7 +5674,7 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 					{
 						for (int poi=0; poi<gly.size()-3; poi += 4)
 						{
-							if (gly.point(poi).x() > 900000)
+							if (gly.isMarker(poi))
 							{
 								tmp2 += "h\n";
 								nPath = true;
@@ -5610,14 +5708,14 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 				{
 					if (ite->reversed())
 					{
-						double wtr = hl->glyph.xadvance;
-						tmp +=  FToStr(-qMax(hl->glyph.scaleH, 0.1))+" 0 0 "+FToStr(qMax(hl->glyph.scaleV, 0.1)) +" "+FToStr(x+hl->glyph.xoffset+wtr)+" "+FToStr(-y-hl->glyph.yoffset+(style.fontSize() / 10.0) * (style.baselineOffset() / 1000.0))+" Tm\n";
+						double wtr = glyphs->xadvance;
+						tmp +=  FToStr(-qMax(glyphs->scaleH, 0.1))+" 0 0 "+FToStr(qMax(glyphs->scaleV, 0.1)) +" "+FToStr(x+ glyphs->xoffset+wtr)+" "+FToStr(-y- glyphs->yoffset+(style.fontSize() / 10.0) * (style.baselineOffset() / 1000.0))+" Tm\n";
 					}
 					else
-						tmp +=  FToStr(qMax(hl->glyph.scaleH, 0.1))+" 0 0 "+FToStr(qMax(hl->glyph.scaleV, 0.1))+" "+FToStr(x+hl->glyph.xoffset)+" "+FToStr(-y-hl->glyph.yoffset+(style.fontSize() / 10.0) * (style.baselineOffset() / 1000.0))+" Tm\n";
+						tmp +=  FToStr(qMax(glyphs->scaleH, 0.1))+" 0 0 "+FToStr(qMax(glyphs->scaleV, 0.1))+" "+FToStr(x+ glyphs->xoffset)+" "+FToStr(-y- glyphs->yoffset+(style.fontSize() / 10.0) * (style.baselineOffset() / 1000.0))+" Tm\n";
 				}
 				else
-					tmp += FToStr(qMax(hl->glyph.scaleH, 0.1))+" 0 0 "+FToStr(qMax(hl->glyph.scaleV, 0.1))+" 0 0 Tm\n";
+					tmp += FToStr(qMax(glyphs->scaleH, 0.1))+" 0 0 "+FToStr(qMax(glyphs->scaleV, 0.1))+" 0 0 Tm\n";
 				uchar idx2;
 				if (Options.SubsetList.contains(style.font().replacementName()))
 				{
@@ -5627,7 +5725,8 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 						tmp += "<"+QString(toHex(idx2))+"> Tj\n";
 					}
 				}
-				else if (Options.Version == PDFOptions::PDFVersion_X4 && (currentFace.format() == ScFace::SFNT || currentFace.format() == ScFace::TTCF))
+				else if ((Options.Version == PDFOptions::PDFVersion_X4 || currentFace.isSymbolic()) && 
+				         (currentFace.format() == ScFace::SFNT || currentFace.format() == ScFace::TTCF))
 				{
 					QString val;
 					val.setNum(idx,16);
@@ -5646,7 +5745,7 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 		if ((style.effects() & ScStyle_Strikethrough) && (chstr != SpecialChars::PARSEP))
 		{
 			//		double Ulen = style.font().charWidth(chstr, style.fontSize()) * (hl->glyph.scaleH);
-			double Ulen = hl->glyph.xadvance;
+			double Ulen = glyphs->xadvance;
 			double Upos, Uwid;
 			if ((style.strikethruOffset() != -1) || (style.strikethruWidth() != -1))
 			{
@@ -5665,19 +5764,19 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 				Uwid = qMax(style.font().strokeWidth(style.fontSize() / 10.0), 1.0);
 			}
 			if (style.baselineOffset() != 0)
-				Upos += (style.fontSize() / 10.0) * hl->glyph.scaleV * (style.baselineOffset() / 1000.0);
+				Upos += (style.fontSize() / 10.0) * glyphs->scaleV * (style.baselineOffset() / 1000.0);
 			if (style.fillColor() != CommonStrings::None)
 				tmp2 += putColor(style.fillColor(), style.fillShade(), false);
 			tmp2 += FToStr(Uwid)+" w\n";
 			if (ite->itemType() == PageItem::PathText)
 			{
-				tmp2 += FToStr(x+hl->glyph.xoffset)     +" "+FToStr(-y+Upos)+" m\n";
-				tmp2 += FToStr(x+hl->glyph.xoffset+Ulen)+" "+FToStr(-y+Upos)+" l\n";
+				tmp2 += FToStr(x+ glyphs->xoffset)     +" "+FToStr(-y+Upos)+" m\n";
+				tmp2 += FToStr(x+ glyphs->xoffset+Ulen)+" "+FToStr(-y+Upos)+" l\n";
 			}
 			else
 			{
-				tmp2 += FToStr(x+hl->glyph.xoffset)     +" "+FToStr(-y-hl->glyph.yoffset+Upos)+" m\n";
-				tmp2 += FToStr(x+hl->glyph.xoffset+Ulen)+" "+FToStr(-y-hl->glyph.yoffset+Upos)+" l\n";
+				tmp2 += FToStr(x+ glyphs->xoffset)     +" "+FToStr(-y- glyphs->yoffset+Upos)+" m\n";
+				tmp2 += FToStr(x+ glyphs->xoffset+Ulen)+" "+FToStr(-y- glyphs->yoffset+Upos)+" l\n";
 			}
 			tmp2 += "S\n";
 		}
@@ -5687,14 +5786,14 @@ bool PDFLibCore::setTextCh(PageItem *ite, uint PNr, double x, double y, uint d, 
 			tmp2 = "";
 		}
 	}
-	if (hl->glyph.more) {
-		// ugly hack until setTextCh interface is changed
-		ScText hl2(*hl);
-		hl2.glyph = *(hl->glyph.more);
-		if (!setTextCh(ite, PNr, x + hl->glyph.xadvance, y, d, tmp, tmp2, &hl2, pstyle, pag))
+	if (glyphs->more) {
+//		// ugly hack until setTextCh interface is changed
+//		ScText hl2(*hl);
+//		hl2.glyph = *(hl->glyph.more);
+		if (!setTextCh(ite, PNr, x + glyphs->xadvance, y, d, tmp, tmp2, style, glyphs->more, pdata, pstyle, pag))
 			return false;
-		// don't let hl2's destructor delete these!
-		hl2.glyph.more = 0;
+//		// don't let hl2's destructor delete these!
+//		hl2.glyph.more = 0;
 	}
 	return true;
 }
@@ -5865,7 +5964,7 @@ QString PDFLibCore::SetClipPath(PageItem *ite, bool poly)
 
 	for (int poi=0; poi<ite->PoLine.size()-3; poi += 4)
 	{
-		if (ite->PoLine.point(poi).x() > 900000)
+		if (ite->PoLine.isMarker(poi))
 		{
 			nPath = true;
 			continue;
@@ -5909,7 +6008,7 @@ QString PDFLibCore::SetClipPathArray(FPointArray *ite, bool poly)
 
 	for (int poi=0; poi<ite->size()-3; poi += 4)
 	{
-		if (ite->point(poi).x() > 900000)
+		if (ite->isMarker(poi))
 		{
 			nPath = true;
 			continue;
@@ -5951,7 +6050,7 @@ QString PDFLibCore::SetClipPathImage(PageItem *ite)
 	bool nPath = true;
 	for (int poi=0; poi<ite->imageClip.size()-3; poi += 4)
 	{
-		if (ite->imageClip.point(poi).x() > 900000)
+		if (ite->imageClip.isMarker(poi))
 		{
 			tmp += "h\n";
 			nPath = true;
@@ -6133,7 +6232,10 @@ QString PDFLibCore::PDF_TransparenzFill(PageItem *currItem)
 		else
 			PutDoc("/ShadingType 3\n");
 		PutDoc("/ColorSpace /DeviceGray\n");
-		PutDoc("/Extend [true true]\n");
+		if (gradient.repeatMethod() == VGradient::none)
+			PutDoc("/Extend [false false]\n");
+		else
+			PutDoc("/Extend [true true]\n");
 		if ((GType == 1) || (GType == 4))
 			PutDoc("/Coords ["+FToStr(StartX)+" "+FToStr(-StartY)+" "+FToStr(EndX)+" "+FToStr(-EndY)+"]\n");
 		else
@@ -6339,6 +6441,89 @@ QString PDFLibCore::PDF_TransparenzStroke(PageItem *currItem)
 	return tmp;
 }
 
+bool PDFLibCore::PDF_HatchFill(QString& output, PageItem *currItem)
+{
+	output += "q\n1 w\n[] 0 d\n0 J\n0 j\n";
+	if ((currItem->hatchBackground != CommonStrings::None) && (currItem->hatchUseBackground))
+	{
+		output += putColor(currItem->hatchBackground, 100, true);
+		output += SetClipPath(currItem);
+		output += (currItem->fillRule ? "h\nf*\n" : "h\nf\n");
+	}
+	if (currItem->hatchForeground != CommonStrings::None)
+		output += putColor(currItem->hatchForeground, 100, false);
+	output += SetPathAndClip(currItem);
+	QTransform mpa;
+	mpa.translate(currItem->width() / 2.0, -currItem->height() / 2.0);
+	output += FToStr(mpa.m11())+" "+FToStr(mpa.m12())+" "+FToStr(mpa.m21())+" "+FToStr(mpa.m22())+" "+FToStr(mpa.dx())+" "+FToStr(mpa.dy())+" cm\n";
+	double lineLen = sqrt((currItem->width() / 2.0) * (currItem->width() / 2.0) + (currItem->height() / 2.0) * (currItem->height() / 2.0));
+	double dist = 0.0;
+	output += "q\n";
+	QTransform mp;
+	mp.rotate(currItem->hatchAngle);
+	output += FToStr(mp.m11())+" "+FToStr(mp.m12())+" "+FToStr(mp.m21())+" "+FToStr(mp.m22())+" "+FToStr(mp.dx())+" "+FToStr(mp.dy())+" cm\n";
+	while (dist < lineLen)
+	{
+		output += FToStr(-lineLen) + " " + FToStr(dist) + " m\n";
+		output += FToStr(lineLen)+ " " + FToStr(dist) + " l\n";
+		output += "S\n";
+		if (dist > 0)
+		{
+			output += FToStr(-lineLen) + " " + FToStr(-dist) + " m\n";
+			output += FToStr(lineLen)+ " " + FToStr(-dist) + " l\n";
+			output += "S\n";
+		}
+		dist += currItem->hatchDistance;
+	}
+	output += "Q\n";
+	dist = 0;
+	if ((currItem->hatchType == 1) || (currItem->hatchType == 2))
+	{
+		output += "q\n";
+		QTransform mp;
+		mp.rotate(currItem->hatchAngle + 90);
+		output += FToStr(mp.m11())+" "+FToStr(mp.m12())+" "+FToStr(mp.m21())+" "+FToStr(mp.m22())+" "+FToStr(mp.dx())+" "+FToStr(mp.dy())+" cm\n";
+		while (dist < lineLen)
+		{
+			output += FToStr(-lineLen) + " " + FToStr(dist) + " m\n";
+			output += FToStr(lineLen)+ " " + FToStr(dist) + " l\n";
+			output += "S\n";
+			if (dist > 0)
+			{
+				output += FToStr(-lineLen) + " " + FToStr(-dist) + " m\n";
+				output += FToStr(lineLen)+ " " + FToStr(-dist) + " l\n";
+				output += "S\n";
+			}
+			dist += currItem->hatchDistance;
+		}
+		output += "Q\n";
+	}
+	if (currItem->hatchType == 2)
+	{
+		dist = 0;
+		output += "q\n";
+		QTransform mp;
+		mp.rotate(currItem->hatchAngle - 45);
+		output += FToStr(mp.m11())+" "+FToStr(mp.m12())+" "+FToStr(mp.m21())+" "+FToStr(mp.m22())+" "+FToStr(mp.dx())+" "+FToStr(mp.dy())+" cm\n";
+		while (dist < lineLen)
+		{
+			output += FToStr(-lineLen) + " " + FToStr(dist * sqrt(2.0)) + " m\n";
+			output += FToStr(lineLen)+ " " + FToStr(dist * sqrt(2.0)) + " l\n";
+			output += "S\n";
+			if (dist > 0)
+			{
+				output += FToStr(-lineLen) + " " + FToStr(-dist * sqrt(2.0)) + " m\n";
+				output += FToStr(lineLen)+ " " + FToStr(-dist * sqrt(2.0)) + " l\n";
+				output += "S\n";
+			}
+			dist += currItem->hatchDistance;
+		}
+		output += "Q\n";
+	}
+	output += "Q\n";
+	return true;
+}
+
 bool PDFLibCore::PDF_PatternFillStroke(QString& output, PageItem *currItem, int kind, bool forArrow)
 {
 	QString tmp2 = "", tmpOut;
@@ -6407,7 +6592,7 @@ bool PDFLibCore::PDF_PatternFillStroke(QString& output, PageItem *currItem, int 
 			mpa.rotate(-currItem->rotation());
 		}
 	}
-	double patternScaleX, patternScaleY, patternOffsetX, patternOffsetY, patternRotation, patternSkewX, patternSkewY, patternSpace;
+	double patternScaleX=0.0, patternScaleY=0.0, patternOffsetX=0.0, patternOffsetY=0.0, patternRotation=0.0, patternSkewX=0.0, patternSkewY=0.0, patternSpace=0.0;
 	bool mirrorX=false, mirrorY=false;
 	if (kind == 0)
 	{
@@ -7261,6 +7446,7 @@ bool PDFLibCore::PDF_DiamondGradientFill(QString& output, PageItem *c)
 		PutDoc("/BitsPerCoordinate 32\n");
 		PutDoc("/BitsPerComponent 16\n");
 		PutDoc("/BitsPerFlag 8\n");
+		PutDoc("/Background [1]\n");
 		QByteArray vertStreamT;
 		QDataStream vst(&vertStreamT, QIODevice::WriteOnly);
 		vst.setByteOrder(QDataStream::BigEndian);
@@ -7434,6 +7620,7 @@ bool PDFLibCore::PDF_DiamondGradientFill(QString& output, PageItem *c)
 		else
 			PutDoc("/ColorSpace /DeviceCMYK\n");
 	}
+	PutDoc("/Background [" + Gcolors.last() + "]\n");
 	PutDoc("/BitsPerCoordinate 32\n");
 	PutDoc("/BitsPerComponent 16\n");
 	PutDoc("/BitsPerFlag 8\n");
@@ -7617,22 +7804,6 @@ bool PDFLibCore::PDF_DiamondGradientFill(QString& output, PageItem *c)
 		PutDoc(">>\nstream\n"+EncStream(colorDesc, spotObject)+"\nendstream\nendobj\n");
 	}
 	QString tmp;
-	tmp += "q\n";
-	if (((Options.Version >= PDFOptions::PDFVersion_14) || (Options.Version == PDFOptions::PDFVersion_X4)) && (transparencyFound))
-	{
-		QString ShName = ResNam+QString::number(ResCount);
-		ResCount++;
-		Transpar[ShName] = writeGState("/ca "+FToStr(TransVec.last())+"\n/SMask /None\n/AIS false\n/OPM 1\n");
-		tmp += "/"+ShName+" gs\n";
-	}
-	tmp += putColor(colorNames.last(), colorShades.last(), true);
-	tmp += SetPathAndClip(c);
-	tmp += FToStr(c->GrControl1.x())+" "+FToStr(-c->GrControl1.y())+" m\n";
-	tmp += FToStr(c->GrControl2.x())+" "+FToStr(-c->GrControl2.y())+" l\n";
-	tmp += FToStr(c->GrControl3.x())+" "+FToStr(-c->GrControl3.y())+" l\n";
-	tmp += FToStr(c->GrControl4.x())+" "+FToStr(-c->GrControl4.y())+" l\n";
-	tmp += "h\nf*\n";
-	tmp += "Q\n";
 	if (((Options.Version >= PDFOptions::PDFVersion_14) || (Options.Version == PDFOptions::PDFVersion_X4)) && (transparencyFound))
 		tmp += "/"+TRes+" gs\n";
 	tmp += "/Pattern cs\n";
@@ -7986,6 +8157,7 @@ bool PDFLibCore::PDF_GradientFillStroke(QString& output, PageItem *currItem, boo
 			gradient = doc.docGradients[currItem->strokeGradient()];
 		else
 			gradient = currItem->stroke_gradient;
+		gradient.setRepeatMethod(currItem->getStrokeGradientExtend());
 	}
 	else
 	{
@@ -8010,6 +8182,7 @@ bool PDFLibCore::PDF_GradientFillStroke(QString& output, PageItem *currItem, boo
 			gradient = doc.docGradients[currItem->gradient()];
 		else
 			gradient = currItem->fill_gradient;
+		gradient.setRepeatMethod(currItem->getGradientExtend());
 	}
 	QList<VColorStop*> cstops = gradient.colorStops();
 	StopVec.clear();
@@ -8106,7 +8279,8 @@ bool PDFLibCore::PDF_GradientFillStroke(QString& output, PageItem *currItem, boo
 	if (((Options.Version >= PDFOptions::PDFVersion_14) || (Options.Version == PDFOptions::PDFVersion_X4)) && (transparencyFound))
 	{
 		QTransform mpM;
-		mpM.rotate(-currItem->rotation());
+		//#12058: cause problems with rotated objects
+		//mpM.rotate(-currItem->rotation());
 		if (GType == 6)
 		{
 			mpM.translate(StartX, -StartY);
@@ -8135,7 +8309,10 @@ bool PDFLibCore::PDF_GradientFillStroke(QString& output, PageItem *currItem, boo
 		else
 			PutDoc("/ShadingType 3\n");
 		PutDoc("/ColorSpace /DeviceGray\n");
-		PutDoc("/Extend [true true]\n");
+		if (gradient.repeatMethod() == VGradient::none)
+			PutDoc("/Extend [false false]\n");
+		else
+			PutDoc("/Extend [true true]\n");
 		if (GType == 6)
 			PutDoc("/Coords ["+FToStr(StartX)+" "+FToStr(-StartY)+" "+FToStr(EndX)+" "+FToStr(-EndY)+"]\n");
 		else
@@ -8256,7 +8433,10 @@ bool PDFLibCore::PDF_GradientFillStroke(QString& output, PageItem *currItem, boo
 		else
 			PutDoc("/ColorSpace /DeviceCMYK\n");
 	}
-	PutDoc("/Extend [true true]\n");
+	if (gradient.repeatMethod() == VGradient::none)
+		PutDoc("/Extend [false false]\n");
+	else
+		PutDoc("/Extend [true true]\n");
 	if (GType == 6)
 		PutDoc("/Coords ["+FToStr(StartX)+" "+FToStr(-StartY)+" "+FToStr(EndX)+" "+FToStr(-EndY)+"]\n");
 	else
@@ -11003,7 +11183,7 @@ bool PDFLibCore::PDF_End_Doc(const QString& PrintPr, const QString& Name, int Co
 		PutDoc("]\n");
 		PutDoc(">>\nendobj\n");
 	}
-	if ((Options.Version == PDFOptions::PDFVersion_X3) || (Options.Version == PDFOptions::PDFVersion_X1a) || (Options.Version == PDFOptions::PDFVersion_X4))
+	if (PDF_IsPDFX())
 	{
 		StartObj(ObjCounter);
 		ObjCounter++;
@@ -11141,7 +11321,7 @@ void PDFLibCore::generateXMP(const QString& timeStamp)
 	li1.setAttribute("xml:lang", "x-default");
 	alt1.appendChild(li1);
 	QString docTitle = doc.documentInfo().title();
-	if (((Options.Version == PDFOptions::PDFVersion_X3) || (Options.Version == PDFOptions::PDFVersion_X1a) || (Options.Version == PDFOptions::PDFVersion_X4)) && (docTitle.isEmpty()))
+	if ((PDF_IsPDFX()) && (docTitle.isEmpty()))
 		docTitle = doc.DocName;
 	li1.appendChild(xmpDoc.createTextNode(docTitle));
 	QDomElement creator = xmpDoc.createElement("dc:creator");
@@ -11161,7 +11341,7 @@ void PDFLibCore::generateXMP(const QString& timeStamp)
 	alt2.appendChild(li3);
 	li3.appendChild(xmpDoc.createTextNode(doc.documentInfo().subject()));
 
-	if ((Options.Version == PDFOptions::PDFVersion_X3) || (Options.Version == PDFOptions::PDFVersion_X1a) || (Options.Version == PDFOptions::PDFVersion_X4))
+	if (PDF_IsPDFX())
 	{
 		QDomElement descPDFXID = desc.cloneNode().toElement();
 		rdf.appendChild(descPDFXID);
@@ -11176,7 +11356,6 @@ void PDFLibCore::generateXMP(const QString& timeStamp)
 		else if (Options.Version == PDFOptions::PDFVersion_X4)
 			descPDFXID.setAttributeNS(pdfxidNS, "pdfxid:GTS_PDFXVersion", "PDF/X-4");
 	}
-
 
 	QDomElement descXMPMM = desc.cloneNode().toElement();
 	rdf.appendChild(descXMPMM);

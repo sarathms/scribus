@@ -11,25 +11,24 @@ for which a new license (GPL+exception) is in place.
 #include <QToolTip>
 #include <QMessageBox>
 
-#include "prefsmanager.h"
-#include "prefsfile.h"
 #include "commonstrings.h"
+#include "fileloader.h"
+#include "prefsfile.h"
+#include "prefsmanager.h"
+#include "scraction.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
-#include "stylemanager.h"
-#include "shortcutwidget.h"
-#include "ui/styleview.h"
-#include "styleitem.h"
-#include "smreplacedia.h"
 #include "selection.h"
-#include "ui/customfdialog.h"
-#include "smtextstyles.h"
+#include "shortcutwidget.h"
 #include "smlinestyle.h"
 #include "smlinestylewidget.h"
+#include "smreplacedia.h"
 #include "smstyleimport.h"
-#include "fileloader.h"
-#include "scraction.h"
-
+#include "smtextstyles.h"
+#include "styleitem.h"
+#include "stylemanager.h"
+#include "ui/customfdialog.h"
+#include "ui/styleview.h"
 
 const QString StyleManager::SEPARATOR = "$$$$"; // dumb but it works
 
@@ -147,7 +146,8 @@ void StyleManager::languageChange()
 		m_styleClassesPS[m_items.at(i)->typeNamePlural()] = m_items.at(i)->typeNameSingular();
 		m_styleClassesSP[m_items.at(i)->typeNameSingular()] = m_items.at(i)->typeNamePlural();
 	}
-	popupStrings.sort();
+	//12193 turn off sort
+	//popupStrings.sort();
 	for (int i = 0; i < popupStrings.count(); ++i)
 		m_newPopup->addAction(popupStrings[i]);
 
@@ -604,20 +604,20 @@ void StyleManager::slotRightClick(/*StyleViewItem *item, */const QPoint &point/*
 		
 
 		// Add "Apply" menu entry
-		if(m_selectedStyleAction)
+		if (m_selectedStyleAction)
 		{
 			m_rightClickPopup->removeAction(m_selectedStyleAction);
 			m_selectedStyleAction = 0;
 		}
-		if(styleView->selectedItems().count() == 1)
+		if (styleView->selectedItems().count() == 1)
 		{
 			QString key = item->rootName() + SEPARATOR + item->text(NAME_COL);
-			if(m_styleActions.contains(key))
+			if (m_styleActions.contains(key))
 			{
 				m_selectedStyleAction = m_styleActions[key];
-				if(m_selectedStyleAction)
+				if (m_selectedStyleAction)
 				{
-					m_rightClickPopup->insertAction( m_rightClickPopup->actions().first(), m_selectedStyleAction);
+					m_rightClickPopup->insertAction(m_rightClickPopup->actions().first(), m_selectedStyleAction);
 				}
 			}
 		}
@@ -635,7 +635,7 @@ void StyleManager::slotRightClick(/*StyleViewItem *item, */const QPoint &point/*
 		m_rcType = m_styleClassesPS[item->text(0)];
 		loadType(m_rcType);
 		
-		if(m_selectedStyleAction)
+		if (m_selectedStyleAction)
 		{
 			m_rightClickPopup->removeAction(m_selectedStyleAction);
 			m_selectedStyleAction = 0;
@@ -651,7 +651,7 @@ void StyleManager::slotRightClick(/*StyleViewItem *item, */const QPoint &point/*
 		m_rcpCloneId->setEnabled(false);
 //		m_rcpToScrapId->setEnabled(false);
 		
-		if(m_selectedStyleAction)
+		if (m_selectedStyleAction)
 		{
 			m_rightClickPopup->removeAction(m_selectedStyleAction);
 			m_selectedStyleAction = 0;
@@ -877,7 +877,7 @@ void StyleManager::addNewType(StyleItem *item, bool loadFromDoc)
 			if (m_styleActions.contains(key))
 				continue;
 
-			m_styleActions[key] = new ScrAction(ScrAction::DataQString, QPixmap(), QPixmap(), tr("&Apply") ,	shortcutValue, m_doc->view(), 0, 0.0, key);
+			m_styleActions[key] = new ScrAction(ScrAction::DataQString, QPixmap(), QPixmap(), tr("&Apply"), shortcutValue, m_doc->view(), key);
 			connect(m_styleActions[key], SIGNAL(triggeredData(QString)), this, SLOT(slotApplyStyle(QString)));
 		}
 	}
@@ -984,6 +984,7 @@ void StyleManager::insertShortcutPage(QTabWidget *twidget)
 		if (!m_shortcutWidget)
 		{
 			m_shortcutWidget = new ShortcutWidget(0);
+			m_shortcutWidget->setAllowedModifiers(Qt::META|Qt::CTRL|Qt::SHIFT|Qt::ALT,0);
 			connect(m_shortcutWidget, SIGNAL(newKey(const QString&)),
 					this, SLOT(slotShortcutChanged(const QString&)));
 		}
@@ -1035,9 +1036,14 @@ void StyleManager::updateActionName(const QString &oldName, const QString &newNa
 	{
 		ScrAction *a = m_styleActions[oldKey];
 		disconnect(a, SIGNAL(triggeredData(QString)), this, SLOT(slotApplyStyle(QString)));
-		ScrAction *b = new ScrAction(ScrAction::DataQString, QPixmap(), QPixmap(), "",
-			               a->shortcut(), m_doc->view(), 0, 0.0, newKey);
+		ScrAction *b = new ScrAction(ScrAction::DataQString, QPixmap(), QPixmap(), tr("&Apply"),
+						   a->shortcut(), m_doc->view(), newKey);
 		m_styleActions.remove(oldKey);
+		if (m_selectedStyleAction == a)
+		{
+			m_rightClickPopup->removeAction(m_selectedStyleAction);
+			m_selectedStyleAction = 0;
+		}
 		delete a;
 		m_styleActions[newKey] = b;
 		connect(b, SIGNAL(triggeredData(QString)), this, SLOT(slotApplyStyle(QString)));
@@ -1069,10 +1075,8 @@ void StyleManager::slotShortcutChanged(const QString& shortcut)
 		m_styleActions[key]->setShortcut(shortcut);
 	else
 	{
-		m_styleActions[key] =
-			new ScrAction(ScrAction::DataQString, QPixmap(), QPixmap(), "", shortcut, m_doc->view(), 0, 0.0, key);
-		connect(m_styleActions[key], SIGNAL(triggeredData(QString)),
-		        this, SLOT(slotApplyStyle(QString)));
+		m_styleActions[key] = new ScrAction(ScrAction::DataQString, QPixmap(), QPixmap(), tr("&Apply"), shortcut, m_doc->view(), key);
+		connect(m_styleActions[key], SIGNAL(triggeredData(QString)), this, SLOT(slotApplyStyle(QString)));
 	}
 
 	if (m_item)

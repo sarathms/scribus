@@ -34,13 +34,14 @@ void Prefs_Printer::languageChange()
 	applyUnderColorRemovalCheckBox->setToolTip( "<qt>" + tr( "A way of switching off some of the gray shades which are composed of cyan, yellow and magenta and using black instead. UCR most affects parts of images which are neutral and/or dark tones which are close to the gray. Use of this may improve printing some images and some experimentation and testing is need on a case by case basis. UCR reduces the possibility of over saturation with CMY inks." ) + "</qt>");
 	convertSpotsToProcessCheckBox->setToolTip("<qt>" + tr( "Enables Spot Colors to be converted to composite colors. Unless you are planning to print spot colors at a commercial printer, this is probably best left enabled." ) + "</qt>");
 	applyICCProfilesCheckBox->setToolTip("<qt>" + tr( "Allows you to embed color profiles in the print stream when color management is enabled" ) + "</qt>");
-	setMediaSizeCheckBox->setToolTip( "<qt>" + tr( "This enables you to explicitely set the media size of the PostScript file. Not recommended unless requested by your printer." ) + "</qt>");
+	setMediaSizeCheckBox->setToolTip( "<qt>" + tr( "This enables you to explicitly set the media size of the PostScript file. Not recommended unless requested by your printer." ) + "</qt>");
 }
 
 void Prefs_Printer::unitChange(int newIndex)
 {
-	bleedsWidget->setNewUnitIndex(newIndex);
+	bleedsWidget->setNewUnit(newIndex);
 	markOffsetSpinBox->setNewUnit(newIndex);
+	markLengthSpinBox->setNewUnit(newIndex);
 }
 
 void Prefs_Printer::restoreDefaults(struct ApplicationPrefs *prefsData)
@@ -48,7 +49,6 @@ void Prefs_Printer::restoreDefaults(struct ApplicationPrefs *prefsData)
 	int docUnitIndex = prefsData->docSetupPrefs.docUnitIndex;
 	unitChange(docUnitIndex);
 	double unitRatio = unitGetRatioFromIndex(docUnitIndex);
-	QString unitSuffix = unitGetSuffixFromIndex(docUnitIndex);
 
 	QString Pcap;
 	QString printerName;
@@ -85,13 +85,15 @@ void Prefs_Printer::restoreDefaults(struct ApplicationPrefs *prefsData)
 	clipToPrinterMarginsCheckBox->setChecked(prefs->getBool("Clip", false));
 	convertSpotsToProcessCheckBox->setChecked(!prefs->getBool("doSpot", true));
 	MarginStruct bleeds;
-	bleeds.set(prefs->getDouble("BleedTop",0.0)*unitRatio,
-			   prefs->getDouble("BleedBottom",0.0)*unitRatio,
-			   prefs->getDouble("BleedRight",0.0)*unitRatio,
-			   prefs->getDouble("BleedLeft",0.0)*unitRatio);
-	bleedsWidget->setup(bleeds, 0, 0, false, false);
-	markLengthSpinBox->setValue(prefs->getDouble("markLength", 20.0)*unitRatio);
-	markOffsetSpinBox->setValue(prefs->getDouble("markOffset", 0.0)*unitRatio);
+	bleeds.set(prefs->getDouble("BleedTop",0.0),
+			   prefs->getDouble("BleedBottom", 0.0),
+			   prefs->getDouble("BleedRight", 0.0),
+			   prefs->getDouble("BleedLeft", 0.0));
+	bleedsWidget->setup(bleeds, 0, docUnitIndex, false, false);
+	bleedsWidget->setPageWidth(prefsData->docSetupPrefs.pageWidth);
+	bleedsWidget->setPageHeight(prefsData->docSetupPrefs.pageHeight);
+	markLengthSpinBox->setValue(prefs->getDouble("markLength", 20.0) * unitRatio);
+	markOffsetSpinBox->setValue(prefs->getDouble("markOffset", 0.0) * unitRatio);
 	cropMarksCheckBox->setChecked(prefs->getBool("cropMarks", false));
 	bleedMarksCheckBox->setChecked(prefs->getBool("bleedMarks", false));
 	registrationMarksCheckBox->setChecked(prefs->getBool("registrationMarks", false));
@@ -111,6 +113,7 @@ void Prefs_Printer::saveGuiToPrefs(struct ApplicationPrefs *prefsData) const
 	prefs->set("PageNr", "");
 	prefs->set("Copies", 1);
 	prefs->set("Separations", static_cast<int>(outputComboBox->currentIndex()==1));
+	//FIXME: This comparison looks wrong.
 	prefs->set("PrintColor", static_cast<int>(!postscriptPrintToColorComboBox->currentIndex()==0));
 	prefs->set("SepArt", tr("All"));
 	prefs->set("MirrorH", pageMirrorHorizontallyCheckBox->isChecked());
@@ -123,10 +126,10 @@ void Prefs_Printer::saveGuiToPrefs(struct ApplicationPrefs *prefsData) const
 	prefs->set("ICCinUse", applyICCProfilesCheckBox->isChecked());
 	double unitRatio = unitGetRatioFromIndex(prefsData->docSetupPrefs.docUnitIndex);
 	MarginStruct bleeds(bleedsWidget->margins());
-	prefs->set("BleedTop", bleeds.Left / unitRatio);
-	prefs->set("BleedBottom", bleeds.Bottom / unitRatio);
-	prefs->set("BleedRight", bleeds.Right / unitRatio);
-	prefs->set("BleedLeft", bleeds.Left / unitRatio);
+	prefs->set("BleedTop", bleeds.Left);
+	prefs->set("BleedBottom", bleeds.Bottom);
+	prefs->set("BleedRight", bleeds.Right);
+	prefs->set("BleedLeft", bleeds.Left);
 	prefs->set("markLength", markLengthSpinBox->value() / unitRatio);
 	prefs->set("markOffset", markOffsetSpinBox->value() / unitRatio);
 	prefs->set("cropMarks", cropMarksCheckBox->isChecked());

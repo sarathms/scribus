@@ -29,6 +29,7 @@ for which a new license (GPL+exception) is in place.
 #define _USE_MATH_DEFINES
 #endif
 #include <cmath>
+#include "appmodes.h"
 #include "arrowchooser.h"
 #include "autoform.h"
 #include "basepointwidget.h"
@@ -49,7 +50,7 @@ for which a new license (GPL+exception) is in place.
 #include "propertiespalette_xyz.h"
 #include "sccombobox.h"
 #include "scfonts.h"
-#include "scribus.h"
+
 #include "scribuscore.h"
 #include "scraction.h"
 #include "scribusview.h"
@@ -306,8 +307,8 @@ void PropertiesPalette::setTextFlowMode(PageItem::TextFlowMode mode)
 {
 	if (!m_ScMW || m_ScMW->scriptIsRunning() || !m_haveItem)
 		return;
-	shapePal->displayTextFlowMode(mode);
-	groupPal->displayTextFlowMode(mode);
+	shapePal->showTextFlowMode(mode);
+	groupPal->showTextFlowMode(mode);
 }
 
 PageItem* PropertiesPalette::currentItemFromSelection()
@@ -419,7 +420,7 @@ void PropertiesPalette::setCurrentItem(PageItem *i)
 		SelTab(TabStack->currentIndex());
 	}
 
-	if (!sender())
+	if (!sender() || (m_doc->appMode == modeEditTable))
 	{
 		xyzPal->handleSelectionChanged();
 		shadowPal->handleSelectionChanged();
@@ -506,7 +507,7 @@ void  PropertiesPalette::handleSelectionChanged()
 				TabStack->setItemEnabled(ws, false);
 			TabStack->widget(0)->setEnabled(false);
 			TabStack->setItemEnabled(idXYZItem, false);
-			Cpal->displayGradient(0);
+			Cpal->showGradient(0);
 			break;
 		case PageItem::ImageFrame:
 		case PageItem::LatexFrame:
@@ -637,7 +638,7 @@ void PropertiesPalette::NewLineMode(int mode)
 	if (!m_ScMW || m_ScMW->scriptIsRunning())
 		return;
 	xyzPal->setLineMode(mode);
-	xyzPal->displayWH(m_item->width(), m_item->height());
+	xyzPal->showWH(m_item->width(), m_item->height());
 	updateGeometry();
 	repaint();
 }

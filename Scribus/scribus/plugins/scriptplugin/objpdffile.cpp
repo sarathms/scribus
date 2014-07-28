@@ -10,6 +10,7 @@ for which a new license (GPL+exception) is in place.
 #include "prefsmanager.h"
 #include "scribusdoc.h"
 #include "scribuscore.h"
+#include "scribusview.h"
 #include <structmember.h>
 #include "ui/bookmarkpalette.h"
 
@@ -1119,7 +1120,7 @@ static PyObject *PDFfile_save(PDFfile *self)
 	ScCore->primaryMainWindow()->doc->pdfOptions().UseLPI = self->uselpi;
 	ScCore->primaryMainWindow()->doc->pdfOptions().UseSpotColors = self->usespot;
 	ScCore->primaryMainWindow()->doc->pdfOptions().doMultiFile = self->domulti;
-	self->version = minmaxi(self->version, 12, 14);
+	self->version = minmaxi(self->version, 10, 14);
 	// FIXME: Sanity check version
 	ScCore->primaryMainWindow()->doc->pdfOptions().Version = (PDFOptions::PDFVersion)self->version;
 	if (self->encrypt)
@@ -1160,7 +1161,9 @@ static PyObject *PDFfile_save(PDFfile *self)
 			ScCore->primaryMainWindow()->doc->pdfOptions().SolidProf = PyString_AsString(self->solidpr);
 			ScCore->primaryMainWindow()->doc->pdfOptions().ImageProf = PyString_AsString(self->imagepr);
 			ScCore->primaryMainWindow()->doc->pdfOptions().PrintProf = PyString_AsString(self->printprofc);
-			if (ScCore->primaryMainWindow()->doc->pdfOptions().Version == PDFOptions::PDFVersion_X3)
+			if (ScCore->primaryMainWindow()->doc->pdfOptions().Version == PDFOptions::PDFVersion_X1a ||
+				ScCore->primaryMainWindow()->doc->pdfOptions().Version == PDFOptions::PDFVersion_X3 ||
+				ScCore->primaryMainWindow()->doc->pdfOptions().Version == PDFOptions::PDFVersion_X4)
 			{
 				ScColorProfile profile;
 				profile = ScCore->defaultEngine.openProfileFromFile(ScCore->PrinterProfiles[ScCore->primaryMainWindow()->doc->pdfOptions().PrintProf]);
@@ -1189,7 +1192,6 @@ static PyObject *PDFfile_save(PDFfile *self)
 			ScCore->primaryMainWindow()->doc->pdfOptions().UseProfiles = false;
 			ScCore->primaryMainWindow()->doc->pdfOptions().UseProfiles2 = false;
 		}
-
 	}
 	QMap<int,QPixmap> thumbs;
 	for (uint ap = 0; ap < pageNs.size(); ++ap)

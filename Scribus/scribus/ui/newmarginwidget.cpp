@@ -19,6 +19,8 @@ NewMarginWidget::NewMarginWidget(QWidget* parent)
 {
 	setupUi(this);
 
+	pageWidth  = 0;
+	pageHeight = 0;
 }
 
 NewMarginWidget::~NewMarginWidget()
@@ -61,6 +63,8 @@ void NewMarginWidget::setup(const MarginStruct& margs, int layoutType, int unitI
 
 	formLayout->invalidate();
 
+	languageChange();
+
 	connect(topMarginSpinBox, SIGNAL(valueChanged(double)), this, SLOT(setTop()));
 	connect(bottomMarginSpinBox, SIGNAL(valueChanged(double)), this, SLOT(setBottom()));
 	connect(leftMarginSpinBox, SIGNAL(valueChanged(double)), this, SLOT(setLeft()));
@@ -72,10 +76,11 @@ void NewMarginWidget::setup(const MarginStruct& margs, int layoutType, int unitI
 
 void NewMarginWidget::languageChange()
 {
-	leftMarginSpinBox->setToolTip( "<qt>" + tr( "Distance between the top margin guide and the edge of the page" ) + "</qt>");
-	rightMarginSpinBox->setToolTip( "<qt>" + tr( "Distance between the bottom margin guide and the edge of the page" ) + "</qt>");
-	topMarginSpinBox->setToolTip( "<qt>" + tr( "Distance between the left margin guide and the edge of the page. If a double-sided, 3 or 4-fold layout is selected, this margin space can be used to achieve the correct margins for binding") + "</qt>");
-	bottomMarginSpinBox->setToolTip( "<qt>" + tr( "Distance between the right margin guide and the edge of the page. If a double-sided, 3 or 4-fold layout is selected, this margin space can be used to achieve the correct margins for binding") + "</qt>");
+	topMarginSpinBox->setToolTip( "<qt>" + tr( "Distance between the top margin guide and the edge of the page" ) + "</qt>");
+	bottomMarginSpinBox->setToolTip( "<qt>" + tr( "Distance between the bottom margin guide and the edge of the page" ) + "</qt>");
+	leftMarginSpinBox->setToolTip( "<qt>" + tr( "Distance between the left margin guide and the edge of the page. If a double-sided, 3 or 4-fold layout is selected, this margin space can be used to achieve the correct margins for binding") + "</qt>");
+	rightMarginSpinBox->setToolTip( "<qt>" + tr( "Distance between the right margin guide and the edge of the page. If a double-sided, 3 or 4-fold layout is selected, this margin space can be used to achieve the correct margins for binding") + "</qt>");
+	printerMarginsPushButton->setToolTip( "<qt>" + tr( "Import the margins for the selected page size from the available printers." ) + "</qt>");
 }
 
 void NewMarginWidget::setNewValues(const MarginStruct& margs)
@@ -86,8 +91,8 @@ void NewMarginWidget::setNewValues(const MarginStruct& margs)
 
 void NewMarginWidget::setPageWidth(double newWidth)
 {
-	leftMarginSpinBox->setMaximum(qMax(0.0, newWidth * m_unitRatio - leftMarginSpinBox->value()));
-	rightMarginSpinBox->setMaximum(qMax(0.0,newWidth * m_unitRatio - rightMarginSpinBox->value()));
+	leftMarginSpinBox->setMaximum(qMax(0.0, newWidth * m_unitRatio - rightMarginSpinBox->value()));
+	rightMarginSpinBox->setMaximum(qMax(0.0, newWidth * m_unitRatio - leftMarginSpinBox->value()));
 	pageWidth = newWidth;
 	setPreset();
 }
@@ -156,22 +161,24 @@ void NewMarginWidget::setRight()
 	setPreset();
 }
 
-void NewMarginWidget::setNewUnitIndex(int newUnitIndex)
+void NewMarginWidget::setNewUnit(int newUnitIndex)
 {
-	leftMarginSpinBox->blockSignals(true);
-	rightMarginSpinBox->blockSignals(true);
-	topMarginSpinBox->blockSignals(true);
-	bottomMarginSpinBox->blockSignals(true);
-	m_unitIndex=newUnitIndex;
-	m_unitRatio=unitGetRatioFromIndex(newUnitIndex);
+	bool leftSigBlocked   = leftMarginSpinBox->blockSignals(true);
+	bool rightSigBlocked  = rightMarginSpinBox->blockSignals(true);
+	bool topSigBlocked    = topMarginSpinBox->blockSignals(true);
+	bool bottomSigBlocked = bottomMarginSpinBox->blockSignals(true);
+
+	m_unitIndex = newUnitIndex;
+	m_unitRatio = unitGetRatioFromIndex(newUnitIndex);
 	topMarginSpinBox->setNewUnit(newUnitIndex);
 	bottomMarginSpinBox->setNewUnit(newUnitIndex);
 	leftMarginSpinBox->setNewUnit(newUnitIndex);
 	rightMarginSpinBox->setNewUnit(newUnitIndex);
-	leftMarginSpinBox->blockSignals(false);
-	rightMarginSpinBox->blockSignals(false);
-	topMarginSpinBox->blockSignals(false);
-	bottomMarginSpinBox->blockSignals(false);
+
+	leftMarginSpinBox->blockSignals(leftSigBlocked);
+	rightMarginSpinBox->blockSignals(rightSigBlocked);
+	topMarginSpinBox->blockSignals(topSigBlocked);
+	bottomMarginSpinBox->blockSignals(bottomSigBlocked);
 }
 
 void NewMarginWidget::setPreset()
@@ -234,26 +241,29 @@ void NewMarginWidget::setPageSize(const QString& pageSize)
 
 void NewMarginWidget::updateMarginSpinValues()
 {
-	leftMarginSpinBox->blockSignals(true);
-	rightMarginSpinBox->blockSignals(true);
-	topMarginSpinBox->blockSignals(true);
-	bottomMarginSpinBox->blockSignals(true);
+	bool leftBlocked = leftMarginSpinBox->blockSignals(true);
+	bool rightBlocked = rightMarginSpinBox->blockSignals(true);
+	bool topBlocked = topMarginSpinBox->blockSignals(true);
+	bool bottomBlocked = bottomMarginSpinBox->blockSignals(true);
+
 	topMarginSpinBox->setValue(marginData.Top * m_unitRatio);
 	rightMarginSpinBox->setValue(marginData.Right * m_unitRatio);
 	bottomMarginSpinBox->setValue(marginData.Bottom * m_unitRatio);
 	leftMarginSpinBox->setValue(marginData.Left * m_unitRatio);
-	leftMarginSpinBox->blockSignals(false);
-	rightMarginSpinBox->blockSignals(false);
-	topMarginSpinBox->blockSignals(false);
-	bottomMarginSpinBox->blockSignals(false);
+
+	leftMarginSpinBox->blockSignals(leftBlocked);
+	rightMarginSpinBox->blockSignals(rightBlocked);
+	topMarginSpinBox->blockSignals(topBlocked);
+	bottomMarginSpinBox->blockSignals(bottomBlocked);
 }
 
 void NewMarginWidget::slotLinkMargins()
 {
-	leftMarginSpinBox->blockSignals(true);
-	rightMarginSpinBox->blockSignals(true);
-	topMarginSpinBox->blockSignals(true);
-	bottomMarginSpinBox->blockSignals(true);
+	bool leftBlocked = leftMarginSpinBox->blockSignals(true);
+	bool rightBlocked = rightMarginSpinBox->blockSignals(true);
+	bool topBlocked = topMarginSpinBox->blockSignals(true);
+	bool bottomBlocked = bottomMarginSpinBox->blockSignals(true);
+
 	if (marginLinkCheckBox->isChecked())
 	{
 		bottomMarginSpinBox->setValue(leftMarginSpinBox->value());
@@ -262,10 +272,11 @@ void NewMarginWidget::slotLinkMargins()
 		double newVal=leftMarginSpinBox->value() / m_unitRatio;
 		marginData.set(newVal, newVal, newVal, newVal);
 	}
-	leftMarginSpinBox->blockSignals(false);
-	rightMarginSpinBox->blockSignals(false);
-	topMarginSpinBox->blockSignals(false);
-	bottomMarginSpinBox->blockSignals(false);
+
+	leftMarginSpinBox->blockSignals(leftBlocked);
+	rightMarginSpinBox->blockSignals(rightBlocked);
+	topMarginSpinBox->blockSignals(topBlocked);
+	bottomMarginSpinBox->blockSignals(bottomBlocked);
 }
 
 void NewMarginWidget::setMarginPreset(int p)

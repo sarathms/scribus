@@ -5,9 +5,10 @@
 #include "prefsmanager.h"
 #include "prefsfile.h"
 #include "scribusdoc.h"
-#include "scribusview.h"
+
 #include "scribus.h"
 #include "undomanager.h"
+#include "util.h"
 
 NotesStylesEditor::NotesStylesEditor(QWidget *parent, const char *name)
 	: ScrPaletteBase(parent, name), m_Doc(NULL)

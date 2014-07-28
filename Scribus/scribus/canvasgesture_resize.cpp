@@ -25,13 +25,13 @@
 #include <QPen>
 #include <QRubberBand>
 
+#include "pageitem_arc.h"
+#include "pageitem_spiral.h"
+#include "pageitem_table.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
 #include "undomanager.h"
-#include "pageitem_arc.h"
-#include "pageitem_spiral.h"
-#include "pageitem_table.h"
 #include "util_math.h"
 
 ResizeGesture::ResizeGesture (CanvasMode* parent) : CanvasGesture(parent)
@@ -74,17 +74,17 @@ void ResizeGesture::prepare(Canvas::FrameHandle framehandle)
 		m.scale(m_scaleX, m_scaleY);
 		m_bounds = m.mapRect(m_bounds);
 		m_bounds.moveTopLeft(itPos);
-		if (currItem->imageFlippedH())
+		/*if (currItem->imageFlippedH())
 		{
 			m_rotation = -getRotationDFromMatrix(mm) - 180.0;
 			m_bounds.translate(-currItem->visualWidth() * m_scaleX, 0);
 		}
-		else
+		else*/
 			m_rotation = -getRotationDFromMatrix(mm);
-		if (currItem->imageFlippedV())
+		/*if (currItem->imageFlippedV())
 		{
 			m_bounds.translate(0, -currItem->visualHeight() * m_scaleY);
-		}
+		}*/
 		currItem->OldB2 = currItem->width();
 		currItem->OldH2 = currItem->height();
 		m_extraWidth = currItem->visualWidth() - currItem->width();
@@ -171,7 +171,7 @@ void ResizeGesture::drawControls(QPainter* p)
 
 	if (m_origBounds != m_bounds)
 	{
-		if (m_doc->m_Selection->count() > 0)
+		if (m_doc->m_Selection->count() == 1)
 		{
 			p->setBrush(Qt::NoBrush);
 			QPen out = QPen(Qt::gray, 1.0 , Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin);
@@ -181,18 +181,48 @@ void ResizeGesture::drawControls(QPainter* p)
 			QTransform m;
 			m.translate(localRect.x(), localRect.y());
 			m.scale(localRect.width() / currItem->width(), localRect.height() / currItem->height());
-			if (currItem->imageFlippedH())
+			if (!currItem->isSpiral())
 			{
-				m.translate(currItem->width(), 0);
-				m.scale(-1, 1);
-			}
-			if (currItem->imageFlippedV())
-			{
-				m.translate(0, currItem->height());
-				m.scale(1, -1);
+				if (currItem->imageFlippedH())
+				{
+					m.translate(currItem->width(), 0);
+					m.scale(-1, 1);
+				}
+				if (currItem->imageFlippedV())
+				{
+					m.translate(0, currItem->height());
+					m.scale(1, -1);
+				}
 			}
 			QPolygon clip = m.map(currItem->Clip);
 			currItem->DrawPolyL(p, clip);
+		}
+		else if (m_doc->m_Selection->isMultipleSelection())
+		{
+			double x, y, w, h;
+			m_doc->m_Selection->setGroupRect();
+			m_doc->m_Selection->getGroupRect(&x, &y, &w, &h);
+			double scx = localRect.width() / w;
+			double scy = localRect.height() / h;
+			uint docSelectionCount = m_doc->m_Selection->count();
+			if (docSelectionCount < m_canvas->moveWithBoxesOnlyThreshold)
+			{
+				PageItem *currItem;
+				for (uint a = 0; a < docSelectionCount; ++a)
+				{
+					currItem = m_doc->m_Selection->itemAt(a);
+					if (!m_doc->Items->contains(currItem))
+						continue;
+					QTransform m;
+					m.translate(localRect.x(), localRect.y());
+					m.translate((currItem->xPos() - x) * scx, (currItem->yPos() - y) * scy);
+					m.scale(scx, scy);
+					if (currItem->rotation() != 0)
+						m.rotate(currItem->rotation());
+					QPolygon clip = m.map(currItem->Clip);
+					currItem->DrawPolyL(p, clip);
+				}
+			}
 		}
 	}
 	p->restore();
@@ -313,7 +343,7 @@ void ResizeGesture::doResize(bool scaleContent)
 			QPointF itPos = mm.map(QPointF(0, 0));
 			double dx = ((newBounds.x() + m_extraX) - itPos.x());
 			double dy = ((newBounds.y() + m_extraY) - itPos.y());
-			if (currItem->Parent != 0)
+			if (currItem->isGroupChild())
 			{
 				double sx, sy;
 				getScaleFromMatrix(mm, sx, sy);
@@ -377,13 +407,27 @@ void ResizeGesture::doResize(bool scaleContent)
 		getScaleFromMatrix(mm, m_scaleX, m_scaleY);
 		double dx = (itPos.x() - newBounds.x()) / m_scaleX;
 		double dy = (itPos.y() - newBounds.y()) / m_scaleY;
-		if (currItem->imageFlippedH())
+		/*if (currItem->imageFlippedH())
 			dx *= -1;
 		if (currItem->imageFlippedV())
-			dy *= -1;
+			dy *= -1;*/
 		currItem->moveBy(-dx, -dy, true);
 		currItem->setWidth(newBounds.width() / m_scaleX - m_extraWidth);
 		currItem->setHeight(newBounds.height() / m_scaleY - m_extraHeight);
+
+		/*QTransform mm1 = currItem->getTransform();
+		QTransform mm2 = mm1.inverted();
+		QPointF itPos = mm1.map(QPointF(0, 0));
+		double m_scaleX, m_scaleY;
+		getScaleFromMatrix(mm1, m_scaleX, m_scaleY);
+		QPointF newPos = mm2.map(itPos) - mm2.map(newBounds.topLeft());*/
+		/*if (currItem->imageFlippedH())
+			dx *= -1;
+		if (currItem->imageFlippedV())
+			dy *= -1;*/
+		/*currItem->moveBy(-newPos.x(), -newPos.y(), true);
+		currItem->setWidth(newBounds.width() / m_scaleX - m_extraWidth);
+		currItem->setHeight(newBounds.height() / m_scaleY - m_extraHeight);*/
 
 		switch (m_handle)
 		{
@@ -424,15 +468,15 @@ void ResizeGesture::doResize(bool scaleContent)
 				break;
 		}
 
-		if (currItem->imageFlippedH())
+		/*if (currItem->imageFlippedH())
 			currItem->moveBy(-currItem->width(), 0);
 		if (currItem->imageFlippedV())
-			currItem->moveBy(0, -currItem->height());
+			currItem->moveBy(0, -currItem->height());*/
 		currItem->updateClip();
 		if (currItem->isArc())
 		{
 			PageItem_Arc* item = currItem->asArc();
-			item->arcWidth += dw * dscw;
+			item->arcWidth  += dw * dscw;
 			item->arcHeight += dh * dsch;
 			item->recalcPath();
 		}
@@ -710,7 +754,7 @@ void ResizeGesture::mousePressEvent(QMouseEvent *m)
 	else
 	{
 		m_handle = m_canvas->frameHitTest(QPointF(point.x(), point.y()), m_doc->m_Selection->itemAt(0));
-		PageItem* currItem = m_doc->m_Selection->itemAt(0);
+		/*PageItem* currItem = m_doc->m_Selection->itemAt(0);
 		if (currItem->imageFlippedH())
 		{
 			switch (m_handle)
@@ -762,7 +806,7 @@ void ResizeGesture::mousePressEvent(QMouseEvent *m)
 				default:
 					break;
 			}
-		}
+		}*/
 	}
 	if (m_handle > 0)
 	{

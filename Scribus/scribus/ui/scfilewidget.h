@@ -33,6 +33,11 @@ public:
 
 public slots:
 	void accept();
+	void locationDropped(QString fileUrl);
+	void gotoParentDirectory();
+	void gotoSelectedDirectory();
+	void gotoDesktopDirectory();
+	void gotoHomeDirectory();
 };
 
 #endif

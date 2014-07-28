@@ -26,17 +26,16 @@
 #include "pageitem.h"
 #include "scraction.h"
 #include "scribus.h"
+#include "scribusXml.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
-#include "scribusXml.h"
 #include "selection.h"
-#include "undomanager.h"
-#include "util_icon.h"
-#include "util_math.h"
 #include "ui/pageselector.h"
 #include "ui/propertiespalette.h"
 #include "ui/scrspinbox.h"
-
+#include "undomanager.h"
+#include "util_icon.h"
+#include "util_math.h"
 
 CanvasMode_NodeEdit::CanvasMode_NodeEdit(ScribusView* view) : CanvasMode(view), m_rectangleSelect(NULL)
 {
@@ -91,7 +90,7 @@ void CanvasMode_NodeEdit::drawControls(QPainter* p)
 	{
 		for (int poi=0; poi<cli.size()-3; poi += 4)
 		{
-			if (cli.point(poi).x() > 900000)
+			if (cli.isMarker(poi))
 				continue;
 			p->setPen(QPen(Qt::blue, onePerScale, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin));
 			FPoint a1 = cli.point(poi);
@@ -110,7 +109,7 @@ void CanvasMode_NodeEdit::drawControls(QPainter* p)
 	// draw points
 	for (int a = 0; a < cli.size()-1; a += 2)
 	{
-		if (cli.point(a).x() > 900000)
+		if (cli.isMarker(a))
 			continue;
 		if (m_doc->nodeEdit.EdPoints)
 		{
@@ -155,12 +154,17 @@ void CanvasMode_NodeEdit::drawControls(QPainter* p)
 			cli.point((*itm), &x, &y);
 			p->drawPoint(QPointF(x, y));
 		}
-		emit m_view->HavePoint(true, m_doc->nodeEdit.MoveSym);
+	}
+
+	bool havePoint = (m_doc->nodeEdit.ClRe != -1);
+	emit m_view->HavePoint(havePoint, m_doc->nodeEdit.MoveSym);
+
+	if (m_doc->nodeEdit.ClRe != -1)
+	{
 		cli.point(m_doc->nodeEdit.ClRe, &x, &y);
 		emit m_view->ClipPo(x, y);
 	}
-	else
-		emit m_view->HavePoint(false, m_doc->nodeEdit.MoveSym);
+
 	p->restore();
 }
 
@@ -198,7 +202,7 @@ void CanvasMode_NodeEdit::activate(bool fromGesture)
 		}
 		for (int a = 0; a < Clip.size(); ++a)
 		{
-			if (Clip.point(a).x() > 900000)
+			if (Clip.isMarker(a))
 				continue;
 			FPoint np = Clip.point(a);
 			FPoint npf2 = np.transformPoint(pm2, false);
@@ -482,8 +486,8 @@ void CanvasMode_NodeEdit::mouseReleaseEvent(QMouseEvent *m)
 		m_doc->itemAddCommit(m_doc->m_Selection->itemAt(0));
 	}
 	//Make sure the Zoom spinbox and page selector dont have focus if we click on the canvas
-	m_view->zoomSpinBox->clearFocus();
-	m_view->pageSelector->clearFocus();
+	m_view->m_ScMW->zoomSpinBox->clearFocus();
+	m_view->m_ScMW->pageSelector->clearFocus();
 	if (m_doc->m_Selection->itemAt(0) != 0) // is there the old clip stored for the undo action
 	{
 		currItem = m_doc->m_Selection->itemAt(0);
@@ -527,7 +531,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 	for (int a=0; a < signed(Clip.size()); ++a)
 	{
 		if (((m_doc->nodeEdit.EdPoints) && (a % 2 != 0)) || ((!m_doc->nodeEdit.EdPoints) && (a % 2 == 0)))
-				continue;
+			continue;
 		QPointF npf = pm2.map(Clip.pointQF(a));
 		if (m_canvas->hitsCanvasPoint(m->globalPos(), npf))
 		{
@@ -564,7 +568,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 	{
 		for (int n = m_doc->nodeEdit.ClRe; n < Clip.size(); ++n)
 		{
-			if (Clip.point(n).x() > 900000)
+			if (Clip.isMarker(n))
 			{
 				EndInd = n;
 				break;
@@ -574,7 +578,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 		{
 			if (n2 == 0)
 				break;
-			if (Clip.point(n2).x() > 900000)
+			if (Clip.isMarker(n2))
 			{
 				StartInd = n2 + 1;
 				break;
@@ -585,7 +589,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 	{
 		if (!m_doc->nodeEdit.EdPoints)
 			return;
-		if (!m_doc->nodeEdit.hasNodeSelected())	// We don't have a Point, try to add one onto the current curve segment
+		if ((!m_doc->nodeEdit.hasNodeSelected()) && (m_doc->nodeEdit.ClRe2 != -1)) // We don't have a Point, try to add one onto the current curve segment
 		{
 			bool foundP = false;
 			uint seg = 0;
@@ -665,7 +669,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 				StartInd = 0;
 				for (int n = m_doc->nodeEdit.ClRe; n < Clip.size(); ++n)
 				{
-					if (Clip.point(n).x() > 900000)
+					if (Clip.isMarker(n))
 					{
 						EndInd = n;
 						break;
@@ -677,7 +681,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 					{
 						if (n2 == 0)
 							break;
-						if (Clip.point(n2).x() > 900000)
+						if (Clip.isMarker(n2))
 						{
 							StartInd = n2 + 1;
 							break;
@@ -941,6 +945,7 @@ void CanvasMode_NodeEdit::handleNodeEditPress(QMouseEvent* m, QRect)
 		currItem->update();
 		if ((xp != xp2) || (yp != yp2) || (w != w2) || (h != h2))
 			m_view->DrawNew();
+		emit m_view->PolyStatus(currItem->itemType(), currItem->PoLine.size());
 	}
 	else
 	{

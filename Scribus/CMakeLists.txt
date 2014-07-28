@@ -72,23 +72,48 @@ EXECUTE_PROCESS(
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 MESSAGE(STATUS  "Machine: ${MACHINE}, void pointer size: ${CMAKE_SIZEOF_VOID_P}")
-STRING(REGEX MATCH "(i?86-*)|(athlon-*)|(pentium-*)" _machine_x86 "${MACHINE}")
+STRING(REGEX MATCH "(i[0-9]86-*)|(athlon-*)|(pentium-*)" _machine_x86 "${MACHINE}")
 IF (_machine_x86)
     MESSAGE(STATUS "Found target X86")
     SET(ARCH_X86 1)
 ENDIF (_machine_x86)
-IF (APPLE AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND ARCH_X86 EQUAL 1)
-  MESSAGE(STATUS "Found Snow Leopard Target: Apple, 64 bit, X86")
-  UNSET(ARCH_X86)
-  SET(ARCH_X86_64 1)
-  SET(APPLE_10_6_X 1 CACHE TYPE BOOL)
-ENDIF (APPLE AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND ARCH_X86 EQUAL 1)
 
 STRING(REGEX MATCH "(x86_64-*)|(X86_64-*)|(AMD64-*)|(amd64-*)" _machine_x86_64 "${MACHINE}")
 IF (_machine_x86_64)
-    MESSAGE(STATUS "Found target X86_64")
-    SET(ARCH_X86_64 1)
+	MESSAGE(STATUS "Found target X86_64")
+	SET(ARCH_X86_64 1)
 ENDIF (_machine_x86_64)
+
+IF (APPLE AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND (ARCH_X86 EQUAL 1 OR ARCH_X86_64 EQUAL 1))
+	STRING(REGEX REPLACE ".*-darwin([0-9]+).*" "\\1" _apple_ver "${MACHINE}")
+	IF (_apple_ver EQUAL "14")
+		MESSAGE(STATUS "Found OSX Yosemite Target: Apple, 64 bit, X86")
+		SET(APPLE_10_10_X 1 CACHE TYPE BOOL)
+	ENDIF (_apple_ver EQUAL "14")
+	IF (_apple_ver EQUAL "13")
+		MESSAGE(STATUS "Found OSX Mavericks Target: Apple, 64 bit, X86")
+		SET(APPLE_10_9_X 1 CACHE TYPE BOOL)
+	ENDIF (_apple_ver EQUAL "13")
+	IF (_apple_ver EQUAL "12")
+		MESSAGE(STATUS "Found OSX Mountain Lion Target: Apple, 64 bit, X86")
+		SET(APPLE_10_8_X 1 CACHE TYPE BOOL)
+	ENDIF (_apple_ver EQUAL "12")
+	IF (_apple_ver EQUAL "11")
+		MESSAGE(STATUS "Found OSX Lion Target: Apple, 64 bit, X86")
+		SET(APPLE_10_7_X 1 CACHE TYPE BOOL)
+	ENDIF (_apple_ver EQUAL "11")
+	IF (_apple_ver EQUAL "10")
+		MESSAGE(STATUS "Found OSX Snow Leopard Target: Apple, 64 bit, X86")
+		SET(APPLE_10_6_X 1 CACHE TYPE BOOL)
+	ENDIF (_apple_ver EQUAL "10")
+	IF (_apple_ver EQUAL "9")
+		MESSAGE(STATUS "Found OSX Leopard Target: Apple, 32 bit, X86")
+		SET(APPLE_10_5_X 1 CACHE TYPE BOOL)
+	ENDIF (_apple_ver EQUAL "9")
+	UNSET(ARCH_X86)
+ENDIF (APPLE AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND (ARCH_X86 EQUAL 1 OR ARCH_X86_64 EQUAL 1))
+
+
 
 STRING(REGEX MATCH "(sparc64-*)|(SPARC64-*)" _machine_sparc_64 "${MACHINE}")
 IF (_machine_sparc_64)
@@ -134,9 +159,9 @@ IF (_machine_sparc64)
 ENDIF (_machine_sparc64)
 
 #convert any 64 bit build into generic 64 tag for below
-IF (ARCH_X86_64 OR ARCH_SPARC_64 OR ARCH_MIPS_64 OR ARCH_PPC_64) 
+IF (ARCH_X86_64 OR ARCH_SPARC_64 OR ARCH_MIPS_64 OR ARCH_PPC_64)
   SET(ARCH64BIT 1)
-ENDIF (ARCH_X86_64 OR ARCH_SPARC_64 OR ARCH_MIPS_64 OR ARCH_PPC_64) 
+ENDIF (ARCH_X86_64 OR ARCH_SPARC_64 OR ARCH_MIPS_64 OR ARCH_PPC_64)
 
 MESSAGE(STATUS "Building for target ${MACHINE}")
 
@@ -200,7 +225,7 @@ IF (APPLEBUNDLE)
 ENDIF (APPLEBUNDLE)
 
 
-#Setp all the directories we will use
+#Setup all the directories we will use
 #MAN
 CMAKE_POLICY(SET CMP0005 OLD)
 SET(MANDIR "share/man/")
@@ -336,77 +361,116 @@ ENDIF(NOT WANT_DEBUG AND NOT WANT_RELEASEWITHDEBUG)
 
 #Based on our build type, setup our build options
 IF(APPLE)
-  IF(APPLE_10_6_X)
-    SET(OSXMINVER "10.6" CACHE TYPE STRING)
-  ELSE(APPLE_10_6_X)
-    SET(OSXMINVER "10.4" CACHE TYPE STRING)
-  ENDIF(APPLE_10_6_X)
-  # gcc/mac
-  IF(WANT_UNIVERSAL_BUNDLE)
-    MESSAGE("Setting Universal (PPC/i386) Architecture for OSX Build/Bundle")
-    SET(CMAKE_OSX_ARCHITECTURES "ppc;i386" )
-    SET(CMAKE_TRY_COMPILE_OSX_ARCHITECTURES "ppc;i386" )
-    SET(CMAKE_OSX_SYSROOT "/Developer/SDKs/MacOSX10.4u.sdk")
-	SET(CMAKE_OSX_DEPLOYMENT_TARGET "10.4")
-  ELSE(WANT_UNIVERSAL_BUNDLE)
-    IF(ARCH_PPC OR ARCH_PPC_64)
-      MESSAGE("Setting PPC Architecture for OSX Build/Bundle")
-      SET(CMAKE_OSX_ARCHITECTURES "ppc" )
-      SET(CMAKE_TRY_COMPILE_OSX_ARCHITECTURES "ppc" )
-	ELSE(ARCH_PPC OR ARCH_PPC_64)
-	  IF(APPLE_10_6_X)
-		MESSAGE("Setting x86_64 Architecture for OSX Build/Bundle")
-		SET(CMAKE_OSX_ARCHITECTURES "x86_64" )
-		SET(CMAKE_TRY_COMPILE_OSX_ARCHITECTURES "x86_64" )
-	  ELSE(APPLE_10_6_X)
-		MESSAGE("Setting i386 Architecture for OSX Build/Bundle")
-		SET(CMAKE_OSX_ARCHITECTURES "i386" )
-		SET(CMAKE_TRY_COMPILE_OSX_ARCHITECTURES "i386" )
-	  ENDIF(APPLE_10_6_X)
-    ENDIF(ARCH_PPC OR ARCH_PPC_64)
-  ENDIF(WANT_UNIVERSAL_BUNDLE)
-  MESSAGE(STATUS "${CMAKE_OSX_ARCHITECTURES} ${CMAKE_OSX_SYSROOT}")
-  SET(ENV{MACOSX_DEPLOYMENT_TARGET} ${OSXMINVER} )
-  SET( ENV{LD_PREBIND} 1 )
-  SET( ENV{LD_PREBIND_ALLOW_OVERLAP} 1 )
-  IF (WANT_DEBUG)
-	SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
-	SET(CMAKE_C_FLAGS_DEBUG "-O0 -g3 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
-  ENDIF (WANT_DEBUG)
-  IF (WANT_RELEASEWITHDEBUG)
-	SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g3 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
-	SET(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g3 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
-  ENDIF (WANT_RELEASEWITHDEBUG)
-  IF (NOT WANT_DEBUG AND NOT WANT_RELEASEWITHDEBUG)
-	SET(CMAKE_CXX_FLAGS_RELEASE "-O2 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
-	SET(CMAKE_C_FLAGS_RELEASE "-O2 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
-  ENDIF (NOT WANT_DEBUG AND NOT WANT_RELEASEWITHDEBUG)
+	IF(APPLE_10_10_X)
+		SET(OSXMINVER "10.10" CACHE TYPE STRING)
+		IF (WANT_OSX_SDK)
+			SET(CMAKE_OSX_SYSROOT "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk")
+		ENDIF (WANT_OSX_SDK)
+	ENDIF(APPLE_10_10_X)
+	IF(APPLE_10_9_X)
+		SET(OSXMINVER "10.9" CACHE TYPE STRING)
+		IF (WANT_OSX_SDK)
+			SET(CMAKE_OSX_SYSROOT "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk")
+		ENDIF (WANT_OSX_SDK)
+	ENDIF(APPLE_10_9_X)
+	IF(APPLE_10_8_X)
+		SET(OSXMINVER "10.8" CACHE TYPE STRING)
+		IF (WANT_OSX_SDK)
+			SET(CMAKE_OSX_SYSROOT "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.8.sdk")
+		ENDIF (WANT_OSX_SDK)
+	ENDIF(APPLE_10_8_X)
+	IF(APPLE_10_7_X)
+		SET(OSXMINVER "10.7" CACHE TYPE STRING)
+		IF (WANT_OSX_SDK)
+			SET(CMAKE_OSX_SYSROOT "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk")
+		ENDIF (WANT_OSX_SDK)
+	ENDIF(APPLE_10_7_X)
+	IF(APPLE_10_6_X)
+		SET(OSXMINVER "10.6" CACHE TYPE STRING)
+		IF (WANT_OSX_SDK)
+			SET(CMAKE_OSX_SYSROOT "/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk")
+		ENDIF (WANT_OSX_SDK)
+	ENDIF(APPLE_10_6_X)
+	IF(APPLE_10_5_X)
+		SET(OSXMINVER "10.5" CACHE TYPE STRING)
+		IF (WANT_OSX_SDK)
+			SET(CMAKE_OSX_SYSROOT "/Developer/SDKs/MacOSX10.5.sdk")
+		ENDIF (WANT_OSX_SDK)
+	ENDIF(APPLE_10_5_X)
+	IF(APPLE_10_4_X)
+		SET(OSXMINVER "10.4" CACHE TYPE STRING)
+		IF (WANT_OSX_SDK)
+			SET(CMAKE_OSX_SYSROOT "/Developer/SDKs/MacOSX10.4u.sdk")
+		ENDIF (WANT_OSX_SDK)
+	ENDIF(APPLE_10_4_X)
+	# gcc/mac
+	IF(WANT_UNIVERSAL_BUNDLE)
+		MESSAGE("Setting Universal (PPC/i386) Architecture for OSX Build/Bundle")
+		SET(CMAKE_OSX_ARCHITECTURES "ppc;i386" )
+		SET(CMAKE_TRY_COMPILE_OSX_ARCHITECTURES "ppc;i386" )
+		IF (WANT_OSX_SDK)
+			SET(CMAKE_OSX_DEPLOYMENT_TARGET "10.4")
+		ENDIF (WANT_OSX_SDK)
+	ELSE(WANT_UNIVERSAL_BUNDLE)
+		IF(ARCH_PPC OR ARCH_PPC_64)
+			MESSAGE("Setting PPC Architecture for OSX Build/Bundle")
+			SET(CMAKE_OSX_ARCHITECTURES "ppc" )
+			SET(CMAKE_TRY_COMPILE_OSX_ARCHITECTURES "ppc" )
+		ELSE(ARCH_PPC OR ARCH_PPC_64)
+			IF (WANT_OSX_SDK)
+				SET(CMAKE_OSX_DEPLOYMENT_TARGET "${OSXMINVER}")
+			ENDIF (WANT_OSX_SDK)
+			IF(APPLE_10_6_X OR APPLE_10_7_X OR APPLE_10_8_X OR APPLE_10_9_X OR APPLE_10_10_X)
+				MESSAGE("Setting x86_64 Architecture for OSX Build/Bundle")
+				SET(CMAKE_OSX_ARCHITECTURES "x86_64" )
+				SET(CMAKE_TRY_COMPILE_OSX_ARCHITECTURES "x86_64" )
+			ELSE(APPLE_10_6_X OR APPLE_10_7_X OR APPLE_10_8_X OR APPLE_10_9_X OR APPLE_10_10_X)
+				MESSAGE("Setting i386 Architecture for OSX Build/Bundle")
+				SET(CMAKE_OSX_ARCHITECTURES "i386" )
+				SET(CMAKE_TRY_COMPILE_OSX_ARCHITECTURES "i386" )
+			ENDIF(APPLE_10_6_X OR APPLE_10_7_X OR APPLE_10_8_X OR APPLE_10_9_X OR APPLE_10_10_X)
+		ENDIF(ARCH_PPC OR ARCH_PPC_64)
+	ENDIF(WANT_UNIVERSAL_BUNDLE)
+	MESSAGE(STATUS "${CMAKE_OSX_ARCHITECTURES} ${CMAKE_OSX_SYSROOT}")
+	SET(ENV{MACOSX_DEPLOYMENT_TARGET} ${OSXMINVER} )
+	SET(ENV{LD_PREBIND} 1 )
+	SET(ENV{LD_PREBIND_ALLOW_OVERLAP} 1 )
+	IF (WANT_DEBUG)
+		SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
+		SET(CMAKE_C_FLAGS_DEBUG "-O0 -g3 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
+	ENDIF (WANT_DEBUG)
+	IF (WANT_RELEASEWITHDEBUG)
+		SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g3 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
+		SET(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g3 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
+	ENDIF (WANT_RELEASEWITHDEBUG)
+	IF (NOT WANT_DEBUG AND NOT WANT_RELEASEWITHDEBUG)
+		SET(CMAKE_CXX_FLAGS_RELEASE "-O2 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
+		SET(CMAKE_C_FLAGS_RELEASE "-O2 -fno-inline-functions -Wall -mmacosx-version-min=${OSXMINVER}")
+	ENDIF (NOT WANT_DEBUG AND NOT WANT_RELEASEWITHDEBUG)
 ELSE(APPLE)
-  IF(${CMAKE_GENERATOR} MATCHES "^(Visual Studio|NMake).*")
-    # Windows build with Visual Studio
-    # Surely there's a better way to identify the compiler?
-    SET(CMAKE_CXX_FLAGS_DEBUG)
-    SET(CMAKE_C_FLAGS_DEBUG)
-  ELSE(${CMAKE_GENERATOR} MATCHES "^(Visual Studio|NMake).*")
-    # vanilla gcc
-    SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -Wall -fstrict-aliasing")
-    SET(CMAKE_C_FLAGS_DEBUG "-O0 -g3 -Wall -fstrict-aliasing")
-    
-    IF (_machine_x86 OR _machine_x86_64)
-      SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC")
-      SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fPIC")
-    ENDIF (_machine_x86 OR _machine_x86_64)
-    
-  ENDIF(${CMAKE_GENERATOR} MATCHES "^(Visual Studio|NMake).*")
+	IF(${CMAKE_GENERATOR} MATCHES "^(Visual Studio|NMake).*")
+		# Windows build with Visual Studio
+		# Surely there's a better way to identify the compiler?
+		SET(CMAKE_CXX_FLAGS_DEBUG)
+		SET(CMAKE_C_FLAGS_DEBUG)
+	ELSE(${CMAKE_GENERATOR} MATCHES "^(Visual Studio|NMake).*")
+		# vanilla gcc
+		SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -Wall -fstrict-aliasing")
+		SET(CMAKE_C_FLAGS_DEBUG "-O0 -g3 -Wall -fstrict-aliasing")
+		IF (_machine_x86 OR _machine_x86_64)
+			SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC")
+			SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fPIC")
+		ENDIF (_machine_x86 OR _machine_x86_64)
+	ENDIF(${CMAKE_GENERATOR} MATCHES "^(Visual Studio|NMake).*")
 ENDIF(APPLE)
 
 IF(${CMAKE_GENERATOR} MATCHES "^(Visual Studio|NMake).*")
-  SET(CMAKE_CXX_FLAGS_RELEASE)
-  SET(CMAKE_C_FLAGS_RELEASE)
+	SET(CMAKE_CXX_FLAGS_RELEASE)
+	SET(CMAKE_C_FLAGS_RELEASE)
 ELSE(${CMAKE_GENERATOR} MATCHES "^(Visual Studio|NMake).*")
-  SET(CMAKE_CXX_FLAGS_RELEASE "-O2 -Wall -fPIC")
-  SET(CMAKE_C_FLAGS_RELEASE "-O2 -Wall -fPIC")
-  ADD_DEFINITIONS(-DNDEBUG)
+	SET(CMAKE_CXX_FLAGS_RELEASE "-O2 -Wall -fPIC")
+	SET(CMAKE_C_FLAGS_RELEASE "-O2 -Wall -fPIC")
+	ADD_DEFINITIONS(-DNDEBUG)
 ENDIF(${CMAKE_GENERATOR} MATCHES "^(Visual Studio|NMake).*")
 
 IF(WIN32)
@@ -502,7 +566,7 @@ ENDIF(WIN32)
 #<< ZLIB, PNG
 IF (WIN32)
   # On win32 we can use Qt's zlib and libpng, so we use some
-  # custom cmake includes. This permits us to honour the 
+  # custom cmake includes. This permits us to honour the
   # USE_QT_ZLIB_PNGLIB flag if passed.
   SET(PNG_DIR ${CMAKE_MODULE_PATH})
   SET(ZLIB_DIR ${CMAKE_MODULE_PATH})
@@ -512,10 +576,10 @@ IF (ZLIB_FOUND)
   MESSAGE("ZLIB Library Found OK")
   SET(HAVE_LIBZ 1)
 ENDIF(ZLIB_FOUND)
-FIND_PACKAGE(PNG REQUIRED)
-IF (PNG_FOUND)
-  MESSAGE("PNG Library Found OK")
-ENDIF(PNG_FOUND)
+#FIND_PACKAGE(PNG REQUIRED)
+#IF (PNG_FOUND)
+#  MESSAGE("PNG Library Found OK")
+#ENDIF(PNG_FOUND)
 #>> ZLIB, PNG
 
 IF (WANT_NOOSG)
@@ -546,8 +610,8 @@ ENDIF(TIFF_FOUND)
 #<< JPEG, TIFF
 
 #<< PYTHON
-SET(PythonLibs_FIND_VERSION 2)
-FIND_PACKAGE(PythonLibs REQUIRED)
+#SET(PythonLibs_FIND_VERSION 2)
+FIND_PACKAGE(PythonLibs 2 REQUIRED)
 IF (PYTHON_LIBRARY)
   MESSAGE("Python Library Found OK")
   SET(HAVE_PYTHON 1)
@@ -709,12 +773,23 @@ ELSE (POPPLER_FOUND)
 ENDIF (POPPLER_FOUND)
 #>>Poppler for PDF import
 
+# librevenge for MsPub import
+pkg_check_modules(LIBREVENGE librevenge-0.0)
+IF (LIBREVENGE_FOUND)
+	pkg_check_modules(LIBREVENGE_STREAM librevenge-stream-0.0)
+	IF (LIBREVENGE_STREAM_FOUND)
+		pkg_check_modules(LIBREVENGE_GENERATORS librevenge-generators-0.0)
+		IF (LIBREVENGE_GENERATORS_FOUND)
+			SET(HAVE_REVENGE 1)
+		ENDIF (LIBREVENGE_GENERATORS_FOUND)
+	ENDIF (LIBREVENGE_STREAM_FOUND)
+ENDIF (LIBREVENGE_FOUND)
 
 ##############################################################################################################
 ########## Include Setup                                                                            ##########
 
 TEST_BIG_ENDIAN(WORDS_BIGENDIAN)
-  
+
 CHECK_INCLUDE_FILE("dlfcn.h" HAVE_DLFCN_H)
 IF(HAVE_DLFCN_H)
   ADD_DEFINITIONS(-DHAVE_DLFCN_H)
@@ -784,8 +859,8 @@ CONFIGURE_FILE(
 
 ADD_CUSTOM_TARGET(uninstall
   "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
-  
-  
+
+
 ##############################################################################################################
 ########## Add our subdirs                                                                          ##########
 
@@ -804,18 +879,18 @@ ADD_SUBDIRECTORY(resources/translations)
 
 #Install our READMEs etc.
 INSTALL(FILES
-  AUTHORS
-  BUILDING
-  ChangeLog
-  ChangeLogSVN
-  COPYING
-  LINKS
-  NEWS
-  PACKAGING
-  README
-  TODO
-  TRANSLATION
-  DESTINATION ${DOCDIR}
+	AUTHORS
+	BUILDING
+	ChangeLog
+	ChangeLogSVN
+	COPYING
+	LINKS
+	NEWS
+	PACKAGING
+	README
+	TODO
+	TRANSLATION
+	DESTINATION ${DOCDIR}
 )
 
 IF (APPLE)

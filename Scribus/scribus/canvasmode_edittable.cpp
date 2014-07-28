@@ -7,18 +7,22 @@ a copyright and/or license notice that predates the release of Scribus 1.3.2
 for which a new license (GPL+exception) is in place.
 */
 
+#include "canvasmode_edittable.h"
+
 #include <QCursor>
 #include <QDebug>
 #include <QPainter>
 #include <QPointF>
 #include <QTimer>
 
+#include "appmodes.h"
 #include "canvas.h"
 #include "canvasgesture_cellselect.h"
 #include "canvasgesture_columnresize.h"
 #include "canvasgesture_rowresize.h"
 #include "canvasgesture_tableresize.h"
 #include "cellarea.h"
+#include "ui/contextmenu.h"
 #include "fpoint.h"
 #include "pageitem_table.h"
 #include "scribus.h"
@@ -26,10 +30,8 @@ for which a new license (GPL+exception) is in place.
 #include "scribusview.h"
 #include "selection.h"
 #include "tablehandle.h"
-#include "util_icon.h"
 #include "ui/scmwmenumanager.h"
-
-#include "canvasmode_edittable.h"
+#include "util_icon.h"
 
 // TODO: We should have a preference for this instead.
 #ifdef Q_OS_MAC
@@ -49,7 +51,8 @@ CanvasMode_EditTable::CanvasMode_EditTable(ScribusView* view) : CanvasMode(view)
 	m_tableResizeGesture(new TableResize(this)),
 	m_rowResizeGesture(new RowResize(this)),
 	m_columnResizeGesture(new ColumnResize(this)),
-	m_cellSelectGesture(new CellSelect(this))
+	m_cellSelectGesture(new CellSelect(this)),
+	m_ScMW(view->m_ScMW)
 {
 	connect(m_canvasUpdateTimer, SIGNAL(timeout()), this, SLOT(updateCanvas()));
 }
@@ -245,7 +248,9 @@ void CanvasMode_EditTable::mousePressEvent(QMouseEvent* event)
 	else if (event->button() == Qt::RightButton)
 	{
 		// Show the table popup menu.
-		m_view->m_ScMW->scrMenuMgr->runMenuAtPos("ItemTable", event->globalPos());
+		//m_view->m_ScMW->scrMenuMgr->runMenuAtPos("ItemTable", event->globalPos());
+		const FPoint mousePointDoc(m_canvas->globalToCanvas(event->globalPos()));
+		createContextMenu(m_table, mousePointDoc.x(), mousePointDoc.y());
 	}
 }
 
@@ -324,11 +329,13 @@ void CanvasMode_EditTable::handleMouseDrag(QMouseEvent* event)
 		// Select text in active cell text frame.
 		activeFrame->itemText.deselectAll();
 		m_view->slotSetCurs(event->globalPos().x(), event->globalPos().y());
+		activeFrame->HasSel = false;
 
 		const int selectionStart = qMin(activeFrame->itemText.cursorPosition(), m_lastCursorPos);
 		const int selectionLength = qAbs(activeFrame->itemText.cursorPosition() - m_lastCursorPos);
 
 		activeFrame->itemText.select(selectionStart, selectionLength);
+		activeFrame->HasSel = (selectionLength > 0);
 	}
 	else
 	{
@@ -337,6 +344,7 @@ void CanvasMode_EditTable::handleMouseDrag(QMouseEvent* event)
 		 * cell selection gesture.
 		 */
 		activeFrame->itemText.deselectAll();
+		activeFrame->HasSel = false;
 
 		m_cellSelectGesture->setup(m_table, activeCell);
 		m_view->startGesture(m_cellSelectGesture);
@@ -371,4 +379,19 @@ void CanvasMode_EditTable::makeLongTextCursorBlink()
 	m_cursorVisible = true;
 	m_longBlink = true;
 	m_blinkTime.restart();
+}
+
+void CanvasMode_EditTable::createContextMenu(PageItem *currItem, double mx, double my)
+{
+	ContextMenu* cmen=NULL;
+	m_view->setCursor(QCursor(Qt::ArrowCursor));
+	m_view->setObjectUndoMode();
+	if(currItem!=NULL)
+		cmen = new ContextMenu(*(m_doc->m_Selection), m_ScMW, m_doc);
+	else
+		cmen = new ContextMenu(m_ScMW, m_doc, mx, my);
+	if (cmen)
+		cmen->exec(QCursor::pos());
+	m_view->setGlobalUndoMode();
+	delete cmen;
 }

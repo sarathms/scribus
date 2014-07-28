@@ -75,15 +75,17 @@ void Prefs_DocumentSetup::unitChange()
 	unitRatio = unitGetRatioFromIndex(docUnitIndex);
 	pageWidthSpinBox->setValue(pageW * unitRatio);
 	pageHeightSpinBox->setValue(pageH * unitRatio);
-	marginsWidget->setNewUnitIndex(docUnitIndex);
+	marginsWidget->setNewUnit(docUnitIndex);
 	marginsWidget->setPageHeight(pageH);
 	marginsWidget->setPageWidth(pageW);
-	bleedsWidget->setNewUnitIndex(docUnitIndex);
+	bleedsWidget->setNewUnit(docUnitIndex);
 	bleedsWidget->setPageHeight(pageH);
 	bleedsWidget->setPageWidth(pageW);
 
 	pageWidthSpinBox->blockSignals(false);
 	pageHeightSpinBox->blockSignals(false);
+
+	emit prefsChangeUnits(docUnitIndex);
 }
 
 void Prefs_DocumentSetup::languageChange()

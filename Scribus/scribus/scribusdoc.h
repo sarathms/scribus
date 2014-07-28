@@ -739,6 +739,7 @@ public:
 	 * @brief Undo function for applying a master page
 	 */
 	void restoreMasterPageApplying(SimpleState *state, bool isUndo);
+	void restoreMasterPageRenaming(SimpleState *state, bool isUndo);
 	void restoreCopyPage(SimpleState *state, bool isUndo);
 	void restoreMovePage(SimpleState *state, bool isUndo);
 	void restoreAddMasterPage(SimpleState *state, bool isUndo);
@@ -768,11 +769,17 @@ public:
 	/**
 	 * @brief Sets up the ScText defaults from the document
 	 */
-	void setScTextDefaultsFromDoc(ScText *);
+	//void setScTextDefaultsFromDoc(ScText *);
 	/**
 	 * @brief Copies a normal page to be a master pages
 	 */
 	bool copyPageToMasterPage(const int, const int, const int, const QString&, bool);
+	
+	
+	/**
+	 * @brief Just create but don't add to items list and don't create undo record
+	 */
+	PageItem* createPageItem(const PageItem::ItemType itemType, const PageItem::ItemFrameType frameType, double x, double y, double b, double h, double w, const QString& fill, const QString& outline);
 	
 	/**
 	 * @brief Add an Item to the document.
@@ -877,8 +884,13 @@ public:
 	void reformPages(bool moveObjects = true);
 	/** @brief Refresh automatic guides once Margin struct has been properly configure by reformPages() */
 	void refreshGuides();
+
 	/** @brief Check and fix if needed PageItem OwnPage member */
 	void fixItemPageOwner();
+	/** @brief Fix paragraph styles */
+	void fixParagraphStyles();
+	/** @brief Fix notes styles */
+	void fixNotesStyles();
 	
 	/**
 	 * @brief Return the x or y offset for a page on the canvas
@@ -1077,17 +1089,17 @@ public:
 	void itemSelection_SetRenderIntent(int intentIndex, Selection* customSelection=0);
 	void itemSelection_SetCompressionMethod(int cmIndex, Selection* customSelection=0);
 	void itemSelection_SetCompressionQuality(int cqIndex, Selection* customSelection=0);
-
-	
-//	void chAbStyle(PageItem *currItem, int s);
-
 	void itemSelection_SetTracking(int us, Selection* customSelection=0);
 	void itemSelection_SetFontSize(int size, Selection* customSelection=0);
 	//void FlipImageH();
 	//void FlipImageV();
 	void MirrorPolyH(PageItem *currItem);
 	void MirrorPolyV(PageItem *currItem);
-	
+	bool getItem(PageItem **currItem, int nr = -1);
+	void setFrameRect();
+	void setFrameRounded();
+	void setFrameOval();
+
 	void setRedrawBounding(PageItem *currItem);
 	void adjustCanvas(FPoint minPos, FPoint maxPos, bool absolute = false);
 	struct PicResMapped
@@ -1126,7 +1138,9 @@ public:
 		int m_lowResType;
 	};
 	void recalcPicturesRes(bool applyNewRes = false);
+	int previewQuality();
 	void connectDocSignals();
+	void disconnectDocSignals();
 	void removeLayer(int l, bool dl = false); //FIXME: Make protected once scripter function no longer uses this directly
 	/*! \brief We call changed() whenever the document needs to know it has been changed.
 	 *  If the document is the primary document in a main window, it will signal to enable/disable
@@ -1154,13 +1168,13 @@ public:
 	void SnapToGuides(PageItem *currItem);
 	bool ApplyGuides(double *x, double *y, bool elementSnap = false);
 	bool ApplyGuides(FPoint* point, bool elementSnap = false);
-	bool MoveItem(double newX, double newY, PageItem* ite, bool fromMP = false);
+	bool MoveItem(double newX, double newY, PageItem* ite);
 	void RotateItem(double win, PageItem *currItem);
-	void MoveRotated(PageItem *currItem, FPoint npv, bool fromMP = false);
+	void MoveRotated(PageItem *currItem, FPoint npv);
 	bool SizeItem(double newX, double newY, PageItem *pi, bool fromMP = false, bool DoUpdateClip = true, bool redraw = true);
 	bool MoveSizeItem(FPoint newX, FPoint newY, PageItem* currItem, bool fromMP = false, bool constrainRotation = false);
 	void AdjustItemSize(PageItem *currItem, bool includeGroup = false, bool moveInGroup = true);
-	void moveGroup(double x, double y, bool fromMP = false, Selection* customSelection = 0);
+	void moveGroup(double x, double y, Selection* customSelection = 0);
 	void rotateGroup(double angle, Selection* customSelection = 0);
 	void rotateGroup(double angle, FPoint RCenter, Selection* customSelection = 0);
 	void scaleGroup(double scx, double scy, bool scaleText=true, Selection* customSelection = 0, bool scaleLine = false);
@@ -1385,6 +1399,7 @@ signals:
 	 * @brief Let the document tell whatever is listening that it has changed
 	 */
 	void docChanged();
+	void saved(QString name);
 	void updateContents();
 	void updateContents(const QRect &r);
 	void refreshItem(PageItem *);
@@ -1408,6 +1423,9 @@ signals:
 	void rotationMode(int);
 	void updateEditItem();
 	void updateAutoSaveClock();
+	void addBookmark(PageItem *);
+	void deleteBookmark(PageItem *);
+	void changeLayers(int);
 	
 public slots:
 	void selectionChanged();
@@ -1415,6 +1433,8 @@ public slots:
 	void itemSelection_ToggleSizeLock();
 	void itemSelection_ToggleImageShown();
 	void itemSelection_TogglePrintEnabled();
+	void itemSelection_ToggleBookMark(Selection* customSelection=0);
+	void itemSelection_ToggleAnnotation(Selection* customSelection=0);
 	void itemSelection_Transform(int nrOfCopies, QTransform matrix, int basepoint);
 	void itemSelection_ChangePreviewResolution(int id);
 
@@ -1426,7 +1446,8 @@ public slots:
 	//FIXME : change to process a selection
 	void item_setFrameShape(PageItem* item, int frameType, int count, double* points); 
 
-	void itemSelection_ClearItem(Selection* customSelection=0);
+	void itemSelection_ClearItem(Selection* customSelection=0, bool useWarning=false);
+	void itemSelection_TruncateItem(Selection* customSelection=0);
 	//! Delete the items in the current selection. When force is true, we do not warn the user and make SE happy too. Force is used from @sa Page::restorePageItemCreation
 	void itemSelection_DeleteItem(Selection* customSelection=0, bool forceDeletion=false);
 	void itemSelection_SetItemTextReversed(bool reversed, Selection* customSelection=0);
@@ -1780,6 +1801,9 @@ public slots:
 	void itemSelection_EditWeld();
 	void restartAutoSaveTimer();
 
+protected slots:
+	void slotAutoSave();
+
 //auto-numerations
 public:
 	QMap<QString, NumStruct*> numerations;
@@ -1799,6 +1823,7 @@ public:
 	void SubmitForm();
 	void ImportData();
 	void ResetFormFields();
+
 };
 
 Q_DECLARE_METATYPE(ScribusDoc*);

@@ -15,13 +15,14 @@ for which a new license (GPL+exception) is in place.
 #include "pageitem_latexframe.h"
 #include "pageitem_table.h"
 #include "prefsmanager.h"
+#include "qtiocompressor.h"
 #include "scclocale.h"
 #include "scconfig.h"
 #include "sccolorengine.h"
 #include "scpattern.h"
 #include "scribuscore.h"
 #include "scribusdoc.h"
-#include "scribusview.h"
+
 #include "sctextstream.h"
 #include "scxmlstreamreader.h"
 #include "undomanager.h"
@@ -30,7 +31,6 @@ for which a new license (GPL+exception) is in place.
 #include "util_math.h"
 #include "util_color.h"
 #include "util_layer.h"
-#include "scgzfile.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -115,11 +115,14 @@ bool Scribus134Format::fileSupported(QIODevice* /* file */, const QString & file
 	QByteArray docBytes("");
 	if(fileName.right(2) == "gz")
 	{
-		if (!ScGzFile::readFromFile(fileName, docBytes, 4096))
-		{
-			// FIXME: Needs better error return
+		QFile file(fileName);
+		QtIOCompressor compressor(&file);
+		compressor.setStreamFormat(QtIOCompressor::GzipFormat);
+		compressor.open(QIODevice::ReadOnly);
+		docBytes = compressor.read(1024);
+		compressor.close();
+		if (docBytes.isEmpty())
 			return false;
-		}
 	}
 	else
 	{
@@ -148,12 +151,15 @@ QIODevice* Scribus134Format::slaReader(const QString & fileName)
 	QIODevice* ioDevice = 0;
 	if(fileName.right(2) == "gz")
 	{
-		ioDevice = new ScGzFile(fileName);
-		if (!ioDevice->open(QIODevice::ReadOnly))
+		aFile.setFileName(fileName);
+		QtIOCompressor *compressor = new QtIOCompressor(&aFile);
+		compressor->setStreamFormat(QtIOCompressor::GzipFormat);
+		if (!compressor->open(QIODevice::ReadOnly))
 		{
-			delete ioDevice;
+			delete compressor;
 			return NULL;
 		}
+		ioDevice = compressor;
 	}
 	else
 	{
@@ -739,7 +745,7 @@ bool Scribus134Format::loadFile(const QString & fileName, const FileFormat & /* 
 	if (m_mwProgressBar!=0)
 		m_mwProgressBar->setValue(reader.characterOffset());
 	return true;
-// 	return false;
+//	return false;
 }
 
 // Low level plugin API
@@ -1148,7 +1154,11 @@ void Scribus134Format::readCharacterStyleAttrs(ScribusDoc *doc, ScXmlStreamAttri
 
 	static const QString FONT("FONT");
 	if (attrs.hasAttribute(FONT))
-		newStyle.setFont(m_AvailableFonts->findFont(attrs.valueAsString(FONT), doc));
+	{
+		const ScFace& face = m_AvailableFonts->findFont(attrs.valueAsString(FONT), doc);
+		if (!face.isNone())
+			newStyle.setFont(face);
+	}
 	
 	static const QString FONTSIZE("FONTSIZE");
 	if (attrs.hasAttribute(FONTSIZE))
@@ -2205,9 +2215,7 @@ bool Scribus134Format::readPattern(ScribusDoc* doc, ScXmlStreamReader& reader, c
 	uint itemCount2 = m_Doc->Items->count();
 	if (itemCount2 > itemCount1)
 	{
-		PageItem* currItem = doc->Items->at(itemCount1), *newItem;
-		pat.pattern = currItem->DrawObj_toImage(qMax(pat.width, pat.height));
-		pat.pattern = pat.pattern.copy(-pat.xoffset, -pat.yoffset, pat.width, pat.height);
+		PageItem* newItem;
 		for (uint as = itemCount1; as < itemCount2; ++as)
 		{
 			newItem = doc->Items->takeAt(itemCount1);
@@ -2216,6 +2224,7 @@ bool Scribus134Format::readPattern(ScribusDoc* doc, ScXmlStreamReader& reader, c
 			newItem->gYpos += pat.yoffset;
 			pat.items.append(newItem);
 		}
+		pat.createPreview();
 	}
 	doc->docPatterns.insert(patternName, pat);
 
@@ -2344,14 +2353,14 @@ bool Scribus134Format::readItemText(PageItem *obj, ScXmlStreamAttributes& attrs,
 
 	for (int cxx=0; cxx<tmp2.length(); ++cxx)
 	{
-		QChar ch = tmp2.at(cxx);		
+		QChar ch = tmp2.at(cxx);
 		{ // Legacy mode
 			if (ch == QChar(5))
 				ch = SpecialChars::PARSEP;
 			if (ch == QChar(4))
 				ch = SpecialChars::TAB;
 		}
-		
+
 		int pos = obj->itemText.length();
 		if (ch == SpecialChars::OBJECT)
 		{
@@ -2369,16 +2378,16 @@ bool Scribus134Format::readItemText(PageItem *obj, ScXmlStreamAttributes& attrs,
 		else if (ch == SpecialChars::SHYPHEN && pos > 0)
 		{
 //			qDebug() << QString("scribus134format: SHYPHEN at %1").arg(pos);
-            // double SHY means user provided SHY, single SHY is automatic one
+			// double SHY means user provided SHY, single SHY is automatic one
 			if (obj->itemText.hasFlag(pos-1, ScLayout_HyphenationPossible))
-            {
+			{
 				obj->itemText.clearFlag(pos-1, ScLayout_HyphenationPossible);
-                obj->itemText.insertChars(pos, QString(ch));
-            }
-            else
-            {
+				obj->itemText.insertChars(pos, QString(ch));
+			}
+			else
+			{
 				obj->itemText.setFlag(pos-1, ScLayout_HyphenationPossible);
-            }
+			}
 		}
 		else {
 			obj->itemText.insertChars(pos, QString(ch));
@@ -2845,12 +2854,9 @@ PageItem* Scribus134Format::pasteItem(ScribusDoc *doc, ScXmlStreamAttributes& at
 	currItem->setLocked (attrs.valueAsBool("LOCK", false));
 	currItem->setSizeLocked(attrs.valueAsBool("LOCKR", false));
 	currItem->setFillTransparency(attrs.valueAsDouble("TransValue", 0.0));
+	currItem->setLineTransparency(attrs.valueAsDouble("TransValueS", 0.0));
 	currItem->fillRule    = attrs.valueAsBool("fillRule", true);
 	currItem->doOverprint = attrs.valueAsBool("doOverprint", false);
-	if (attrs.hasAttribute("TransValueS"))
-		currItem->setLineTransparency(attrs.valueAsDouble("TransValueS", 0.0));
-	else
-		currItem->setLineTransparency(attrs.valueAsDouble("TransValue", 0.0));
 	currItem->setFillBlendmode(attrs.valueAsInt("TransBlend", 0));
 	currItem->setLineBlendmode(attrs.valueAsInt("TransBlendS", 0));
 	if (attrs.valueAsInt("TRANSPARENT", 0) == 1)
@@ -3366,7 +3372,7 @@ bool Scribus134Format::loadPage(const QString & fileName, int pageNumber, bool M
 				ta->BottomLink = 0;
 		}
 	}
-	
+
 	// reestablish textframe links
 	if (itemNext.count() != 0 && !Mpage)
 	{
@@ -3410,7 +3416,7 @@ bool Scribus134Format::loadPage(const QString & fileName, int pageNumber, bool M
 			}
 		}
 	}
-	
+
 	// reestablish first/lastAuto
 	m_Doc->FirstAuto = m_Doc->LastAuto;
 	if (m_Doc->LastAuto)

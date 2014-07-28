@@ -19,7 +19,7 @@ for which a new license (GPL+exception) is in place.
  *                                                                         *
  ***************************************************************************/
 #include <QMenuBar>
-#include "scribus.h"
+
 #include "menumanager.h"
 #include "ui/scmenu.h"
 #include "scraction.h"
@@ -86,8 +86,10 @@ QMenu *MenuManager::getLocalPopupMenu(const QString &menuName)
 
 void MenuManager::setMenuEnabled(const QString &menuName, const bool enabled)
 {
-	if (menuBarMenus.contains(menuName) && menuBarMenus.value(menuName)!=NULL)
-		menuBarMenus.value(menuName)->setEnabled(enabled);
+	return;
+	// OSX UI rules don't allow this so let's not do it elsewhere.
+	//if (menuBarMenus.contains(menuName) && menuBarMenus.value(menuName)!=NULL)
+	//	menuBarMenus.value(menuName)->setEnabled(enabled);
 }
 
 bool MenuManager::addMenuStringToMenuBar(const QString &menuName, bool rememberMenu)
@@ -181,7 +183,9 @@ void MenuManager::addMenuItemStringstoMenu(const QString &menuName, QMenu *menuT
 			{
 				//Add Menu Items
 				if (menuActions.contains(menuStrings[menuName].at(i)))
+				{
 					menuToAddTo->addAction(menuActions[menuStrings[menuName].at(i)]);
+				}
 				else
 				//Add Sub Menus
 				{
@@ -193,8 +197,8 @@ void MenuManager::addMenuItemStringstoMenu(const QString &menuName, QMenu *menuT
 							if (rememberedMenus.contains(menuStrings[menuName].at(i)))
 							{
 								rememberedMenus.insert(menuStrings[menuName].at(i), subMenu);
-								addMenuItemStringstoMenu(menuStrings[menuName].at(i), subMenu, menuActions);
 							}
+							addMenuItemStringstoMenu(menuStrings[menuName].at(i), subMenu, menuActions);
 						}
 					}
 				}
@@ -215,7 +219,9 @@ void MenuManager::clearMenuStrings(const QString &menuName)
 	if (rememberedMenus.contains(menuName))
 	{
 		if (rememberedMenus.value(menuName)!=NULL)
+		{
 			rememberedMenus.value(menuName)->clear();
+		}
 	}
 }
 

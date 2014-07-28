@@ -24,11 +24,10 @@ for which a new license (GPL+exception) is in place.
 
 #include <cstdlib>
 
-#include "ui/customfdialog.h"
 #include "importxar.h"
+
+
 #include "loadsaveplugin.h"
-#include "ui/missing.h"
-#include "ui/multiprogressdialog.h"
 #include "pageitem_imageframe.h"
 #include "pageitem_polygon.h"
 #include "pageitem_polyline.h"
@@ -37,7 +36,6 @@ for which a new license (GPL+exception) is in place.
 #include "prefsfile.h"
 #include "prefsmanager.h"
 #include "prefstable.h"
-#include "ui/propertiespalette.h"
 #include "rawimage.h"
 #include "scclocale.h"
 #include "sccolorengine.h"
@@ -45,16 +43,22 @@ for which a new license (GPL+exception) is in place.
 #include "scmimedata.h"
 #include "scpaths.h"
 #include "scpattern.h"
-#include "scribus.h"
 #include "scribusXml.h"
 #include "scribuscore.h"
+#include "scribusdoc.h"
+#include "scribusview.h"
 #include "sctextstream.h"
 #include "selection.h"
+#include "ui/customfdialog.h"
+#include "ui/missing.h"
+#include "ui/multiprogressdialog.h"
+#include "ui/propertiespalette.h"
 #include "undomanager.h"
 #include "util.h"
 #include "util_formats.h"
 #include "util_icon.h"
 #include "util_math.h"
+
 
 extern SCRIBUS_API ScribusQApp * ScQApp;
 
@@ -3650,10 +3654,10 @@ void XarPlug::popGraphicContext()
 			}
 			else
 			{
-				double minx = 999999.9;
-				double miny = 999999.9;
-				double maxx = -999999.9;
-				double maxy = -999999.9;
+				double minx =  std::numeric_limits<double>::max();
+				double miny =  std::numeric_limits<double>::max();
+				double maxx = -std::numeric_limits<double>::max();
+				double maxy = -std::numeric_limits<double>::max();
 				PageItem* groupItem = Elements.at(gg.index);
 				for (int a = gg.index+1; a < Elements.count(); ++a)
 				{
@@ -3691,7 +3695,7 @@ void XarPlug::popGraphicContext()
 				if (gg.isBrush)
 				{
 					m_Doc->DoDrawing = true;
-					QImage tmpImg = groupItem->DrawObj_toImage(qMax(groupItem->width(), groupItem->height()));
+					QImage tmpImg = groupItem->DrawObj_toImage(qMin(qMax(groupItem->width(), groupItem->height()), 500.0));
 					ScPattern pat = ScPattern();
 					pat.setDoc(m_Doc);
 					pat.width = groupItem->width();

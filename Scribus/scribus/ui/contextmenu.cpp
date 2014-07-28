@@ -13,7 +13,8 @@
 *                                                                         *
 ***************************************************************************/
 
-// #include <QDebug>
+#include "contextmenu.h"
+
 #include <QApplication>
 #include <QFrame>
 #include <QGridLayout>
@@ -22,17 +23,16 @@
 #include <QWidget>
 #include <QWidgetAction>
 
-#include "contextmenu.h"
-#include "prefsmanager.h"
+#include "appmodes.h"
+#include "canvasmode.h"
 #include "pageitem_textframe.h"
 #include "scmimedata.h"
 #include "scraction.h"
-#include "scrapbookpalette.h"
 #include "scribus.h"
 #include "scribusdoc.h"
-#include "ui/scmwmenumanager.h"
+#include "scribusview.h"
 #include "undomanager.h"
-#include "canvasmode_normal.h"
+
 
 // #include "util.h" //just for tdebug
 
@@ -100,6 +100,8 @@ void ContextMenu::createMenuItems_Selection()
 	QMenu *menuLocking = new QMenu(this);
 	QMenu *menuSendTo = new QMenu(this);
 	QMenu *menuScrapbook = new QMenu(this);
+	QMenu *menuEdit = new QMenu(this);
+	QMenu *menuImage = new QMenu(this);
 //	QMenu *menuWeld = new QMenu(this);
 
 	//<-- Add Info
@@ -107,7 +109,7 @@ void ContextMenu::createMenuItems_Selection()
 	if (selectedItemCount==1 && currItem->asImageFrame())
 	{
 		QAction *act = addMenu(menuInfo);
-		act->setText( ScribusView::tr("In&fo"));
+		act->setText( tr("In&fo"));
 		if (currItem->asImageFrame())
 		{
 			QLabel* menuLabel = new QLabel("<html>" + currItem->infoDescription() + "</html>", this);
@@ -131,12 +133,12 @@ void ContextMenu::createMenuItems_Selection()
 	
 			QLabel *printCT = new QLabel(infoGroup);
 			QLabel *printT = new QLabel(infoGroup);
-			printCT->setText( ScribusView::tr("Print: "));
+			printCT->setText( tr("Print: "));
 			infoGroupLayout->addWidget( printCT, row, 0, Qt::AlignRight );
 			if (currItem->printEnabled())
-				printT->setText( ScribusView::tr("Enabled"));
+				printT->setText( tr("Enabled"));
 			else
-				printT->setText( ScribusView::tr("Disabled"));
+				printT->setText( tr("Disabled"));
 			infoGroupLayout->addWidget( printT, row, 1 ); // </a.l.e>
 					
 			QWidgetAction* MenAct = new QWidgetAction(this);
@@ -146,20 +148,57 @@ void ContextMenu::createMenuItems_Selection()
 	// Qt4				menuInfo->insertItem(infoGroup);
 //			currItem->createContextMenu(menuInfo, 5);
 			QAction *act = addMenu(menuInfo);
-			act->setText( ScribusView::tr("In&fo"));
-		} else	{
+			act->setText( tr("In&fo"));
+		}
+		else
+		{
 			delete infoGroupLayout;
 			delete infoGroup;
 		}
 	}
 	//-->
 
-	//<-- Add undo
-	UndoManager * const undoManager(UndoManager::instance());
-	if (undoManager->hasUndoActions())
-		addAction(m_ScMW->scrActions["editUndoAction"]);
-	if (undoManager->hasRedoActions())
-		addAction(m_ScMW->scrActions["editRedoAction"]);
+	//<-- Add Contents Actions
+	if (m_actionList.contains("fileImportText"))
+	{
+		addSeparator();
+		menuEditContents->addAction(m_ScMW->scrActions["fileImportText"]);
+		menuEditContents->addAction(m_ScMW->scrActions["fileImportAppendText"]);
+		menuEditContents->addAction(m_ScMW->scrActions["toolsEditWithStoryEditor"]);
+		menuEditContents->addAction(m_ScMW->scrActions["insertSampleText"]);
+		menuEditContents->addSeparator();
+	}
+	else //enable this for, eg, text on a path
+		if (m_actionList.contains("toolsEditWithStoryEditor"))
+		{
+			addSeparator();
+			menuEditContents->addAction(m_ScMW->scrActions["toolsEditWithStoryEditor"]);
+		}
+	if (m_actionList.contains("fileImportImage"))
+		menuEditContents->addAction(m_ScMW->scrActions["fileImportImage"]);
+	if (selectedItemCount==1 && currItem->asImageFrame())
+	{
+		if (QApplication::clipboard()->mimeData()->hasImage())
+			menuEditContents->addAction(m_ScMW->scrActions["editPasteImageFromClipboard"]);
+	}
+	if (itemsAreSameType)
+	{
+		if (m_actionList.contains("editCopyContents"))
+			menuEditContents->addAction(m_ScMW->scrActions["editCopyContents"]);
+		if (m_actionList.contains("editPasteContents"))
+			menuEditContents->addAction(m_ScMW->scrActions["editPasteContents"]);
+		if (currItem->asImageFrame() && m_actionList.contains("editPasteContentsAbs"))
+			menuEditContents->addAction(m_ScMW->scrActions["editPasteContentsAbs"]);
+	}
+	if (m_actionList.contains("editClearContents"))
+		menuEditContents->addAction(m_ScMW->scrActions["editClearContents"]);
+	if (m_actionList.contains("editTruncateContents"))
+		menuEditContents->addAction(m_ScMW->scrActions["editTruncateContents"]);
+	if (menuEditContents->actions().count()>0)
+	{
+		QAction *act = addMenu(menuEditContents);
+		act->setText( tr("Contents"));
+	}
 	//-->
 
 	//<-- Item specific actions
@@ -168,14 +207,24 @@ void ContextMenu::createMenuItems_Selection()
 		if (m_actionList.contains("editEditRenderSource"))
 		{
 			addSeparator();
+#ifdef HAVE_OSG
+			if (currItem->isOSGFrame())
+			{
+				QAction *act = addAction( tr("Edit 3D Annotation..."));
+				connect(act, SIGNAL(triggered()), m_ScMW, SLOT(callImageEditor()));
+			}
+			else
+				addAction(m_ScMW->scrActions["editEditRenderSource"]);
+#else
 			addAction(m_ScMW->scrActions["editEditRenderSource"]);
+#endif
 		}
 		if (m_doc->appMode == modeEdit)
 		{
 			//add actions for marks in edit mode
 			addSeparator();
 			QAction *act2 = addMenu(menuMark);
-			act2->setText( ScribusView::tr("Insert Mark"));
+			act2->setText( tr("Insert Mark"));
 			menuMark->addAction(m_ScMW->scrActions["insertMarkVariableText"]);
 			if (m_actionList.contains("insertMarkAnchor"))
 			{
@@ -197,32 +246,14 @@ void ContextMenu::createMenuItems_Selection()
 			addSeparator();
 			addAction(m_ScMW->scrActions["itemUpdateMarks"]);
 		}
-		if (m_actionList.contains("fileImportText"))
-		{
-			addSeparator();
-			addAction(m_ScMW->scrActions["fileImportText"]);
-			addAction(m_ScMW->scrActions["fileImportAppendText"]);
-			addAction(m_ScMW->scrActions["toolsEditWithStoryEditor"]);
-			addAction(m_ScMW->scrActions["insertSampleText"]);
-		}
-		else //enable this for, eg, text on a path
-			if (m_actionList.contains("toolsEditWithStoryEditor"))
-			{
-				addSeparator();
-				addAction(m_ScMW->scrActions["toolsEditWithStoryEditor"]);
-			}
+
+
+
+
+
 		addSeparator();
-		if (m_actionList.contains("fileImportImage"))
-			addAction(m_ScMW->scrActions["fileImportImage"]);
-		if (selectedItemCount==1 && currItem->asImageFrame())
-		{
-			if (QApplication::clipboard()->mimeData()->hasImage())
-				addAction(m_ScMW->scrActions["editPasteImageFromClipboard"]);
-		}
-		if (m_actionList.contains("itemAdjustFrameToImage"))
-			addAction(m_ScMW->scrActions["itemAdjustFrameToImage"]);
-		if (m_actionList.contains("itemAdjustImageToFrame"))
-			addAction(m_ScMW->scrActions["itemAdjustImageToFrame"]);
+
+
 
 		if (m_actionList.contains("tableInsertRows"))
 			addAction(m_ScMW->scrActions["tableInsertRows"]);
@@ -250,17 +281,7 @@ void ContextMenu::createMenuItems_Selection()
 			addAction(m_ScMW->scrActions["tableAdjustTableToFrame"]);
 		if (m_actionList.contains("itemAdjustFrameHeightToText"))
 			addAction(m_ScMW->scrActions["itemAdjustFrameHeightToText"]);
-		if (m_actionList.contains("itemExtendedImageProperties"))
-			addAction(m_ScMW->scrActions["itemExtendedImageProperties"]);
-		if (m_actionList.contains("itemAdjustFrameToImage"))
-		{
-			if (currItem->PictureIsAvailable)
-				addAction(m_ScMW->scrActions["itemToggleInlineImage"]);
-		}
-		if (m_actionList.contains("itemImageInfo"))
-			addAction(m_ScMW->scrActions["itemImageInfo"]);
-		if (m_actionList.contains("itemUpdateImage"))
-			addAction(m_ScMW->scrActions["itemUpdateImage"]);
+
 		
 		if (m_actionList.contains("itemPreviewLow"))
 		{
@@ -281,13 +302,28 @@ void ContextMenu::createMenuItems_Selection()
 		}
 		
 		if (m_actionList.contains("styleImageEffects"))
-			addAction(m_ScMW->scrActions["styleImageEffects"]);
+			menuImage->addAction(m_ScMW->scrActions["styleImageEffects"]);
 		if (m_actionList.contains("editEditWithImageEditor"))
-			addAction(m_ScMW->scrActions["editEditWithImageEditor"]);
+			menuImage->addAction(m_ScMW->scrActions["editEditWithImageEditor"]);
 		if (selectedItemCount==1 && currItem->asImageFrame())
 		{
 			if (currItem->PictureIsAvailable)
 			{
+				if (m_actionList.contains("itemExtendedImageProperties"))
+					menuImage->addAction(m_ScMW->scrActions["itemExtendedImageProperties"]);
+				if (m_actionList.contains("itemAdjustFrameToImage"))
+				{
+					if (currItem->PictureIsAvailable)
+						menuImage->addAction(m_ScMW->scrActions["itemToggleInlineImage"]);
+				}
+				if (m_actionList.contains("itemImageInfo"))
+					menuImage->addAction(m_ScMW->scrActions["itemImageInfo"]);
+				if (m_actionList.contains("itemUpdateImage"))
+					menuImage->addAction(m_ScMW->scrActions["itemUpdateImage"]);
+				if (m_actionList.contains("itemAdjustFrameToImage"))
+					menuImage->addAction(m_ScMW->scrActions["itemAdjustFrameToImage"]);
+				if (m_actionList.contains("itemAdjustImageToFrame"))
+					menuImage->addAction(m_ScMW->scrActions["itemAdjustImageToFrame"]);
 				m_ScMW->scrActions["itemAdjustFrameToImage"]->setEnabled(true);
 				m_ScMW->scrActions["itemAdjustImageToFrame"]->setEnabled(true);
 				if (currItem->pixm.imgInfo.valid)
@@ -300,6 +336,13 @@ void ContextMenu::createMenuItems_Selection()
 					m_ScMW->scrActions["styleImageEffects"]->setEnabled(true);
 					m_ScMW->scrActions["editEditWithImageEditor"]->setEnabled(true);
 				}
+
+
+				if (menuImage->actions().count()>0)
+				{
+					QAction *act = addMenu(menuImage);
+					act->setText( tr("Image"));
+				}
 			}
 		}
 		
@@ -311,48 +354,26 @@ void ContextMenu::createMenuItems_Selection()
 	}
 	//-->
 
-	//<-- Item Attributes
-	if (selectedItemCount == 1)
-	{
-		addSeparator();
-		addAction(m_ScMW->scrActions["itemAttributes"]);
-	}
-	//-->
 
-	//<-- Item PDF Options
-	if (currItem->itemType() == PageItem::TextFrame)
-	{
-		QAction *act = addMenu(menuPDF);
-		act->setText( ScribusView::tr("&PDF Options"));
-		menuPDF->addAction(m_ScMW->scrActions["itemPDFIsAnnotation"]);
-		if (!m_doc->masterPageMode())
-			menuPDF->addAction(m_ScMW->scrActions["itemPDFIsBookmark"]);
-		if (selectedItemCount == 1)
-		{
-			menuPDF->addSeparator();
-			if (m_actionList.contains("itemPDFAnnotationProps"))
-				menuPDF->addAction(m_ScMW->scrActions["itemPDFAnnotationProps"]);
-			if (m_actionList.contains("itemPDFFieldProps"))
-				menuPDF->addAction(m_ScMW->scrActions["itemPDFFieldProps"]);
-		}
-	}
-	//-->
 
-	//<-- Item Locking
+
 	addSeparator();
-	//-->
+
 	
 	if (selectedItemCount>0)
 	{
+		//<-- Item Locking
 		menuLocking->addAction(m_ScMW->scrActions["itemLock"]);
 		menuLocking->addAction(m_ScMW->scrActions["itemLockSize"]);
 		QAction *actL = addMenu(menuLocking);
-		actL->setText( ScribusView::tr("Locking"));
+		actL->setText( tr("Locking"));
+		//-->
 
+		//<-- Send To
 		QAction *actST = addMenu(menuSendTo);
-		actST->setText( ScribusView::tr("Send to"));
+		actST->setText( tr("Send to"));
 		QAction *actScr = menuSendTo->addMenu(menuScrapbook);
-		actScr->setText( ScribusView::tr("Scrapbook"));
+		actScr->setText( tr("Scrapbook"));
 		menuSendTo->addAction(m_ScMW->scrActions["itemSendToPattern"]);
 		menuSendTo->addAction(m_ScMW->scrActions["itemSendToInline"]);
 
@@ -383,10 +404,12 @@ void ContextMenu::createMenuItems_Selection()
 				menuLayer->addAction(m_ScMW->scrLayersActions[QString::number(layerMap[i--])]);
 			}
 			QAction *act = addMenu(menuLayer);
-			act->setText( ScribusView::tr("Send to La&yer"));
+			act->setText( tr("Send to La&yer"));
 		}
 		//-->
 	}
+
+
 	//<-- Add Groups Items
 	if (selectedItemCount > 1)
 	{
@@ -403,7 +426,7 @@ void ContextMenu::createMenuItems_Selection()
 	}
 	//-->
 
-	//<-- Add Level Item
+	//<-- Add Level Items
 	if (!currItem->locked())
 	{
 		menuLevel->addAction(m_ScMW->scrActions["itemRaise"]);
@@ -413,7 +436,7 @@ void ContextMenu::createMenuItems_Selection()
 		if (menuLevel->actions().count()>0)
 		{
 			QAction *act = addMenu(menuLevel);
-			act->setText( ScribusView::tr("Le&vel"));
+			act->setText( tr("Le&vel"));
 		}
 	}
 	//-->
@@ -436,40 +459,57 @@ void ContextMenu::createMenuItems_Selection()
 		if (menuConvertTo->actions().count()>0)
 		{
 			QAction *act = addMenu(menuConvertTo);
-			act->setText( ScribusView::tr("Conve&rt to"));
+			act->setText( tr("Conve&rt to"));
 		}
 	}
 	//-->
-	
-	//<-- Add Copy/Paste Actions
-	addSeparator();
-	if (!currItem->locked() && !(currItem->isSingleSel))
-		addAction(m_ScMW->scrActions["editCut"]);
-	if (!(currItem->isSingleSel))
-		addAction(m_ScMW->scrActions["editCopy"]);
-	if ((m_doc->appMode == modeEdit) && (ScMimeData::clipboardHasScribusText()||ScMimeData::clipboardHasPlainText()) && (currItem->itemType() == PageItem::TextFrame))
-		addAction(m_ScMW->scrActions["editPaste"]);
-	if (!currItem->locked() && (m_doc->appMode != modeEdit) && (!(currItem->isSingleSel)))
-		addAction(m_ScMW->scrActions["itemDelete"]);
+	//<-- Item Attributes
+	if (selectedItemCount == 1)
+	{
+		addSeparator();
+		addAction(m_ScMW->scrActions["itemAttributes"]);
+	}
 	//-->
-	
-	//<-- Add Contents Actions
-	if (itemsAreSameType)
+
+	//<-- Item PDF Options
+	if (currItem->itemType() == PageItem::TextFrame)
 	{
-		if (m_actionList.contains("editCopyContents"))
-			menuEditContents->addAction(m_ScMW->scrActions["editCopyContents"]);
-		if (m_actionList.contains("editPasteContents"))
-			menuEditContents->addAction(m_ScMW->scrActions["editPasteContents"]);
-		if (currItem->asImageFrame() && m_actionList.contains("editPasteContentsAbs"))
-			menuEditContents->addAction(m_ScMW->scrActions["editPasteContentsAbs"]);
+		QAction *act = addMenu(menuPDF);
+		act->setText( tr("&PDF Options"));
+		menuPDF->addAction(m_ScMW->scrActions["itemPDFIsAnnotation"]);
+		if (!m_doc->masterPageMode())
+			menuPDF->addAction(m_ScMW->scrActions["itemPDFIsBookmark"]);
+		if (selectedItemCount == 1)
+		{
+			menuPDF->addSeparator();
+			if (m_actionList.contains("itemPDFAnnotationProps"))
+				menuPDF->addAction(m_ScMW->scrActions["itemPDFAnnotationProps"]);
+			if (m_actionList.contains("itemPDFFieldProps"))
+				menuPDF->addAction(m_ScMW->scrActions["itemPDFFieldProps"]);
+		}
 	}
-	if (m_actionList.contains("editClearContents"))
-		menuEditContents->addAction(m_ScMW->scrActions["editClearContents"]);
-	if (menuEditContents->actions().count()>0)
-	{
-		QAction *act = addMenu(menuEditContents);
-		act->setText( ScribusView::tr("Contents"));
-	}
+	//-->
+	//<<-- Edit Menu
+	addSeparator();
+	//<-- Add Copy/Paste Actions
+	if (!currItem->locked() && !(currItem->isSingleSel))
+		menuEdit->addAction(m_ScMW->scrActions["editCut"]);
+	if (!(currItem->isSingleSel))
+		menuEdit->addAction(m_ScMW->scrActions["editCopy"]);
+	if (((m_doc->appMode == modeEdit && currItem->itemType() == PageItem::TextFrame) || (m_doc->appMode == modeEditTable && currItem->itemType() == PageItem::Table)) && (ScMimeData::clipboardHasScribusText()||ScMimeData::clipboardHasPlainText()) )
+		menuEdit->addAction(m_ScMW->scrActions["editPaste"]);
+	if (!currItem->locked() && (m_doc->appMode != modeEdit)  && (m_doc->appMode != modeEditTable) && (!(currItem->isSingleSel)))
+		menuEdit->addAction(m_ScMW->scrActions["itemDelete"]);
+	//-->
+	//<-- Add undo
+	UndoManager * const undoManager(UndoManager::instance());
+	if (undoManager->hasUndoActions())
+		menuEdit->addAction(m_ScMW->scrActions["editUndoAction"]);
+	if (undoManager->hasRedoActions())
+		menuEdit->addAction(m_ScMW->scrActions["editRedoAction"]);
+	QAction *actEdit = addMenu(menuEdit);
+	actEdit->setText( tr("Edit"));
+	//-->
 	//-->
 	
 	//<-- Add Welding Menu
@@ -495,7 +535,7 @@ void ContextMenu::createMenuItems_Selection()
 //		menuWeld->addAction(m_AP->scrActions["itemWeld13"]);
 //		menuWeld->addAction(m_AP->scrActions["itemWeld31"]);
 //		QAction *act = addMenu(menuWeld);
-//		act->setText( ScribusView::tr("Weld to last..."));
+//		act->setText( tr("Weld to last..."));
 //	}
 	//-->
 	
@@ -516,7 +556,7 @@ void ContextMenu::createMenuItems_NoSelection(double mx, double my)
 	{
 		m_doc->view()->dragX = mx;
 		m_doc->view()->dragY = my;
-		addAction( ScribusView::tr("&Paste Here") , m_doc->view(), SLOT(PasteToPage()));
+		addAction( tr("&Paste Here") , m_doc->view(), SLOT(PasteToPage()));
 	}
 	if (m_ScMW->scrRecentPasteActions.count()>0)
 	{
@@ -524,7 +564,7 @@ void ContextMenu::createMenuItems_NoSelection(double mx, double my)
 		m_doc->view()->dragY = my;
 		QMenu* menuPasteRecent = new QMenu(this);
 		QAction *act = addMenu(menuPasteRecent);
-		act->setText( ScribusView::tr("Paste Recent"));
+		act->setText( tr("Paste Recent"));
 		
 		QMap<QString, QPointer<ScrAction> > scrRecentPasteActions;
 		ScrAction *recentPasteAction;

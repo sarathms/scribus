@@ -30,25 +30,28 @@
 #include <QWidgetAction>
 #include <QDebug>
 
+#include "appmodes.h"
 #include "canvas.h"
-#include "ui/contextmenu.h"
 #include "fpoint.h"
 #include "fpointarray.h"
 #include "pageitem_textframe.h"
-#include "ui/pageselector.h"
 #include "prefscontext.h"
 #include "prefsfile.h"
 #include "prefsmanager.h"
-#include "ui/propertiespalette.h"
 #include "scribus.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
+#include "ui/contextmenu.h"
+#include "ui/pageselector.h"
+#include "ui/propertiespalette.h"
 #include "undomanager.h"
 #include "units.h"
 #include "util.h"
 #include "util_icon.h"
 #include "util_math.h"
+
+
 
 CanvasMode_FrameLinks::CanvasMode_FrameLinks(ScribusView* view) : CanvasMode(view), m_ScMW(view->m_ScMW) 
 {
@@ -186,7 +189,7 @@ void CanvasMode_FrameLinks::mousePressEvent(QMouseEvent *m)
 					if (bb->prevInChain() != NULL)
 					{
 						QMessageBox msgBox(QMessageBox::Question, tr("Linking Text Frames"),
-										   "<qt>" + ScribusView::tr("Do you want to insert the frame into the selected text chain? If so, where would you like to insert it?") + "<qt>");
+										   "<qt>" + ScribusView::tr("You are trying to insert a frame into an existing text chain, where would you like to insert it?") + "<qt>");
 						//QMessageBox msgBox;
 						QPushButton *cancelButton = msgBox.addButton(CommonStrings::tr_Cancel, QMessageBox::RejectRole);
 						QPushButton *beforeButton = msgBox.addButton(tr("Before"), QMessageBox::AcceptRole);
@@ -196,6 +199,8 @@ void CanvasMode_FrameLinks::mousePressEvent(QMouseEvent *m)
 							break;
 						if ((QPushButton *) msgBox.clickedButton() == beforeButton)
 						{
+							if (currItem->prevInChain())
+								currItem->prevInChain()->unlink();
 							PageItem *prev = bb->prevInChain();
 							prev->unlink();
 							prev->link(currItem);
@@ -204,6 +209,8 @@ void CanvasMode_FrameLinks::mousePressEvent(QMouseEvent *m)
 						{
 							if (bb->nextInChain() != NULL)
 							{
+								if (currItem->prevInChain())
+									currItem->prevInChain()->unlink();
 								PageItem *next = bb->nextInChain();
 								bb->unlink();
 								bb->link(currItem);
@@ -217,6 +224,8 @@ void CanvasMode_FrameLinks::mousePressEvent(QMouseEvent *m)
 							}
 						}
 					}
+					if (bb->prevInChain())
+						bb->prevInChain()->unlink();
 					currItem->link(bb);
 					int cid = m_doc->Items->indexOf(currItem);
 					int bid = m_doc->Items->indexOf(bb);
@@ -303,8 +312,8 @@ void CanvasMode_FrameLinks::mouseReleaseEvent(QMouseEvent *m)
 	for (int i = 0; i < m_doc->m_Selection->count(); ++i)
 		m_doc->m_Selection->itemAt(i)->checkChanges(true);
 	//Make sure the Zoom spinbox and page selector dont have focus if we click on the canvas
-	m_view->zoomSpinBox->clearFocus();
-	m_view->pageSelector->clearFocus();
+	m_view->m_ScMW->zoomSpinBox->clearFocus();
+	m_view->m_ScMW->pageSelector->clearFocus();
 }
 
 void CanvasMode_FrameLinks::selectPage(QMouseEvent *m)
@@ -325,7 +334,7 @@ void CanvasMode_FrameLinks::selectPage(QMouseEvent *m)
 			if (docCurrPageNo != j)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(j));
-				m_view->setMenTxt(j);
+				m_view->m_ScMW->slotSetCurrentPage(j);
 				m_view->DrawNew();
 			}
 		}
@@ -390,7 +399,7 @@ bool CanvasMode_FrameLinks::SeleItem(QMouseEvent *m)
 			if (m_doc->currentPageNumber() != pgNum)
 			{
 				m_doc->setCurrentPage(m_doc->Pages->at(unsigned(pgNum)));
-				m_view->setMenTxt(unsigned(pgNum));
+				m_view->m_ScMW->slotSetCurrentPage(unsigned(pgNum));
 				m_view->DrawNew();
 			}
 		}

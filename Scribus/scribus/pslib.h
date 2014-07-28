@@ -122,6 +122,7 @@ class SCRIBUS_API PSLib : public QObject
 		virtual void ProcessPage(ScribusDoc* Doc, ScPage* a, uint PNr, bool sep = false, bool farb = true, bool ic = false, bool gcr = true);
 		virtual bool ProcessMasterPageLayer(ScribusDoc* Doc, ScPage* a, ScLayer& ll, uint PNr, bool sep = false, bool farb = true, bool ic = false, bool gcr = true);
 		virtual bool ProcessPageLayer(ScribusDoc* Doc, ScPage* a, ScLayer& ll, uint PNr, bool sep = false, bool farb = true, bool ic = false, bool gcr = true);
+		virtual void PS_HatchFill(PageItem *currItem, bool gcr);
 		virtual void drawArrow(PageItem *ite, QTransform &arrowTrans, int arrowIndex, bool gcr);
 		virtual void putColor(const QString& color, double shade, bool fill);
 		virtual void putColorNoDraw(const QString& color, double shade, bool gcr);
@@ -139,7 +140,7 @@ class SCRIBUS_API PSLib : public QObject
 		virtual void SetColor(const QString& color, double shade, int *h, int *s, int *v, int *k, bool gcr);
 		virtual void SetColor(const ScColor& color, double shade, int *h, int *s, int *v, int *k, bool gcr);
 		virtual void setTextSt(ScribusDoc* Doc, PageItem* ite, bool gcr, uint a, ScPage* pg, bool sep, bool farb, bool ic, bool master);
-		virtual void setTextCh(ScribusDoc* Doc, PageItem* ite, double x, double y, bool gcr, uint a, uint d, ScText *hl, const ParagraphStyle& pstyle, ScPage* pg, bool sep, bool farb, bool ic, bool master);
+		virtual void setTextCh(ScribusDoc* Doc, PageItem* ite, double x, double y, bool gcr, uint a, uint d, QChar chstr, const GlyphLayout* glyphs, const CharStyle& cstyle, const ParagraphStyle& pstyle, ScPage* pg, bool sep, bool farb, bool ic, bool master);
 		bool psExport;
 
 	private:

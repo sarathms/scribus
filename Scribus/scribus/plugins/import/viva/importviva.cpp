@@ -30,9 +30,12 @@ for which a new license (GPL+exception) is in place.
 #include <climits>
 #include <limits>
 
-#include "commonstrings.h"
 
 #include "importviva.h"
+
+
+
+#include "commonstrings.h"
 #include "loadsaveplugin.h"
 #include "pageitem_table.h"
 #include "pagesize.h"
@@ -46,21 +49,21 @@ for which a new license (GPL+exception) is in place.
 #include "scconfig.h"
 #include "scmimedata.h"
 #include "scpaths.h"
-#include "scribus.h"
 #include "scribusXml.h"
 #include "scribuscore.h"
+#include "scribusdoc.h"
+#include "scribusview.h"
 #include "sctextstream.h"
 #include "selection.h"
+#include "ui/customfdialog.h"
+#include "ui/missing.h"
+#include "ui/multiprogressdialog.h"
+#include "ui/propertiespalette.h"
 #include "undomanager.h"
 #include "util.h"
 #include "util_formats.h"
 #include "util_icon.h"
 #include "util_math.h"
-
-#include "ui/customfdialog.h"
-#include "ui/missing.h"
-#include "ui/multiprogressdialog.h"
-#include "ui/propertiespalette.h"
 
 extern SCRIBUS_API ScribusQApp * ScQApp;
 
@@ -439,6 +442,7 @@ void VivaPlug::parseSettingsXML(const QDomElement& grNode)
 		double pgGap = m_Doc->PageSpa;
 		papersize = "Custom";
 		QString paperOrien = "portrait";
+		bool hasPageSize = false;
 		for (QDomNode n = grNode.firstChild(); !n.isNull(); n = n.nextSibling() )
 		{
 			QDomElement e = n.toElement();
@@ -460,17 +464,35 @@ void VivaPlug::parseSettingsXML(const QDomElement& grNode)
 				papersize = e.text();
 			else if (e.tagName() == "vd:pageOrientation")
 				paperOrien = e.text();
+			else if (e.tagName() == "vd:pageSize")
+			{
+				docWidth = parseUnit(e.attribute("vd:width", "0"));
+				docHeight = parseUnit(e.attribute("vd:height", "0"));
+				hasPageSize = true;
+			}
 		}
 		PageSize ps(papersize);
-		if (paperOrien.startsWith("portrait"))
+		if (hasPageSize)
 		{
-			docWidth = ps.width();
-			docHeight = ps.height();
+			if (!paperOrien.startsWith("portrait"))
+			{
+				double tmp = docWidth;
+				docWidth = docHeight;
+				docHeight = tmp;
+			}
 		}
 		else
 		{
-			docHeight = ps.width();
-			docWidth = ps.height();
+			if (paperOrien.startsWith("portrait"))
+			{
+				docWidth = ps.width();
+				docHeight = ps.height();
+			}
+			else
+			{
+				docHeight = ps.width();
+				docWidth = ps.height();
+			}
 		}
 		m_Doc->setPage(docWidth, docHeight, topMargin, leftMargin, rightMargin, bottomMargin, pgCols, pgGap, false, facingPages);
 		m_Doc->setPageSize(papersize);
@@ -876,7 +898,11 @@ PageItem* VivaPlug::parseObjectXML(const QDomElement& obNode)
 			{
 				QDomElement eog = obg.toElement();
 				if (eog.tagName() == "vo:object")
-					GElements.append(parseObjectXML(eog));
+				{
+					PageItem *gItem = parseObjectXML(eog);
+					if (gItem != NULL)
+						GElements.append(gItem);
+				}
 				else if (eog.tagName() == "vo:transformation")
 				{
 					for(QDomNode spo = eog.firstChild(); !spo.isNull(); spo = spo.nextSibling() )
@@ -895,6 +921,7 @@ PageItem* VivaPlug::parseObjectXML(const QDomElement& obNode)
 				double miny =  std::numeric_limits<double>::max();
 				double maxx = -std::numeric_limits<double>::max();
 				double maxy = -std::numeric_limits<double>::max();
+				bool groupClip = true;
 				for (int ep = 0; ep < GElements.count(); ++ep)
 				{
 					PageItem* currItem = GElements.at(ep);
@@ -904,6 +931,8 @@ PageItem* VivaPlug::parseObjectXML(const QDomElement& obNode)
 					miny = qMin(miny, y1);
 					maxx = qMax(maxx, x2);
 					maxy = qMax(maxy, y2);
+					if (currItem->hasSoftShadow())
+						groupClip = false;
 				}
 				double gx = minx;
 				double gy = miny;
@@ -920,6 +949,7 @@ PageItem* VivaPlug::parseObjectXML(const QDomElement& obNode)
 					retObj->OldH2 = retObj->height();
 					retObj->updateClip();
 					m_Doc->groupObjectsToItem(retObj, GElements);
+					retObj->setGroupClipping(groupClip);
 					retObj->moveBy(ob_xpos, ob_ypos, true);
 					m_Doc->AdjustItemSize(retObj);
 					retObj->OwnPage = m_Doc->OnPage(retObj);
@@ -969,7 +999,7 @@ PageItem* VivaPlug::parseObjectDetailsXML(const QDomElement& obNode, int baseTyp
 	int ob_type = 0;
 	bool printable = false;
 	bool locked = false;
-	bool resizeable = false;
+	bool resizable = false;
 	FPointArray Path;
 	Path.resize(0);
 	QString imageFile = "";
@@ -986,6 +1016,13 @@ PageItem* VivaPlug::parseObjectDetailsXML(const QDomElement& obNode, int baseTyp
 	double textMarginBottom = 0.0;
 	double textColumnGap = 0.0;
 	int textColumnCount = 1;
+	bool hasShadow = false;
+	double shadowX = 0.0;
+	double shadowY = 0.0;
+	double shadowBlur = 0.0;
+	double shadowOpacity = 0.0;
+	int shadowTint = 100;
+	QString shadowColor = "Black";
 	StoryText itemText;
 	itemText.clear();
 	PageItem::TextFlowMode textFlow = PageItem::TextFlowDisabled;
@@ -1227,6 +1264,42 @@ PageItem* VivaPlug::parseObjectDetailsXML(const QDomElement& obNode, int baseTyp
 				}
 				else if (eog.tagName() == "vo:shadow")
 				{
+					hasShadow = true;
+					double shadowAngle = 0;
+					double shadowOffset = 0;
+					for(QDomElement spo = eog.firstChildElement(); !spo.isNull(); spo = spo.nextSiblingElement() )
+					{
+						if (spo.tagName() == "uni:color")
+							shadowColor = colorTranslate[spo.text()];
+						else if (spo.tagName() == "uni:opacity")
+						{
+							if (spo.text() == "transparent")
+								shadowOpacity = 1;
+							else if (spo.text() == "opaque")
+								shadowOpacity = 0;
+							else
+								shadowOpacity = 1.0 - (spo.text().toDouble() / 100.0);
+						}
+						else if (spo.tagName() == "uni:density")
+						{
+							if (spo.text() == "transparent")
+								shadowTint = 0;
+							else if (spo.text() == "opaque")
+								shadowTint = 100;
+							else
+								shadowTint = spo.text().toInt();
+						}
+						else if (spo.tagName() == "uni:angle")
+							shadowAngle = spo.text().toDouble();
+						else if (spo.tagName() == "uni:offset")
+							shadowOffset = parseUnit(spo.text());
+						else if (spo.tagName() == "uni:softValue")
+							shadowBlur = parseUnit(spo.text());
+					}
+					QLineF oLine = QLineF(0, 0, shadowOffset, 0);
+					oLine.setAngle(shadowAngle - 180.0);
+					shadowX = oLine.p2().x();
+					shadowY = oLine.p2().y();
 				}
 			}
 		}
@@ -1240,7 +1313,7 @@ PageItem* VivaPlug::parseObjectDetailsXML(const QDomElement& obNode, int baseTyp
 				else if (eog.tagName() == "vo:protected")
 					locked = eog.text() == "true";
 				else if (eog.tagName() == "vo:fixed")
-					resizeable = eog.text() == "true";
+					resizable = eog.text() == "true";
 			}
 		}
 		else if (obe.tagName() == "vo:runaround")
@@ -1467,7 +1540,7 @@ PageItem* VivaPlug::parseObjectDetailsXML(const QDomElement& obNode, int baseTyp
 					meshGradientPatch patch;
 					patch.BL = cP;
 					patch.BR = cP;
-					if (item->PoLine.point(poi).x() > 900000)
+					if (item->PoLine.isMarker(poi))
 						continue;
 					meshPoint tL;
 					tL.resetTo(item->PoLine.point(poi));
@@ -1547,6 +1620,17 @@ PageItem* VivaPlug::parseObjectDetailsXML(const QDomElement& obNode, int baseTyp
 		item->updateClip();
 		item->OwnPage = m_Doc->OnPage(item);
 		item->ContourLine = item->PoLine.copy();
+		if (hasShadow)
+		{
+			item->setHasSoftShadow(true);
+			item->setSoftShadowColor(shadowColor);
+			item->setSoftShadowXOffset(shadowX);
+			item->setSoftShadowYOffset(shadowY);
+			item->setSoftShadowBlurRadius(shadowBlur);
+			item->setSoftShadowShade(shadowTint);
+			item->setSoftShadowOpacity(shadowOpacity);
+			item->setSoftShadowBlendMode(0);
+		}
 		if (baseType == 1)
 		{
 			item->AspectRatio = true;
@@ -1585,9 +1669,10 @@ PageItem* VivaPlug::parseObjectDetailsXML(const QDomElement& obNode, int baseTyp
 			item->setColumnGap(textColumnGap);
 			if (itemText.length() > 0)
 				item->itemText.append(itemText);
+			item->itemText.trim();
 		}
 		item->setLocked(locked);
-		item->setSizeLocked(resizeable);
+		item->setSizeLocked(resizable);
 		item->setPrintEnabled(printable);
 		retObj = m_Doc->Items->takeAt(z);
 	}
@@ -2100,7 +2185,7 @@ void VivaPlug::applyCharacterAttrs(CharStyle &tmpCStyle, ParagraphStyle &newStyl
 {
 	if (pAttrs.fontSize.valid)
 	{
-		tmpCStyle.setFontSize(pAttrs.fontSize.value.toInt() * 10);
+		tmpCStyle.setFontSize(pAttrs.fontSize.value.toDouble() * 10);
 		if (pAttrs.lineSpacing.valid)
 		{
 			if (pAttrs.fontSize.value.toInt() > parseUnit(pAttrs.lineSpacing.value))

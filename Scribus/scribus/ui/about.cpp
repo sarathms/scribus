@@ -20,19 +20,22 @@ for which a new license (GPL+exception) is in place.
 #include <QPushButton>
 #include <QShowEvent>
 #include <QString>
+#include <QStringList>
 #include <QTabWidget>
 #include <QTextStream>
 #include <QToolTip>
 #include <QWidget>
+
+#include <cairo.h>
 
 #include "about.h"
 #include "commonstrings.h"
 #include "scconfig.h"
 #include "scpaths.h"
 #include "sctextbrowser.h"
-
-#include <cairo.h>
-
+#ifdef HAVE_SVNVERSION
+	#include "svnversion.h"
+#endif
 #include "util_ghostscript.h"
 #include "util_icon.h"
 #include "upgradechecker.h"
@@ -112,8 +115,8 @@ About::About( QWidget* parent, AboutMode diaMode ) : QDialog( parent )
 	buildID = new QLabel( tab );
 	buildID->setAlignment(Qt::AlignCenter);
 	buildID->setTextInteractionFlags(Qt::TextSelectableByMouse);
-	QString BUILD_DAY = "14";
-	QString BUILD_MONTH = CommonStrings::january;
+	QString BUILD_DAY = "15";
+	QString BUILD_MONTH = CommonStrings::june;
 	QString BUILD_YEAR = "2014";
 	QString BUILD_TIME = "";
 	QString BUILD_TZ = "";
@@ -130,6 +133,14 @@ About::About( QWidget* parent, AboutMode diaMode ) : QDialog( parent )
 	if (BUILD_NAME == "BleedingEdge")
 		built = tr("%3-%2-%1 %4 %5").arg(BUILD_DAY).arg(BUILD_MONTH).arg(BUILD_YEAR).arg(BUILD_TIME).arg(BUILD_TZ);
 
+#ifdef HAVE_SVNVERSION
+	#ifdef SVNVERSION
+		QString revText;
+		revText=QString("SVN Revision: %1").arg(SVNVERSION);
+		built+=" - ";
+		built+=revText;
+	#endif
+#endif
 	QString bu;
 	bu += "C";
 	bu += "-";
@@ -472,6 +483,13 @@ QString About::parseTranslationFile(QString fileName)
 		bool startText = false;
 		bool startTitle = false;
 		result = "<table>";
+
+		QMap<QString, QString> sections;
+		QMap<QString, QString> languages;
+		QMultiMap<QString, QString> names;
+		QString currLang;
+		int section=0;
+		QString snum;
 		while (!inTS.atEnd())
 		{
 			lineTS = inTS.readLine();
@@ -483,7 +501,11 @@ QString About::parseTranslationFile(QString fileName)
 			{
 				if  (isSectionTitle)
 				{
-					result += "<tr><td><b><i>"+About::trTranslationTitle(lineTS)+"</i></b></td><td></td></tr>";
+					++section;
+					snum.setNum(section);
+					//result += "<tr><td><b><i>"+About::trTranslationTitle(lineTS)+"</i></b></td><td></td></tr>";
+
+					sections.insert(snum, "<tr><td><b><i>"+About::trTranslationTitle(lineTS)+"</i></b></td><td></td></tr>");
 					isSectionTitle = false;
 					isTitle = false;
 					startTitle = false;
@@ -499,8 +521,10 @@ QString About::parseTranslationFile(QString fileName)
 						code.replace(")", "");
 						code = LanguageManager::instance()->getLangFromAbbrev(code);
 					}
-					result += "<tr><td><b>"+code+"</b></td><td></td></tr>";
+					//result += "<tr><td><b>"+code+"</b></td><td></td></tr>";
+					languages.insert(snum+":"+code, "<tr><td><b>"+code+"</b></td><td></td></tr>");
 					isTitle = false;
+					currLang=code;
 
 				} // if is title
 				else
@@ -511,7 +535,8 @@ QString About::parseTranslationFile(QString fileName)
 					contact.replace("(", "");
 					contact.replace(")", "");
 					name = (fieldTS.isEmpty() ? "" : fieldTS.join(" "));
-					result += "<tr><td>"+name+"</td><td>"+(contact == "@" ? "" : contact)+"</td></tr>";
+					//result += "<tr><td>"+name+"</td><td>"+(contact == "@" ? "" : contact)+"</td></tr>";
+					names.insert(snum+":"+code, "<tr><td>"+name+"</td><td>"+(contact == "@" ? "" : contact)+"</td></tr>");
 				} // else is title
 			} // if is empty line
 			else
@@ -522,7 +547,7 @@ QString About::parseTranslationFile(QString fileName)
 					isTitle = !isTitle;
 					if (isTitle)
 					{
-						result += "<tr><td></td><td></td></tr>";
+						//result += "<tr><td></td><td></td></tr>";
 						startTitle = true;
 					}
 					else
@@ -539,6 +564,33 @@ QString About::parseTranslationFile(QString fileName)
 				}
 			} // else is empty line
 		} // while ! atEnd
+
+		QMapIterator<QString, QString> s(sections);
+		while (s.hasNext())
+		{
+			s.next();
+			result += s.value();
+			QMapIterator<QString, QString> l(languages);
+			while (l.hasNext())
+			{
+				l.next();
+				QStringList sl=l.key().split(":");
+				if (s.key()==sl.first())
+				{
+					result += l.value();
+
+					QMapIterator<QString, QString> n(names);
+					while (n.hasNext())
+					{
+						n.next();
+						if (n.key()==l.key())
+							result += n.value();
+					}
+					result += "<tr><td></td><td></td></tr>";
+				}
+			}
+			result += "<tr><td></td><td></td></tr><tr><td></td><td></td></tr>";
+		}
 		result += "<table>";
 	} // if file found
 	else

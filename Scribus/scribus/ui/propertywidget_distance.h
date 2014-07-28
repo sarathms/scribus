@@ -49,14 +49,15 @@ public slots:
 	void languageChange();
 	void unitChange();
 
-	void displayColumns(int r, double g);
-	void displayTextDistances(double left, double top, double bottom, double right);
+	void showColumns(int r, double g);
+	void showTextDistances(double left, double top, double bottom, double right);
 
 private slots:
 	void handleColumns();
 	void handleColumnGap();
 	void handleGapSwitch();
 	void handleTabs();
+	void handleVAlign();
 	void handleTextDistances();
 };
 

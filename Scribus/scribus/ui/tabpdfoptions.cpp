@@ -14,29 +14,31 @@ for which a new license (GPL+exception) is in place.
  ***************************************************************************/
 #include "tabpdfoptions.h"
 
-#include <QPixmap>
-#include <QHBoxLayout>
-#include <QVBoxLayout>
-#include <QGridLayout>
-#include <QSpacerItem>
-#include <QGroupBox>
+
+#include <QAbstractItemView>
 #include <QCheckBox>
 #include <QComboBox>
-#include <QPushButton>
-#include <QToolButton>
-#include <QLineEdit>
+#include <QGridLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
-#include <QSpinBox>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QListWidgetItem>
-
+#include <QPixmap>
+#include <QPushButton>
+#include <QSpacerItem>
+#include <QSpinBox>
 #include <QStandardItem>
-#include <QAbstractItemView>
+#include <QToolButton>
+#include <QVBoxLayout>
+
 
 #include "ui/createrange.h"
 #include "pdfoptions.h"
 #include "prefsmanager.h"
 #include "scribuscore.h"
+#include "scribusview.h"
 #include "scconfig.h"
 #include "units.h"
 #include "usertaskstructs.h"
@@ -359,7 +361,7 @@ TabPDFOptions::TabPDFOptions(   QWidget* parent, PDFOptions & Optionen,
 	tabLayout->addLayout( Layout13 );
 	Compression = new QCheckBox( tr( "Com&press Text and Vector Graphics" ), tabGeneral );
 	tabLayout->addWidget( Compression );
-	CBox = new QGroupBox( tr( "Image Compression Method" ), tabGeneral );
+	CBox = new QGroupBox( tr( "Image Quality Settings" ), tabGeneral );
 	CBoxLayout = new QGridLayout( CBox );
 	CBoxLayout->setSpacing( 5 );
 	CBoxLayout->setMargin( 10 );
@@ -976,7 +978,7 @@ TabPDFOptions::TabPDFOptions(   QWidget* parent, PDFOptions & Optionen,
 	DSColor->setToolTip( "<qt>" + tr( "Limits the resolution of your bitmap images to the selected DPI. Images with a lower resolution will be left untouched. Leaving this unchecked will render them at their native resolution. Enabling this will increase memory usage and slow down export." ) + "</qt>" );
 	ValC->setToolTip( "<qt>" + tr( "DPI (Dots Per Inch) for image export.") + "</qt>" );
 	Encry->setToolTip( "<qt>" + tr( "Enable the security features in your exported PDF. If you selected PDF 1.3, the PDF will be protected by 40 bit encryption. If you selected PDF 1.4, the PDF will be protected by 128 bit encryption. Disclaimer: PDF encryption is not as reliable as GPG or PGP encryption and does have some limitations." ) + "</qt>" );
-	PassOwner->setToolTip( "<qt>" + tr( "Choose a master password which enables or disables all the security features in your exported PDF" ) + "</qt>" );
+	PassOwner->setToolTip( "<qt>" + tr( "Choose an owner password which enables or disables all the security features in your exported PDF" ) + "</qt>" );
 	PassUser->setToolTip( "<qt>" + tr( "Choose a password for users to be able to read your PDF." ) + "</qt>" );
 	PrintSec->setToolTip( "<qt>" + tr( "Allow printing of the PDF. If un-checked, printing is prevented. " ) + "</qt>" );
 	ModifySec->setToolTip( "<qt>" + tr( "Allow modifying of the PDF. If un-checked, modifying the PDF is prevented." ) + "</qt>" );

@@ -5,14 +5,18 @@ a copyright and/or license notice that predates the release of Scribus 1.3.2
 for which a new license (GPL+exception) is in place.
 */
 #include "cmdtext.h"
+
+#include "appmodes.h"
 #include "cmdutil.h"
+#include "hyphenator.h"
 #include "pageitem_textframe.h"
 #include "prefsmanager.h"
-#include "selection.h"
-#include "util.h"
 #include "scribuscore.h"
 #include "scribusdoc.h"
-#include "hyphenator.h"
+#include "scribusview.h"
+#include "selection.h"
+#include "util.h"
+
 
 template<typename T>
 class ApplyCharstyleHelper {
@@ -127,7 +131,7 @@ PyObject *scribus_gettextlines(PyObject* /* self */, PyObject* args)
 		PyErr_SetString(WrongFrameTypeError, QObject::tr("Cannot get number of lines of non-text frame.","python error").toLocal8Bit().constData());
 		return NULL;
 	}
-	return PyInt_FromLong(static_cast<long>(i->itemText.lines()));
+	return PyInt_FromLong(static_cast<long>(i->textLayout.lines()));
 }
 
 PyObject *scribus_getcolumns(PyObject* /* self */, PyObject* args)

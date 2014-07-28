@@ -79,15 +79,17 @@ public slots:
 	/*void editLineColorSelectorButton();
 	void editFillColorSelectorButton();*/
 	void fillStrokeSelector(int /*index*/);
-	void displayColorValues(QString stroke, QString fille, int sShade, int fShade);
-	void displayGradient(int nr);
-	void displayGradientStroke(int nr);
-	void displayOverprint(int);
 	void handleFillShade(double);
 	void handleStrokeShade(double);
 	void handleOverprint(int);
 	void handleFillGradient();
 	void handleStrokeGradient();
+	void handleStrokeGradientExtend(int val);
+	void handleGradientExtend(int val);
+	void showColorValues(QString stroke, QString fille, int sShade, int fShade);
+	void showGradient(int nr);
+	void showGradientStroke(int nr);
+	void showOverprint(int);
 	void updateCList();
 	void toggleColorDisplay();
 	void setNamedGradient(const QString &name);
@@ -126,6 +128,7 @@ public slots:
 	void changePatternProps();
 	void changePatternPropsStroke();
 	void toggleStrokePattern();
+	void changeHatchProps();
 	void unitChange(double, double, int unitIndex);
 signals:
 	void NewPen(QString);

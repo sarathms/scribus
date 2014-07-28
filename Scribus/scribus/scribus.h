@@ -39,8 +39,10 @@ for which a new license (GPL+exception) is in place.
 #include <QMultiHash>
 #include <QPixmap>
 #include <QPointer>
+#include <QPushButton>
 #include <QProcess>
 #include <QString>
+#include <QToolButton>
 
 class QCloseEvent;
 class QDragEnterEvent;
@@ -50,14 +52,14 @@ class QKeyEvent;
 class QLabel;
 class QMdiArea;
 class QMdiSubWindow;
-class QProgressBar;
-class QToolButton;
+class QQuickView;
 
 // application specific includes
 #include "scribusapi.h"
-#include "scribusview.h"
 #include "scribusdoc.h"
+#include "styleoptions.h"
 #include "ui/customfdialog.h"
+#include "appmodehelper.h"
 
 class ActionManager;
 class AlignDistributePalette;
@@ -86,6 +88,7 @@ class PDFToolBar;
 class PSLib;
 class PageItem;
 class PagePalette;
+class PageSelector;
 class PrefsContext;
 class PrefsManager;
 class PropertiesPalette;
@@ -96,6 +99,7 @@ class ScribusCore;
 class ScribusMainWindow;
 class ScribusQApp;
 class ScribusWin;
+class ScrSpinBox;
 class SimpleState;
 class StoryEditor;
 class StyleManager;
@@ -104,6 +108,7 @@ class TOCGenerator;
 class UndoManager;
 class UndoPalette;
 class UndoState;
+class ViewToolBar;
 
 
 extern SCRIBUS_API ScribusQApp* ScQApp;
@@ -166,7 +171,7 @@ public:
 	void SwitchWin();
 	void RestoreBookMarks();
 	QStringList  scrapbookNames();
-
+	void updateLayerMenu();
 	void emergencySave();
 
 	/**
@@ -205,6 +210,24 @@ public:
 
 
 	QProgressBar* mainWindowProgressBar;
+	ScrSpinBox* zoomSpinBox; //zoom spinbox at bottom of view
+	PageSelector* pageSelector; //Page selector at bottom of view
+#if OPTION_USE_QTOOLBUTTON
+	QToolButton *zoomDefaultToolbarButton;
+	QToolButton *zoomOutToolbarButton;
+	QToolButton *zoomInToolbarButton;
+#else
+	QPushButton *zoomDefaultToolbarButton;
+	QPushButton *zoomOutToolbarButton;
+	QPushButton *zoomInToolbarButton;
+#endif
+	QComboBox *layerMenu; //Menu for layers at bottom of view
+	QComboBox *unitSwitcher; //Menu for units at bottom of view
+	EditToolBar *editToolBar;
+	FileToolBar *fileToolBar;
+	ModeToolBar* modeToolBar;
+	PDFToolBar* pdfToolBar;
+	ViewToolBar* viewToolBar;
 	QLabel* mainWindowXPosLabel;
 	QLabel* mainWindowXPosDataLabel;
 	QLabel* mainWindowYPosLabel;
@@ -232,6 +255,7 @@ public:
 	ScribusWin* ActWin;
 	QClipboard *ClipB;
 	QString LoadEnc;
+	AppModeHelper appModeHelper;
 
 	QProcess *ExternalApp;
 
@@ -250,7 +274,8 @@ public:
 
 public slots:
 	void languageChange();
-	void specialActionKeyEvent(const QString& actionName, int unicodevalue);
+	void statusBarLanguageChange();
+	void specialActionKeyEvent(int unicodevalue);
 	void newView();
 	void ToggleStickyTools();
 	void ToggleAllGuides();
@@ -281,21 +306,24 @@ public slots:
 	void PutToPatterns();
 	void ConvertToSymbol();
 	void changeLayer(int);
+	void setLayerMenuText(const QString &);
 	void showLayer();
+	void slotSetCurrentPage(int Seite);
+	void setCurrentPage(int p);
 	void ManageJava();
 	void editSelectedSymbolStart();
 	void editSymbolStart(QString temp);
 	void editSymbolEnd();
 	void editInlineStart(int id);
 	void editInlineEnd();
-	void manageMasterPages(QString temp = "");
-	void manageMasterPagesEnd();
+	void editMasterPagesStart(QString temp = "");
+	void editMasterPagesEnd();
 	/** \brief generate a new document in the current view */
 	bool slotFileNew();
 	void newFileFromTemplate();
 	bool slotPageImport();
 	bool loadPage(QString fileName, int Nr, bool Mpa, const QString& renamedPageName=QString::null);
-
+	void GotoLa(int l);
 	void slotGetContent();
 	void slotGetContent2(); // kk2006
 	void slotGetClipboardImage();
@@ -311,11 +339,12 @@ public slots:
 	void loadRecent(QString fn);
 	void rebuildRecentFileMenu();
 	void rebuildRecentPasteMenu();
+	void rebuildScrapbookMenu();
 	void pasteRecent(QString fn);
 	void pasteFromScrapbook(QString fn);
 	void importVectorFile();
 	void rebuildLayersList();
-	bool slotDocOpen();
+	bool slotFileOpen();
 	bool loadDoc(QString);
 	/**
 	 * @brief Do post loading functions
@@ -334,6 +363,7 @@ public slots:
 	/** \brief print the actual file */
 	void slotFilePrint();
 	void slotReallyPrint();
+	void slotEndSpecialEdit();
 	/*!
 	\author Franz Schmid
 	\brief Generate and print PostScript from a doc
@@ -425,7 +455,7 @@ public slots:
 	void setAppModeByToggle(bool isOn, int newMode);
 	/** \brief Neues Dokument erzeugt */
 	void HaveNewDoc();
-	void HaveNewSel(int Nr);
+	void HaveNewSel();
 	/** Dokument ist geaendert worden */
 	void slotDocCh(bool reb = true);
 	/** Setzt die Abstufung */
@@ -513,8 +543,6 @@ public slots:
 	void slotItemTransform();
 	//! \brief manages paints
 	void managePaints();
-	//! \brief enable or disable the unicode actions and their menus
-	void enableTextActions(QMap<QString, QPointer<ScrAction> > *actionMap, bool enabled, const QString& fontName=QString::null);
 	//! \brief allow SE to get the SM for edit stlyes
 	StyleManager *styleMgr() const {return styleManager;};
 	//! \brief drawnew, call palettes to update for new page layout
@@ -540,6 +568,12 @@ public slots:
 	void slotUpdateMarks();
 	bool editMarkDlg(Mark *mrk, PageItem_TextFrame* currItem = NULL);
 	void testQTQuick2_1();
+	void testQT_slot1(QString);
+	void testQT_slot2(double);
+	void testQT_slot3(int);
+	void testQT_slot4();
+	//void adjustCMS();
+	void changePreviewQuality(int index);
 
 signals:
 	void AppModeChanged(int oldMode, int newMode);
@@ -547,6 +581,7 @@ signals:
 //deprecated: (av)
 	void TextEffects(int);
 	void UpdateRequest(int updateFlags);
+	void changeLayers(int);
 
 protected:
 	/*!
@@ -580,16 +615,7 @@ private:
 	QLabel* mainWindowStatusLabel;
 	QString statusLabelText;
 	QPixmap noIcon;
-	EditToolBar *editToolBar;
-	FileToolBar *fileToolBar;
-	ModeToolBar* modeToolBar;
-	PDFToolBar* pdfToolBar;
-	QToolButton* DatOpe;
-	QToolButton* DatSav;
-	QToolButton* DatClo;
-	QToolButton* DatPri;
-	QToolButton* DatPDF;
-	QToolButton* DatNeu;
+
 	int toolbarMenuTools;
 	int toolbarMenuPDFTools;
 	int viewToolbars;
@@ -614,7 +640,6 @@ private:
 	//CB: #8212: add overrideMasterPageSizing, however default to true for compatibility with other calls.. for now
 	void addNewPages(int wo, int where, int numPages, double height, double width, int orient, QString siz, bool mov, QStringList* basedOn = 0, bool overrideMasterPageSizing=true);
 
-	void *PSDriver;
 	int DocNr;
 	bool PrinterUsed;
 	struct PDe {
@@ -640,6 +665,8 @@ private:
 	int m_marksCount; //remember marks count from last call
 	bool m_WasAutoSave;
 	bool m_pagePalVisible;
+
+	QQuickView *qqview;
 };
 
 #endif

@@ -17,13 +17,13 @@ for which a new license (GPL+exception) is in place.
 
 
 #include "prefs_spelling.h"
-#include "fileunzip.h"
 #include "langmgr.h"
 #include "prefsstructs.h"
 #include "scribusdoc.h"
 #include "util_icon.h"
 #include "util.h"
 #include "util_file.h"
+#include "third_party/zip/scribus_zip.h"
 
 #include "scribusapp.h"
 #include "scpaths.h"
@@ -63,6 +63,7 @@ void Prefs_Spelling::saveGuiToPrefs(struct ApplicationPrefs *prefsData) const
 
 void Prefs_Spelling::downloadSpellDicts()
 {
+	spellDownloadButton->setEnabled(false);
 	qDebug()<<"Now attempting downloads";
 	int rows=availDictTableWidget->rowCount();
 	QStringList dlLangs;
@@ -149,6 +150,7 @@ void Prefs_Spelling::updateDictList()
 
 void Prefs_Spelling::updateAvailDictList()
 {
+	availListDownloadButton->setEnabled(false);
 	ScQApp->dlManager()->addURL("http://services.scribus.net/scribus_spell_dicts.xml", true, downloadLocation);
 	connect(ScQApp->dlManager(), SIGNAL(finished()), this, SLOT(downloadDictListFinished()));
 	ScQApp->dlManager()->startDownloads();
@@ -158,6 +160,7 @@ void Prefs_Spelling::downloadDictListFinished()
 {
 	disconnect(ScQApp->dlManager(), SIGNAL(finished()), this, SLOT(downloadDictListFinished()));
 	setAvailDictsXMLFile(downloadLocation + "scribus_spell_dicts.xml");
+	availListDownloadButton->setEnabled(true);
 }
 
 void Prefs_Spelling::downloadSpellDictsFinished()
@@ -185,13 +188,17 @@ void Prefs_Spelling::downloadSpellDictsFinished()
 		if (d.filetype=="zip")
 		{
 			//qDebug()<<"zip data found"<<filename;
-			FileUnzip fun(filename);
-			foreach (QString s, files)
+			ScZipHandler* fun = new ScZipHandler();
+			if (fun->open(filename))
 			{
-				//qDebug()<<"Unzipping"<<userDictDir+s;
-				QString data = fun.getFileToPath(s, userDictDir);
-				allFileList.removeOne(s);
+				foreach (QString s, files)
+				{
+					//qDebug()<<"Unzipping"<<userDictDir+s;
+					fun->extract(s, userDictDir);
+					allFileList.removeOne(s);
+				}
 			}
+			delete fun;
 		}
 		if (d.filetype=="plain")
 		{
@@ -216,6 +223,7 @@ void Prefs_Spelling::downloadSpellDictsFinished()
 	downloadProgressBar->setValue(0);
 	downloadProgressBar->setVisible(false);
 	dlLabel->setVisible(false);
+	spellDownloadButton->setEnabled(true);
 }
 
 void Prefs_Spelling::updateProgressBar()

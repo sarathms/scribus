@@ -17,6 +17,7 @@ for which a new license (GPL+exception) is in place.
 #include "pageitem.h"
 #include "sccolor.h"
 #include "fpointarray.h"
+#include "scribusstructs.h"
 #include <QList>
 #include <QTransform>
 #include <QMultiMap>
@@ -31,19 +32,6 @@ class ScribusDoc;
 class Selection;
 class TransactionSettings;
 class ScZipHandler;
-
-class AttributeValue
-{
-	public:
-		AttributeValue() : valid(false),  value("")
-		{
-		}
-		AttributeValue(QString val) : valid(true),  value(val)
-		{
-		}
-		bool valid;
-		QString value;
-};
 
 class PagesPlug : public QObject
 {
@@ -160,6 +148,14 @@ private:
 		QString styleRef;
 		QString layoutStyleRef;
 	};
+	struct StyleSheet
+	{
+		QHash<QString, ObjStyle> m_objStyles;
+		QHash<QString, ParStyle> m_parStyles;
+		QHash<QString, ChrStyle> m_chrStyles;
+		QHash<QString, LayoutStyle> m_layoutStyles;
+	};
+
 	bool convert(QString fn);
 	bool parseDocReference(QString designMap, bool compressed);
 	void parseStyleSheets(QDomElement &drawPag);
@@ -182,6 +178,7 @@ private:
 	QStringList importedPatterns;
 	bool firstPage;
 	int pagecount;
+	int mpagecount;
 	double topMargin;
 	double leftMargin;
 	double rightMargin;
@@ -190,10 +187,8 @@ private:
 	double pgGap;
 	QString papersize;
 	QHash<int, QString> imageResources;
-	QHash<QString, ObjStyle> m_objStyles;
-	QHash<QString, ParStyle> m_parStyles;
-	QHash<QString, ChrStyle> m_chrStyles;
-	QHash<QString, LayoutStyle> m_layoutStyles;
+	QHash<QString, StyleSheet> m_StyleSheets;
+	QString m_currentStyleSheet;
 
 	PageItem* addClip(PageItem* retObj, ObjState &obState);
 

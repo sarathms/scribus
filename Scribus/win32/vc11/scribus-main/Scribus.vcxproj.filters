@@ -174,9 +174,6 @@
     <ClInclude Include="..\..\..\scribus\exif.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\scribus\fileunzip.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\scribus\fparser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -364,9 +361,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\scribus\scguardedptr.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\scribus\scgzfile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\scribus\scimage.h">
@@ -571,9 +565,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\scribus\units.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\scribus\unzip.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\scribus\updatemanager.h">
@@ -828,7 +819,7 @@
     <ClInclude Include="..\..\..\scribus\ui\ui_propertiespalette_linebase.h">
       <Filter>Generated Form Files</Filter>
     </ClInclude>
-	<ClInclude Include="..\..\..\scribus\ui\ui_propertiespalette_shadowbase.h">
+    <ClInclude Include="..\..\..\scribus\ui\ui_propertiespalette_shadowbase.h">
       <Filter>Generated Form Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\scribus\ui\ui_propertiespalette_shapebase.h">
@@ -997,6 +988,18 @@
       <Filter>colorMgmt</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\scribus\selectionrubberband.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\scribus\scimgdataloader_ora.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\scribus\text\textlayout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\scribus\appmodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\scribus\util_debug.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -1314,9 +1317,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\scribus\ui\filetoolbar.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\scribus\fileunzip.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\scribus\filewatcher.cpp">
@@ -1844,7 +1844,7 @@
     <ClCompile Include="..\..\..\scribus\ui\propertiespalette_line.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-	<ClCompile Include="..\..\..\scribus\ui\propertiespalette_shadow.cpp">
+    <ClCompile Include="..\..\..\scribus\ui\propertiespalette_shadow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\scribus\ui\propertiespalette_shape.cpp">
@@ -1968,9 +1968,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\scribus\scgtplugin.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\scribus\scgzfile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\scribus\schelptreemodel.cpp">
@@ -2379,9 +2376,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\scribus\units.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\scribus\unzip.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\scribus\updatemanager.cpp">
@@ -3050,7 +3044,7 @@
     <ClCompile Include="..\..\..\scribus\ui\moc_propertiespalette_line.cpp">
       <Filter>Generated Moc Files</Filter>
     </ClCompile>
-	<ClCompile Include="..\..\..\scribus\ui\moc_propertiespalette_shadow.cpp">
+    <ClCompile Include="..\..\..\scribus\ui\moc_propertiespalette_shadow.cpp">
       <Filter>Generated Moc Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\scribus\ui\moc_propertiespalette_shape.cpp">
@@ -3422,6 +3416,45 @@
     <ClCompile Include="..\..\..\scribus\moc_upgradechecker.cpp">
       <Filter>Generated Moc Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\scribus\ui\proptree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\ui\moc_proptree.cpp">
+      <Filter>Generated Moc Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\appmodehelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\moc_appmodehelper.cpp">
+      <Filter>Generated Moc Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\qtiocompressor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\moc_qtiocompressor.cpp">
+      <Filter>Generated Moc Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\scimgdataloader_ora.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\text\textlayout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\ui\viewtoolbar.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\ui\moc_viewtoolbar.cpp">
+      <Filter>Generated Moc Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\ui\filedialogeventcatcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\ui\moc_filedialogeventcatcher.cpp">
+      <Filter>Generated Moc Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\scribus\util_debug.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Scribus.rc">
@@ -3665,7 +3698,7 @@
     <uic Include="..\..\..\scribus\ui\propertiespalette_linebase.ui">
       <Filter>Form Files</Filter>
     </uic>
-	<uic Include="..\..\..\scribus\ui\propertiespalette_shadowbase.ui">
+    <uic Include="..\..\..\scribus\ui\propertiespalette_shadowbase.ui">
       <Filter>Form Files</Filter>
     </uic>
     <uic Include="..\..\..\scribus\ui\propertiespalette_shapebase.ui">
@@ -4524,7 +4557,7 @@
     <moc Include="..\..\..\scribus\ui\propertiespalette_line.h">
       <Filter>Header Files</Filter>
     </moc>
-	<moc Include="..\..\..\scribus\ui\propertiespalette_shadow.h">
+    <moc Include="..\..\..\scribus\ui\propertiespalette_shadow.h">
       <Filter>Header Files</Filter>
     </moc>
     <moc Include="..\..\..\scribus\ui\propertiespalette_shape.h">
@@ -4846,6 +4879,21 @@
       <Filter>Header Files</Filter>
     </moc>
     <moc Include="..\..\..\scribus\upgradechecker.h">
+      <Filter>Header Files</Filter>
+    </moc>
+    <moc Include="..\..\..\scribus\ui\proptree.h">
+      <Filter>Header Files</Filter>
+    </moc>
+    <moc Include="..\..\..\scribus\appmodehelper.h">
+      <Filter>Header Files</Filter>
+    </moc>
+    <moc Include="..\..\..\scribus\qtiocompressor.h">
+      <Filter>Header Files</Filter>
+    </moc>
+    <moc Include="..\..\..\scribus\ui\viewtoolbar.h">
+      <Filter>Header Files</Filter>
+    </moc>
+    <moc Include="..\..\..\scribus\ui\filedialogeventcatcher.h">
       <Filter>Header Files</Filter>
     </moc>
   </ItemGroup>
