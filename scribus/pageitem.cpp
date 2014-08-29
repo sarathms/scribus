@@ -108,6 +108,7 @@ PageItem::PageItem(const PageItem & other)
 	GrFocalY(other.GrFocalY),
 	GrScale(other.GrScale),
 	GrSkew(other.GrSkew),
+	GrExtend(other.GrExtend),
 	GrControl1(other.GrControl1),
 	GrControl2(other.GrControl2),
 	GrControl3(other.GrControl3),
@@ -438,6 +439,7 @@ PageItem::PageItem(ScribusDoc *pa, ItemType newType, double x, double y, double 
 	GrFocalY = 0;
 	GrScale = 1;
 	GrSkew = 0;
+	GrExtend = VGradient::pad;
 	GrControl1 = FPoint(0,0);
 	GrControl2 = FPoint(w, 0);
 	GrControl3 = FPoint(w, h);
@@ -1346,7 +1348,7 @@ void PageItem::link(PageItem* nxt, bool addPARSEP)
 
 void PageItem::unlink(bool createUndo)
 {
-	if( NextBox )
+	if (NextBox)
 	{
 		PageItem *undoNextBox=NextBox;
 		// make sure lastInFrame is valid
@@ -1533,7 +1535,7 @@ void PageItem::currentTextProps(ParagraphStyle& parStyle) const
 
 void PageItem::setTextToFrameDistLeft(double newLeft)
 {
-	if(m_textDistanceMargins.Left==newLeft)
+	if (m_textDistanceMargins.Left==newLeft)
 		return;
 	if (UndoManager::undoEnabled())
 	{
@@ -1549,7 +1551,7 @@ void PageItem::setTextToFrameDistLeft(double newLeft)
 
 void PageItem::setTextToFrameDistRight(double newRight)
 {
-	if(m_textDistanceMargins.Right==newRight)
+	if (m_textDistanceMargins.Right==newRight)
 		return;
 	if (UndoManager::undoEnabled())
 	{
@@ -1565,7 +1567,7 @@ void PageItem::setTextToFrameDistRight(double newRight)
 
 void PageItem::setTextToFrameDistTop(double newTop)
 {
-	if(m_textDistanceMargins.Top==newTop)
+	if (m_textDistanceMargins.Top==newTop)
 		return;
 	if (UndoManager::undoEnabled())
 	{
@@ -1581,7 +1583,7 @@ void PageItem::setTextToFrameDistTop(double newTop)
 
 void PageItem::setTextToFrameDistBottom(double newBottom)
 {
-	if(m_textDistanceMargins.Bottom==newBottom)
+	if (m_textDistanceMargins.Bottom==newBottom)
 		return;
 	if (UndoManager::undoEnabled())
 	{
@@ -1597,19 +1599,15 @@ void PageItem::setTextToFrameDistBottom(double newBottom)
 
 void PageItem::setTextToFrameDist(double newLeft, double newRight, double newTop, double newBottom)
 {
-	UndoTransaction* activeTransaction = NULL;
+	UndoTransaction activeTransaction;
 	if (UndoManager::undoEnabled())
-		activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::TextFrame, Um::IDocument, Um::TextFrameDist, "", Um::ITextFrame));
+		activeTransaction = undoManager->beginTransaction(Um::TextFrame, Um::IDocument, Um::TextFrameDist, "", Um::ITextFrame);
 	setTextToFrameDistLeft(newLeft);
 	setTextToFrameDistRight(newRight);
 	setTextToFrameDistTop(newTop);
 	setTextToFrameDistBottom(newBottom);
 	if (activeTransaction)
-	{
-		activeTransaction->commit();
-		delete activeTransaction;
-		activeTransaction = NULL;
-	}
+		activeTransaction.commit();
 	//emit textToFrameDistances(Extra, TExtra, BExtra, RExtra);
 }
 
@@ -1620,9 +1618,9 @@ void PageItem::setGridOffset(double) { } // FIXME
 void PageItem::setGridDistance(double) { } // FIXME
 void PageItem::setColumns(int n) 
 {
-	if(Cols==n)
+	if (Cols==n)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::Columns, "", Um::IBorder);
 		ss->set("COLUMNS", "columns");
@@ -1634,9 +1632,9 @@ void PageItem::setColumns(int n)
 }
 void PageItem::setColumnGap(double gap)
 {
-	if(ColGap==gap)
+	if (ColGap==gap)
 		return;
-	if(UndoManager::undoEnabled()){
+	if (UndoManager::undoEnabled()){
 		SimpleState *ss = new SimpleState(Um::Columns, "", Um::IBorder);
 		ss->set("COLUMNSGAP", "columnsgap");
 		ss->set("OLD_COLUMNS", ColGap);
@@ -1655,7 +1653,7 @@ void PageItem::setVerticalAlignment(int val)
 {
 	if (val == verticalAlign)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::AlignText, "", Um::ITextFrame);
 		ss->set("VERTICAL_ALIGN", "vertical_align");
@@ -1668,9 +1666,9 @@ void PageItem::setVerticalAlignment(int val)
 
 void PageItem::setCornerRadius(double newRadius)
 {
-	if(m_roundedCorderRadius==newRadius)
+	if (m_roundedCorderRadius==newRadius)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *state = new SimpleState(Um::RoundCorner,"",Um::IBorder);
 		state->set("CORNER_RADIUS","corner_radius");
@@ -2862,7 +2860,7 @@ void PageItem::DrawPolyL(QPainter *p, QPolygon pts)
 		uint FirstVal = 0;
 		for (QList<uint>::Iterator it2 = Segments.begin(); it2 != it2end; ++it2)
 		{
-				p->drawPolygon(pts.constData() + FirstVal, (*it2)-FirstVal);
+			p->drawPolygon(pts.constData() + FirstVal, (*it2)-FirstVal);
 			FirstVal = (*it2);
 		}
 		p->drawPolygon(pts.constData() + FirstVal, pts.size() - FirstVal);
@@ -2901,9 +2899,9 @@ void PageItem::setGradient(const QString &newGradient)
 }
 
 void PageItem::setMaskGradient(VGradient grad){
-	if(mask_gradient==grad)
+	if (mask_gradient==grad)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<VGradient,VGradient> > *is = new ScItemState<QPair<VGradient,VGradient> >(Um::GradVal);
 		is->set("MASK_GRAD","mask_grad");
@@ -2914,9 +2912,9 @@ void PageItem::setMaskGradient(VGradient grad){
 }
 
 void PageItem::setFillGradient(VGradient grad){
-	if(fill_gradient==grad)
+	if (fill_gradient==grad)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<VGradient,VGradient> > *is = new ScItemState<QPair<VGradient,VGradient> >(Um::GradVal);
 		is->set("FILL_GRAD","fill_grad");
@@ -2927,9 +2925,9 @@ void PageItem::setFillGradient(VGradient grad){
 }
 
 void PageItem::setStrokeGradient(VGradient grad){
-	if(stroke_gradient==grad)
+	if (stroke_gradient==grad)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<VGradient,VGradient> > *is = new ScItemState<QPair<VGradient,VGradient> >(Um::GradVal);
 		is->set("STROKE_GRAD","STROKE_grad");
@@ -2964,44 +2962,36 @@ void PageItem::setDiamondGeometry(FPoint c1, FPoint c2, FPoint c3, FPoint c4, FP
 
 void PageItem::set4ColorTransparency(double t1, double t2, double t3, double t4)
 {
-	UndoTransaction *trans = NULL;
-	if(UndoManager::undoEnabled())
-		trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill));
+	UndoTransaction trans;
+	if (UndoManager::undoEnabled())
+		trans = undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill);
 	setGradientTransp1(t1);
 	setGradientTransp2(t2);
 	setGradientTransp3(t3);
 	setGradientTransp4(t4);
-	if(trans)
-	{
-		trans->commit();
-		delete trans;
-		trans = NULL;
-	}
+	if (trans)
+		trans.commit();
 }
 
 void PageItem::set4ColorShade(int t1, int t2, int t3, int t4)
 {
-	UndoTransaction *trans = NULL;
-	if(UndoManager::undoEnabled())
-		trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill));
+	UndoTransaction trans;
+	if (UndoManager::undoEnabled())
+		trans = undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill);
 	setGradientShade1(t1);
 	setGradientShade2(t2);
 	setGradientShade3(t3);
 	setGradientShade4(t4);
-	if(trans)
-	{
-		trans->commit();
-		delete trans;
-		trans = NULL;
-	}
+	if (trans)
+		trans.commit();
 }
 
 void PageItem::set4ColorColors(QString col1, QString col2, QString col3, QString col4)
 {
 	QColor tmp;
-	UndoTransaction *trans = NULL;
-	if(UndoManager::undoEnabled())
-		trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill));
+	UndoTransaction trans;
+	if (UndoManager::undoEnabled())
+		trans = undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill);
 	setGradientCol1(col1);
 	if (GrColorP1 != CommonStrings::None)
 	{
@@ -3035,7 +3025,7 @@ void PageItem::set4ColorColors(QString col1, QString col2, QString col3, QString
 		setGradientColor1(tmp);
 	}
 	else
-		setGradientColor1(QColor(255, 255, 255, 0));
+		setGradientColor1(QColor(0, 0, 0, 0));
 	if (m_Doc->viewAsPreview)
 	{
 		VisionDefectColor defect;
@@ -3074,7 +3064,7 @@ void PageItem::set4ColorColors(QString col1, QString col2, QString col3, QString
 		setGradientColor2(tmp);
 	}
 	else
-		setGradientColor2(QColor(255, 255, 255, 0));
+		setGradientColor2(QColor(0, 0, 0, 0));
 	if (m_Doc->viewAsPreview)
 	{
 		VisionDefectColor defect;
@@ -3113,7 +3103,7 @@ void PageItem::set4ColorColors(QString col1, QString col2, QString col3, QString
 		setGradientColor3(tmp);
 	}
 	else
-		setGradientColor3(QColor(255, 255, 255, 0));
+		setGradientColor3(QColor(0, 0, 0, 0));
 	if (m_Doc->viewAsPreview)
 	{
 		VisionDefectColor defect;
@@ -3152,18 +3142,14 @@ void PageItem::set4ColorColors(QString col1, QString col2, QString col3, QString
 		setGradientColor4(tmp);
 	}
 	else
-		setGradientColor4(QColor(255, 255, 255, 0));
+		setGradientColor4(QColor(0, 0, 0, 0));
 	if (m_Doc->viewAsPreview)
 	{
 		VisionDefectColor defect;
 		setGradientColor4(defect.convertDefect(GrColorP4QColor, m_Doc->previewVisual));
 	}
-	if(trans)
-	{
-		trans->commit();
-		delete trans;
-		trans = NULL;
-	}
+	if (trans)
+		trans.commit();
 }
 
 void PageItem::get4ColorGeometry(FPoint &c1, FPoint &c2, FPoint &c3, FPoint &c4)
@@ -3225,7 +3211,7 @@ void PageItem::setMeshPointColor(int x, int y, QString color, int shade, double 
 		MQColor.setAlphaF(transparency);
 	}
 	else
-		MQColor = QColor(255, 255, 255, 0);
+		MQColor = QColor(0, 0, 0, 0);
 	if (m_Doc->viewAsPreview)
 	{
 		VisionDefectColor defect;
@@ -3251,10 +3237,10 @@ void PageItem::setMeshPointColor(int x, int y, QString color, int shade, double 
 				break;
 		}
 
-		UndoTransaction *trans = NULL;
-		if(UndoManager::undoEnabled())
+		UndoTransaction trans;
+		if (UndoManager::undoEnabled())
 		{
-			trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill));
+			trans = undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill);
 			ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradVal);
 			ss->set("GRAD_MESH_COLOR","grad_mesh_color");
 			ss->set("X",x);
@@ -3281,7 +3267,7 @@ void PageItem::setMeshPointColor(int x, int y, QString color, int shade, double 
 				if (meshGradientPatches[col].TL.gridPoint == xx)
 				{
 					mp = &(meshGradientPatches[col].TL);
-					if(UndoManager::undoEnabled())
+					if (UndoManager::undoEnabled())
 					{
 						ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradVal);
 						ss->set("GRAD_MESH_COLOR","grad_mesh_color");
@@ -3305,7 +3291,7 @@ void PageItem::setMeshPointColor(int x, int y, QString color, int shade, double 
 				if (meshGradientPatches[col].TR.gridPoint == xx)
 				{
 					mp = &(meshGradientPatches[col].TR);
-					if(UndoManager::undoEnabled())
+					if (UndoManager::undoEnabled())
 					{
 						ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradVal);
 						ss->set("GRAD_MESH_COLOR","grad_mesh_color");
@@ -3329,7 +3315,7 @@ void PageItem::setMeshPointColor(int x, int y, QString color, int shade, double 
 				if (meshGradientPatches[col].BR.gridPoint == xx)
 				{
 					mp = &(meshGradientPatches[col].BR);
-					if(UndoManager::undoEnabled())
+					if (UndoManager::undoEnabled())
 					{
 						ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradVal);
 						ss->set("GRAD_MESH_COLOR","grad_mesh_color");
@@ -3353,7 +3339,7 @@ void PageItem::setMeshPointColor(int x, int y, QString color, int shade, double 
 				if (meshGradientPatches[col].BL.gridPoint == xx)
 				{
 					mp = &(meshGradientPatches[col].BL);
-					if(UndoManager::undoEnabled())
+					if (UndoManager::undoEnabled())
 					{
 						ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradVal);
 						ss->set("GRAD_MESH_COLOR","grad_mesh_color");
@@ -3376,19 +3362,15 @@ void PageItem::setMeshPointColor(int x, int y, QString color, int shade, double 
 				}
 			}
 		}
-		if(trans)
-		{
-			trans->commit();
-			delete trans;
-			trans = NULL;
-		}
+		if (trans)
+			trans.commit();
 	}
 	else
 	{
 		if ((x > -1) && (y > -1))
 		{
 			mp = &(meshGradientArray[x][y]);
-			if(UndoManager::undoEnabled())
+			if (UndoManager::undoEnabled())
 			{
 				ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradVal);
 				ss->set("GRAD_MESH_COLOR","grad_mesh_color");
@@ -3447,13 +3429,13 @@ void PageItem::createGradientMesh(int rows, int cols)
 		MQColor.setAlphaF(1.0);
 	}
 	else
-		MQColor = QColor(255, 255, 255, 0);
+		MQColor = QColor(0, 0, 0, 0);
 	if (m_Doc->viewAsPreview)
 	{
 		VisionDefectColor defect;
 		MQColor = defect.convertDefect(MQColor, m_Doc->previewVisual);
 	}
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QList<QList<meshPoint> > > *is = new ScItemState<QList<QList<meshPoint> > >(Um::MeshGradient);
 		is->set("CREATE_MESH_GRAD","create_mesh_grad");
@@ -3486,7 +3468,7 @@ void PageItem::resetGradientMesh()
 {
 	int rows = meshGradientArray.count();
 	int cols = meshGradientArray[0].count();
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QList<QList<meshPoint> > > *is = new ScItemState<QList<QList<meshPoint> > >(Um::ResetControlPoints);
 		is->set("RESET_MESH_GRAD","reset_mesh_grad");
@@ -3536,10 +3518,10 @@ void PageItem::meshToShape()
 								meshGradientArray[m-1][0].gridPoint.x(), meshGradientArray[m-1][0].gridPoint.y());
 	}
 	
-	UndoTransaction *trans =  NULL;
-	if(UndoManager::undoEnabled())
+	UndoTransaction trans;
+	if (UndoManager::undoEnabled())
 	{
-		trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IFill,Um::ChangeMeshGradient,"",Um::IFill));
+		trans = undoManager->beginTransaction(Um::Selection,Um::IFill,Um::ChangeMeshGradient,"",Um::IFill);
 		ScItemState<QPair<QList<QList<meshPoint> >,FPointArray> > *ism = new ScItemState<QPair<QList<QList<meshPoint> >,FPointArray> >(Um::ChangeMeshGradient, "",Um::IFill);
 		ism->set("MOVE_MESH_GRAD", "move_mesh_grad");
 		ism->setItem(qMakePair(meshGradientArray,PoLine));
@@ -3566,7 +3548,7 @@ void PageItem::meshToShape()
 	for (int x = 0; x < rows+1; x++)
 		for (int y = 0; y < cols+1; y++)
 			meshGradientArray[x][y].moveRel(dx, dy);
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<FPointArray> *is = new ScItemState<FPointArray>(Um::ResetContourLine, "",Um::IBorder);
 		is->set("RESET_CONTOUR", "reset_contour");
@@ -3574,12 +3556,8 @@ void PageItem::meshToShape()
 		undoManager->action(this, is);
 	}
 	ContourLine = PoLine.copy();
-	if(trans)
-	{
-		trans->commit();
-		delete trans;
-		trans = NULL;
-	}
+	if (trans)
+		trans.commit();
 }
 
 void PageItem::createConicalMesh()
@@ -3861,9 +3839,9 @@ void PageItem::patternFlip(bool &flipX, bool &flipY)
 
 void PageItem::setMaskType(int val)
 {
-	if(GrMask==val)
+	if (GrMask==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradTypeMask,"",Um::IFill);
 		ss->set("MASKTYPE","masktype");
@@ -4433,7 +4411,7 @@ void PageItem::setStartArrowScale(int newScale)
 {
 	if (m_startArrowScale == newScale)
 		return; // nothing to do -> return
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::StartArrowScale,"",Um::IArrow);
 		ss->set("START_ARROWSCALE","start_arrowscale");
@@ -4448,7 +4426,7 @@ void PageItem::setEndArrowScale(int newScale)
 {
 	if (m_endArrowScale == newScale)
 		return; // nothing to do -> return
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::EndArrowScale,"",Um::IArrow);
 		ss->set("END_ARROWSCALE","end_arrowscale");
@@ -4531,7 +4509,7 @@ void PageItem::setImageScalingMode(bool freeScale, bool keepRatio)
 }
 
 void PageItem::setOverprint(bool val) {
-	if(doOverprint==val)
+	if (doOverprint==val)
 			return;
 
 	if (UndoManager::undoEnabled())
@@ -4751,13 +4729,13 @@ void PageItem::setTextFlowMode(TextFlowMode mode)
 	if (UndoManager::undoEnabled())
 	{
 		QString stateMessage;
-		if( mode == TextFlowUsesFrameShape )
+		if (mode == TextFlowUsesFrameShape)
 			stateMessage = Um::ObjectFrame;
-		else if( mode == TextFlowUsesBoundingBox )
+		else if (mode == TextFlowUsesBoundingBox)
 			stateMessage = Um::BoundingBox;
-		else if( mode == TextFlowUsesContourLine )
+		else if (mode == TextFlowUsesContourLine)
 			stateMessage = Um::ContourLine;
-		else if( mode == TextFlowUsesImageClipping )
+		else if (mode == TextFlowUsesImageClipping)
 			stateMessage = Um::ImageClip;
 		else
 			stateMessage = Um::NoTextFlow;
@@ -4773,7 +4751,7 @@ void PageItem::setTextFlowMode(TextFlowMode mode)
 
 void PageItem::checkTextFlowInteractions(bool allItems)
 {	
-	if(!m_Doc->isLoading())
+	if (!m_Doc->isLoading())
 	{
 		QRectF baseRect(getBoundingRect());
 		QList<PageItem*>* items = OnMasterPage.isEmpty() ? &m_Doc->DocItems : &m_Doc->MasterItems;
@@ -4782,10 +4760,10 @@ void PageItem::checkTextFlowInteractions(bool allItems)
 			int ids = items->indexOf(this) - 1;
 			for(int idx = ids; idx >= 0 ; --idx)
 			{
-				if(items->at(idx)->asTextFrame()) // do not bother with no text frames
+				if (items->at(idx)->asTextFrame()) // do not bother with no text frames
 				{
 					QRectF uRect(items->at(idx)->getBoundingRect());
-					if(baseRect.intersects(uRect))
+					if (baseRect.intersects(uRect))
 					{
 						items->at(idx)->update();
 					}
@@ -4796,12 +4774,12 @@ void PageItem::checkTextFlowInteractions(bool allItems)
 		{
 			for(int idx = items->count() - 1; idx >= 0 ; --idx)
 			{
-				if(items->at(idx) != this) // avoids itself
+				if (items->at(idx) != this) // avoids itself
 				{
-					if(items->at(idx)->asTextFrame()) // do not bother with no text frames
+					if (items->at(idx)->asTextFrame()) // do not bother with no text frames
 					{
 						QRectF uRect(items->at(idx)->getBoundingRect());
-						if(baseRect.intersects(uRect))
+						if (baseRect.intersects(uRect))
 						{
 							items->at(idx)->update();
 						}
@@ -5397,7 +5375,7 @@ void PageItem::restore(UndoState *state, bool isUndo)
 void PageItem::restoreConnectPath(SimpleState *state, bool isUndo)
 {
 	ScItemState<QPair<FPointArray, FPointArray> > *is = dynamic_cast<ScItemState<QPair<FPointArray, FPointArray> > *>(state);
-	if(isUndo)
+	if (isUndo)
 	{
 		PoLine = is->getItem().first;
 		doc()->AdjustItemSize(this);
@@ -5848,7 +5826,7 @@ void PageItem::restoreAppMode(SimpleState *state, bool isUndo)
 {
 	doc()->m_Selection->clear();
 	select();
-	if(isUndo)
+	if (isUndo)
 		doc()->view()->requestMode(state->getInt("OLD"));
 	else
 		doc()->view()->requestMode(state->getInt("NEW"));
@@ -6214,7 +6192,7 @@ void PageItem::restoreCreateMeshGrad(SimpleState *state, bool isUndo)
 void PageItem::restoreMoveMeshGrad(SimpleState *state, bool isUndo)
 {
 	ScItemState<QPair<QList<QList<meshPoint> >,FPointArray> > *is = dynamic_cast<ScItemState<QPair<QList<QList<meshPoint> >,FPointArray> > *>(state);
-	if(isUndo)
+	if (isUndo)
 	{
 		PoLine = is->getItem().second;
 		ClipEdited = true;
@@ -6279,7 +6257,7 @@ void PageItem::restoreMoveMeshPatch(SimpleState *state, bool isUndo)
 	int y = is->getInt("Y");
 	if (isUndo)
 	{
-		if(is->getBool("ARRAY"))
+		if (is->getBool("ARRAY"))
 			meshGradientArray[x][y] = is->getItem().first;
 		else
 			switch(y){
@@ -6299,7 +6277,7 @@ void PageItem::restoreMoveMeshPatch(SimpleState *state, bool isUndo)
 	}
 	else
 	{
-		if(is->getBool("ARRAY"))
+		if (is->getBool("ARRAY"))
 			meshGradientArray[x][y] = is->getItem().second;
 		else
 			switch(y){
@@ -6327,7 +6305,7 @@ void PageItem::restoreFillGradient(SimpleState *state, bool isUndo)
 		fill_gradient = is->getItem().first;
 	else
 		fill_gradient = is->getItem().second;
-	if(gradientType()==13)
+	if (gradientType()==13)
 		createConicalMesh();
 	update();
 }
@@ -6359,7 +6337,7 @@ void PageItem::restoreGradientMeshColor(SimpleState *ss, bool isUndo)
 	int x = is->getInt("X");
 	int y = is->getInt("Y");
 	meshPoint *mp=NULL;
-	if(is->getBool("PATCH"))
+	if (is->getBool("PATCH"))
 	{
 		meshGradientPatch *patch = &meshGradientPatches[x];
 		switch (y)
@@ -7141,7 +7119,7 @@ void PageItem::restoreTextFlowing(SimpleState *state, bool isUndo)
 	for(int idx(0); idx < pList.count(); ++idx)
 	{
 		QRectF uRect(pList.at(idx)->getBoundingRect());
-		if(baseRect.intersects(uRect))
+		if (baseRect.intersects(uRect))
 			pList.at(idx)->update();
 	}
 }
@@ -7630,7 +7608,7 @@ ObjectAttribute PageItem::getObjectAttribute(QString attributeName) const
 		}
 	}
 	ObjectAttribute returnAttribute;
-	if(countFound==1)
+	if (countFound==1)
 		returnAttribute = (*foundIt);
 	else
 		returnAttribute.name = QString::null;
@@ -7756,6 +7734,16 @@ void PageItem::replaceNamedResources(ResourceCollection& newNames)
 	}
 	cstops = stroke_gradient.colorStops();
 	for (uint cst = 0; cst < stroke_gradient.Stops(); ++cst)
+	{
+		it = newNames.colors().find(cstops.at(cst)->name);
+		if (it != newNames.colors().end())
+		{
+			if (*it != CommonStrings::None)
+				cstops.at(cst)->name = *it;
+		}
+	}
+	cstops = mask_gradient.colorStops();
+	for (uint cst = 0; cst < mask_gradient.Stops(); ++cst)
 	{
 		it = newNames.colors().find(cstops.at(cst)->name);
 		if (it != newNames.colors().end())
@@ -7938,9 +7926,9 @@ void PageItem::replaceNamedResources(ResourceCollection& newNames)
 
 void PageItem::setGradientType(int val)
 {
-	if(GrType==val)
+	if (GrType==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradType,"",Um::IFill);
 		ss->set("GRAD_TYPE","grad_type");
@@ -7953,9 +7941,9 @@ void PageItem::setGradientType(int val)
 
 void PageItem::setStrokeGradientType(int val)
 {
-	if(GrTypeStroke==val)
+	if (GrTypeStroke==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradTypeStroke,"",Um::ILineStyle);
 		ss->set("GRAD_TYPESTROKE","grad_typestroke");
@@ -7968,9 +7956,9 @@ void PageItem::setStrokeGradientType(int val)
 
 void PageItem::setGradientCol1(QString val)
 {
-	if(GrColorP1==val)
+	if (GrColorP1==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_COL1","grad_col1");
@@ -7983,9 +7971,9 @@ void PageItem::setGradientCol1(QString val)
 
 void PageItem::setGradientCol2(QString val)
 {
-	if(GrColorP2==val)
+	if (GrColorP2==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_COL2","grad_col2");
@@ -7998,9 +7986,9 @@ void PageItem::setGradientCol2(QString val)
 
 void PageItem::setGradientCol3(QString val)
 {
-	if(GrColorP3==val)
+	if (GrColorP3==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_COL3","grad_col3");
@@ -8013,9 +8001,9 @@ void PageItem::setGradientCol3(QString val)
 
 void PageItem::setGradientCol4(QString val)
 {
-	if(GrColorP4==val)
+	if (GrColorP4==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_COL4","grad_col4");
@@ -8028,9 +8016,9 @@ void PageItem::setGradientCol4(QString val)
 
 void PageItem::setGradientShade1(int val)
 {
-	if(GrCol1Shade==val)
+	if (GrCol1Shade==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_SHADE1","grad_shade1");
@@ -8043,9 +8031,9 @@ void PageItem::setGradientShade1(int val)
 
 void PageItem::setGradientShade2(int val)
 {
-	if(GrCol2Shade==val)
+	if (GrCol2Shade==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_SHADE2","grad_shade2");
@@ -8058,9 +8046,9 @@ void PageItem::setGradientShade2(int val)
 
 void PageItem::setGradientShade3(int val)
 {
-	if(GrCol3Shade==val)
+	if (GrCol3Shade==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_SHADE3","grad_shade3");
@@ -8073,9 +8061,9 @@ void PageItem::setGradientShade3(int val)
 
 void PageItem::setGradientShade4(int val)
 {
-	if(GrCol4Shade==val)
+	if (GrCol4Shade==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_SHADE4","grad_shade4");
@@ -8088,9 +8076,9 @@ void PageItem::setGradientShade4(int val)
 
 void PageItem::setGradientTransp1(double val)
 {
-	if(GrCol1transp==val)
+	if (GrCol1transp==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_TRANSP1","grad_transp1");
@@ -8103,9 +8091,9 @@ void PageItem::setGradientTransp1(double val)
 
 void PageItem::setGradientTransp2(double val)
 {
-	if(GrCol2transp==val)
+	if (GrCol2transp==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_TRANSP2","grad_transp2");
@@ -8118,9 +8106,9 @@ void PageItem::setGradientTransp2(double val)
 
 void PageItem::setGradientTransp3(double val)
 {
-	if(GrCol3transp==val)
+	if (GrCol3transp==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_TRANSP3","grad_transp3");
@@ -8133,9 +8121,9 @@ void PageItem::setGradientTransp3(double val)
 
 void PageItem::setGradientTransp4(double val)
 {
-	if(GrCol4transp==val)
+	if (GrCol4transp==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_TRANSP4","grad_transp4");
@@ -8148,9 +8136,9 @@ void PageItem::setGradientTransp4(double val)
 
 void PageItem::setGradientColor1(QColor val)
 {
-	if(GrColorP1QColor ==val)
+	if (GrColorP1QColor ==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_QCOLOR1","grad_qcolor1");
@@ -8162,9 +8150,9 @@ void PageItem::setGradientColor1(QColor val)
 
 void PageItem::setGradientColor2(QColor val)
 {
-	if(GrColorP2QColor ==val)
+	if (GrColorP2QColor ==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_QCOLOR2","grad_qcolor2");
@@ -8176,9 +8164,9 @@ void PageItem::setGradientColor2(QColor val)
 
 void PageItem::setGradientColor3(QColor val)
 {
-	if(GrColorP3QColor ==val)
+	if (GrColorP3QColor ==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_QCOLOR3","grad_qcolor3");
@@ -8190,9 +8178,9 @@ void PageItem::setGradientColor3(QColor val)
 
 void PageItem::setGradientColor4(QColor val)
 {
-	if(GrColorP4QColor ==val)
+	if (GrColorP4QColor ==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<QColor,QColor> > *ss = new ScItemState<QPair<QColor,QColor> >(Um::GradCol,"",Um::IFill);
 		ss->set("GRAD_QCOLOR4","grad_qcolor4");
@@ -8225,9 +8213,9 @@ VGradient::VGradientRepeatMethod PageItem::getStrokeGradientExtend()
 
 void PageItem::setSnapToPatchGrid(bool val)
 {
-	if(snapToPatchGrid ==val)
+	if (snapToPatchGrid ==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("SNAP_TO_PATCH","snap_to_patch");
@@ -8238,9 +8226,9 @@ void PageItem::setSnapToPatchGrid(bool val)
 }
 
 void PageItem::setGradientStartX(double val){
-	if(GrStartX==val)
+	if (GrStartX==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_STARTX","grad_startx");
@@ -8252,9 +8240,9 @@ void PageItem::setGradientStartX(double val){
 }
 
 void PageItem::setGradientStartY(double val){
-	if(GrStartY==val)
+	if (GrStartY==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_STARTY","grad_starty");
@@ -8266,9 +8254,9 @@ void PageItem::setGradientStartY(double val){
 }
 
 void PageItem::setGradientEndX(double val){
-	if(GrEndX==val)
+	if (GrEndX==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_ENDX","grad_endx");
@@ -8280,9 +8268,9 @@ void PageItem::setGradientEndX(double val){
 }
 
 void PageItem::setGradientEndY(double val){
-	if(GrEndY==val)
+	if (GrEndY==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_ENDY","grad_endy");
@@ -8294,9 +8282,9 @@ void PageItem::setGradientEndY(double val){
 }
 
 void PageItem::setGradientFocalX(double val){
-	if(GrFocalX==val)
+	if (GrFocalX==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_FOCALX","grad_focalx");
@@ -8308,9 +8296,9 @@ void PageItem::setGradientFocalX(double val){
 }
 
 void PageItem::setGradientFocalY(double val){
-	if(GrFocalY==val)
+	if (GrFocalY==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_FOCALY","grad_focaly");
@@ -8322,9 +8310,9 @@ void PageItem::setGradientFocalY(double val){
 }
 
 void PageItem::setGradientScale(double val){
-	if(GrScale==val)
+	if (GrScale==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_SCALE","grad_scale");
@@ -8336,9 +8324,9 @@ void PageItem::setGradientScale(double val){
 }
 
 void PageItem::setGradientSkew(double val){
-	if(GrSkew==val)
+	if (GrSkew==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_SKEW","grad_skew");
@@ -8350,9 +8338,9 @@ void PageItem::setGradientSkew(double val){
 }
 
 void PageItem::setGradientMaskStartX(double val){
-	if(GrMaskStartX==val)
+	if (GrMaskStartX==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_MASKSTARTX","grad_maskstartx");
@@ -8364,9 +8352,9 @@ void PageItem::setGradientMaskStartX(double val){
 }
 
 void PageItem::setGradientMaskStartY(double val){
-	if(GrMaskStartY==val)
+	if (GrMaskStartY==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_MASKSTARTY","grad_maskstarty");
@@ -8378,9 +8366,9 @@ void PageItem::setGradientMaskStartY(double val){
 }
 
 void PageItem::setGradientMaskEndX(double val){
-	if(GrMaskEndX==val)
+	if (GrMaskEndX==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_MASKENDX","grad_maskendx");
@@ -8392,9 +8380,9 @@ void PageItem::setGradientMaskEndX(double val){
 }
 
 void PageItem::setGradientMaskEndY(double val){
-	if(GrMaskEndY==val)
+	if (GrMaskEndY==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_MASKENDY","grad_maskendy");
@@ -8406,9 +8394,9 @@ void PageItem::setGradientMaskEndY(double val){
 }
 
 void PageItem::setGradientMaskFocalX(double val){
-	if(GrMaskFocalX==val)
+	if (GrMaskFocalX==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_MASKFOCALX","grad_maskfocalx");
@@ -8420,9 +8408,9 @@ void PageItem::setGradientMaskFocalX(double val){
 }
 
 void PageItem::setGradientMaskFocalY(double val){
-	if(GrMaskFocalY==val)
+	if (GrMaskFocalY==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_MASKFOCALY","grad_maskfocaly");
@@ -8434,9 +8422,9 @@ void PageItem::setGradientMaskFocalY(double val){
 }
 
 void PageItem::setGradientMaskScale(double val){
-	if(GrMaskScale==val)
+	if (GrMaskScale==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_MASKSCALE","grad_maskscale");
@@ -8448,9 +8436,9 @@ void PageItem::setGradientMaskScale(double val){
 }
 
 void PageItem::setGradientMaskSkew(double val){
-	if(GrMaskSkew==val)
+	if (GrMaskSkew==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_MASKSKEW","grad_maskskew");
@@ -8462,9 +8450,9 @@ void PageItem::setGradientMaskSkew(double val){
 }
 
 void PageItem::setGradientControl1(FPoint val){
-	if(GrControl1==val)
+	if (GrControl1==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<FPoint,FPoint> > *ss = new ScItemState<QPair<FPoint,FPoint> >(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_CONTROL1","grad_control1");
@@ -8475,9 +8463,9 @@ void PageItem::setGradientControl1(FPoint val){
 }
 
 void PageItem::setGradientControl2(FPoint val){
-	if(GrControl2==val)
+	if (GrControl2==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<FPoint,FPoint> > *ss = new ScItemState<QPair<FPoint,FPoint> >(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_CONTROL2","grad_control2");
@@ -8488,9 +8476,9 @@ void PageItem::setGradientControl2(FPoint val){
 }
 
 void PageItem::setGradientControl3(FPoint val){
-	if(GrControl3==val)
+	if (GrControl3==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<FPoint,FPoint> > *ss = new ScItemState<QPair<FPoint,FPoint> >(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_CONTROL3","grad_control3");
@@ -8501,9 +8489,9 @@ void PageItem::setGradientControl3(FPoint val){
 }
 
 void PageItem::setGradientControl4(FPoint val){
-	if(GrControl4==val)
+	if (GrControl4==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<FPoint,FPoint> > *ss = new ScItemState<QPair<FPoint,FPoint> >(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_CONTROL4","grad_control4");
@@ -8514,9 +8502,9 @@ void PageItem::setGradientControl4(FPoint val){
 }
 
 void PageItem::setGradientControl5(FPoint val){
-	if(GrControl5==val)
+	if (GrControl5==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		ScItemState<QPair<FPoint,FPoint> > *ss = new ScItemState<QPair<FPoint,FPoint> >(Um::GradPos,"",Um::IFill);
 		ss->set("GRAD_CONTROL5","grad_control5");
@@ -8527,9 +8515,9 @@ void PageItem::setGradientControl5(FPoint val){
 }
 
 void PageItem::setGradientStrokeScale(double val){
-	if(GrStrokeScale==val)
+	if (GrStrokeScale==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::ILine);
 		ss->set("GRADSTROKE_SCALE","gradstroke_scale");
@@ -8541,9 +8529,9 @@ void PageItem::setGradientStrokeScale(double val){
 }
 
 void PageItem::setGradientStrokeSkew(double val){
-	if(GrStrokeSkew==val)
+	if (GrStrokeSkew==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::ILine);
 		ss->set("GRADSTROKE_SKEW","gradstroke_skew");
@@ -8555,9 +8543,9 @@ void PageItem::setGradientStrokeSkew(double val){
 }
 
 void PageItem::setGradientStrokeFocalX(double val){
-	if(GrStrokeFocalX==val)
+	if (GrStrokeFocalX==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::ILine);
 		ss->set("GRADSTROKE_FOCALX","gradstroke_focalx");
@@ -8569,9 +8557,9 @@ void PageItem::setGradientStrokeFocalX(double val){
 }
 
 void PageItem::setGradientStrokeFocalY(double val){
-	if(GrStrokeFocalY==val)
+	if (GrStrokeFocalY==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::ILine);
 		ss->set("GRADSTROKE_FOCALY","gradstroke_focaly");
@@ -8583,9 +8571,9 @@ void PageItem::setGradientStrokeFocalY(double val){
 }
 
 void PageItem::setGradientStrokeStartX(double val){
-	if(GrStrokeStartX==val)
+	if (GrStrokeStartX==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::ILine);
 		ss->set("GRADSTROKE_STARTX","gradstroke_startx");
@@ -8597,9 +8585,9 @@ void PageItem::setGradientStrokeStartX(double val){
 }
 
 void PageItem::setGradientStrokeStartY(double val){
-	if(GrStrokeStartY==val)
+	if (GrStrokeStartY==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::ILine);
 		ss->set("GRADSTROKE_STARTY","gradstroke_starty");
@@ -8611,9 +8599,9 @@ void PageItem::setGradientStrokeStartY(double val){
 }
 
 void PageItem::setGradientStrokeEndX(double val){
-	if(GrStrokeEndX==val)
+	if (GrStrokeEndX==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::ILine);
 		ss->set("GRADSTROKE_ENDX","gradstroke_endx");
@@ -8625,9 +8613,9 @@ void PageItem::setGradientStrokeEndX(double val){
 }
 
 void PageItem::setGradientStrokeEndY(double val){
-	if(GrStrokeEndY==val)
+	if (GrStrokeEndY==val)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::GradPos,"",Um::ILine);
 		ss->set("GRADSTROKE_ENDY","gradstroke_endy");
@@ -10005,9 +9993,9 @@ void PageItem::setIsBookMark(bool isBM)
 }
 
 void PageItem::setResolution(int id){
-	if(pixm.imgInfo.lowResType==id)
+	if (pixm.imgInfo.lowResType==id)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::ResTyp,"",Um::IImageFrame);
 		ss->set("RES_TYP","res_typ");
@@ -10025,9 +10013,9 @@ void PageItem::setAnnotation(const Annotation& ad)
 
 void PageItem::setImageShown(bool isShown)
 {
-	if(PicArt==isShown)
+	if (PicArt==isShown)
 		return;
-	if(UndoManager::undoEnabled())
+	if (UndoManager::undoEnabled())
 	{
 		SimpleState *ss = new SimpleState(Um::ResTyp,"",Um::IImageFrame);
 		ss->set("SHOW_IMAGE","show_image");
@@ -10400,7 +10388,7 @@ FirstLineOffsetPolicy PageItem::firstLineOffset() const
 
 void PageItem::setFirstLineOffset(FirstLineOffsetPolicy flop)
 {
-	if(firstLineOffsetP != flop)
+	if (firstLineOffsetP != flop)
 	{
 		if (UndoManager::undoEnabled())
 		{
@@ -10491,7 +10479,7 @@ void PageItem::weldTo(PageItem* pIt)
 		return;
 	addWelded(pIt);
 	pIt->addWelded(this);
-	if(undoManager->undoEnabled())
+	if (undoManager->undoEnabled())
 	{
 		ScItemState<PageItem*> *is = new ScItemState<PageItem*>(Um::WeldItems,"",Um::IGroup);
 		is->set("WELD_ITEMS", "weld_items");
@@ -10601,10 +10589,10 @@ void PageItem::setWeldPoint(double DX, double DY, PageItem *pItem)
 
 void PageItem::unWeld()
 {
-	UndoTransaction* activeTransaction = NULL;
+	UndoTransaction activeTransaction;
 	if (undoManager->undoEnabled())
-		activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::WeldItems + "/" + Um::Selection, Um::IGroup,
-																			  Um::WeldItems, "", Um::IDelete));
+		activeTransaction = undoManager->beginTransaction(Um::WeldItems + "/" + Um::Selection, Um::IGroup,
+														  Um::WeldItems, "", Um::IDelete);
 	for (int a = 0 ; a < weldList.count(); a++)
 	{
 		weldingInfo wInf = weldList.at(a);
@@ -10621,7 +10609,7 @@ void PageItem::unWeld()
 			if (pIt2 == this)
 			{
 				pIt->weldList.removeAt(b);
-				if(undoManager->undoEnabled())
+				if (undoManager->undoEnabled())
 				{
 					ScItemState<PageItem*> *is = new ScItemState<PageItem*>(Um::WeldItems,"",Um::IGroup);
 					is->set("UNWELD_ITEM", "unweld_item");
@@ -10639,11 +10627,7 @@ void PageItem::unWeld()
 		}
 	}
 	if (activeTransaction)
-	{
-		activeTransaction->commit();
-		delete activeTransaction;
-		activeTransaction = NULL;
-	}
+		activeTransaction.commit();
 	weldList.clear();
 }
 

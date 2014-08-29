@@ -28,6 +28,7 @@
 #include "pageitem_arc.h"
 #include "pageitem_spiral.h"
 #include "pageitem_table.h"
+#include "scribus.h"
 #include "scribusdoc.h"
 #include "scribusview.h"
 #include "selection.h"
@@ -36,7 +37,7 @@
 
 ResizeGesture::ResizeGesture (CanvasMode* parent) : CanvasGesture(parent)
 {
-	m_transactionStarted = NULL;
+	m_transaction = UndoTransaction();
 }
 
 void ResizeGesture::prepare(Canvas::FrameHandle framehandle)
@@ -99,11 +100,10 @@ void ResizeGesture::prepare(Canvas::FrameHandle framehandle)
 void ResizeGesture::clear()
 {
 	m_handle = Canvas::OUTSIDE;
-	if (m_transactionStarted)
+	if (m_transaction.isStarted())
 	{
-		m_transactionStarted->cancel();
-		delete m_transactionStarted;
-		m_transactionStarted = NULL;
+		m_transaction.cancel();
+		m_transaction.reset();
 	}
 }
 
@@ -262,15 +262,16 @@ void ResizeGesture::mouseReleaseEvent(QMouseEvent *m)
 			m_doc->changed();
 		}
 	}
-	if (m_transactionStarted)
+	if (m_transaction.isStarted())
 	{
-		m_transactionStarted->commit();
-		delete m_transactionStarted;
-		m_transactionStarted = NULL;
+		m_transaction.commit();
+		m_transaction.reset();
 	}
 	m->accept();
 	m_canvas->update();
 	m_view->stopGesture();
+	//#12469: emit? update from selection even after resize? if removed, remove scribus.h include
+	m_view->m_ScMW->setStatusBarTextSelectedItemInfo();
 }
 
 
@@ -284,8 +285,8 @@ void ResizeGesture::doResize(bool scaleContent)
 		targetName = currItem->getUName();
 		targetIcon = currItem->getUPixmap();
 	}
-	if (!m_transactionStarted)
-		m_transactionStarted = new UndoTransaction(Um::instance()->beginTransaction(targetName, targetIcon, Um::Resize, "", Um::IResize));
+	if (!m_transaction)
+		m_transaction = Um::instance()->beginTransaction(targetName, targetIcon, Um::Resize, "", Um::IResize);
 	QRectF newBounds = m_bounds.normalized();
 	double dw = (newBounds.width() - m_extraWidth) - currItem->width();
 	double dh = (newBounds.height() - m_extraHeight) - currItem->height();

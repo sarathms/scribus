@@ -1309,6 +1309,72 @@ void ScribusMainWindow::setStatusBarTextPosition(double base, double xp)
 	mainWindowYPosDataLabel->setText("-");
 }
 
+void ScribusMainWindow::setStatusBarTextSelectedItemInfo()
+{
+	const uint docSelectionCount = doc->m_Selection->count();
+	if (docSelectionCount == 0)
+		setStatusBarInfoText("");
+	else if (docSelectionCount == 1)
+	{
+		QString whatSel = tr("Unknown");
+		switch (doc->m_Selection->itemAt(0)->itemType())
+		{
+			case 2:
+				whatSel = CommonStrings::itemType_ImageFrame;
+				break;
+			case 4:
+				whatSel = CommonStrings::itemType_TextFrame;
+				break;
+			case 5:
+				whatSel = CommonStrings::itemType_Line;
+				break;
+			case 6:
+				whatSel = CommonStrings::itemType_Polygon;
+				break;
+			case 7:
+				whatSel = CommonStrings::itemType_Polyline;
+				break;
+			case 8:
+				whatSel = CommonStrings::itemType_PathText;
+				break;
+			case 9:
+				whatSel = CommonStrings::itemType_LatexFrame;
+				break;
+			case 11:
+				whatSel = CommonStrings::itemType_Symbol;
+				break;
+			case 12:
+				whatSel = CommonStrings::itemType_Group;
+				break;
+			case 13:
+				whatSel = CommonStrings::itemType_RegularPolygon;
+				break;
+			case 14:
+				whatSel = CommonStrings::itemType_Arc;
+				break;
+			case 15:
+				whatSel = CommonStrings::itemType_Spiral;
+				break;
+			case 16:
+				whatSel = CommonStrings::itemType_Table;
+				break;
+			default:
+				whatSel = "Unknown";
+				break;
+		}
+		QString widthTxt = value2String(doc->m_Selection->width(), doc->unitIndex(), true, true);
+		QString heightTxt = value2String(doc->m_Selection->height(), doc->unitIndex(), true, true);
+		QString txtBody = tr("%1 selected").arg(whatSel) + " : " + tr("Size");
+		setStatusBarInfoText( QString("%1 = %3 x %4").arg(txtBody).arg(widthTxt).arg(heightTxt));
+	}
+	else
+	{
+		QString widthTxt = value2String(doc->m_Selection->width(), doc->unitIndex(), true, true);
+		QString heightTxt = value2String(doc->m_Selection->height(), doc->unitIndex(), true, true);
+		setStatusBarInfoText( tr("%1 Objects selected, Selection Size = %2 x %3").arg(docSelectionCount).arg(widthTxt).arg(heightTxt));
+	}
+}
+
 void ScribusMainWindow::setTempStatusBarText(const QString &text)
 {
 	if (mainWindowStatusLabel)
@@ -1390,10 +1456,10 @@ void ScribusMainWindow::specialActionKeyEvent(int unicodevalue)
 				{
 					if (unicodevalue!=-1)
 					{
-						UndoTransaction* activeTransaction = NULL;
+						UndoTransaction activeTransaction;
 						if (currItem->HasSel){
 							if (UndoManager::undoEnabled())
-								activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::Selection, Um::IGroup, Um::ReplaceText, "", Um::IDelete));
+								activeTransaction = undoManager->beginTransaction(Um::Selection, Um::IGroup, Um::ReplaceText, "", Um::IDelete);
 							currItem->deleteSelectedTextFromFrame();
 						}
 						if (UndoManager::undoEnabled())
@@ -1418,11 +1484,7 @@ void ScribusMainWindow::specialActionKeyEvent(int unicodevalue)
 						}
 						currItem->itemText.insertChars(QString(QChar(unicodevalue)), true);
 						if (activeTransaction)
-						{
-							activeTransaction->commit();
-							delete activeTransaction;
-							activeTransaction = NULL;
-						}
+							activeTransaction.commit();
 					}
 					else if (unicodevalue==SpecialChars::SHYPHEN.unicode()) //ignore the char as we use an attribute if the text item, for now.
 					{
@@ -2576,82 +2638,20 @@ void ScribusMainWindow::HaveNewDoc()
 
 void ScribusMainWindow::HaveNewSel()
 {
-	int SelectedType = -1;
-	PageItem *currItem = NULL;
 	if (doc == NULL)
 		return;
+	int SelectedType = -1;
+	PageItem *currItem = NULL;
 	const uint docSelectionCount = doc->m_Selection->count();
 	if (docSelectionCount > 0)
 	{
 		currItem = doc->m_Selection->itemAt(0);
 		SelectedType = currItem->itemType();
 	}
-	else
-	{
-		SelectedType = -1;
-	}
 	assert (docSelectionCount == 0 || currItem != NULL); // help coverity analysis
-	if (docSelectionCount == 0)
-		setStatusBarInfoText("");
-	else if (docSelectionCount == 1)
-	{
-		QString whatSel = tr("Unknown");
-		switch (currItem->itemType())
-		{
-			case 2:
-				whatSel = CommonStrings::itemType_ImageFrame;
-				break;
-			case 4:
-				whatSel = CommonStrings::itemType_TextFrame;
-				break;
-			case 5:
-				whatSel = CommonStrings::itemType_Line;
-				break;
-			case 6:
-				whatSel = CommonStrings::itemType_Polygon;
-				break;
-			case 7:
-				whatSel = CommonStrings::itemType_Polyline;
-				break;
-			case 8:
-				whatSel = CommonStrings::itemType_PathText;
-				break;
-			case 9:
-				whatSel = CommonStrings::itemType_LatexFrame;
-				break;
-			case 11:
-				whatSel = CommonStrings::itemType_Symbol;
-				break;
-			case 12:
-				whatSel = CommonStrings::itemType_Group;
-				break;
-			case 13:
-				whatSel = CommonStrings::itemType_RegularPolygon;
-				break;
-			case 14:
-				whatSel = CommonStrings::itemType_Arc;
-				break;
-			case 15:
-				whatSel = CommonStrings::itemType_Spiral;
-				break;
-			case 16:
-				whatSel = CommonStrings::itemType_Table;
-				break;
-			default:
-				whatSel = "Unknown";
-				break;
-		}
-		QString widthTxt = value2String(doc->m_Selection->width(), doc->unitIndex(), true, true);
-		QString heightTxt = value2String(doc->m_Selection->height(), doc->unitIndex(), true, true);
-		QString txtBody = tr("%1 Selected").arg(whatSel) + " " + tr("Size");
-		setStatusBarInfoText( QString("%1 = %3 x %4").arg(txtBody).arg(widthTxt).arg(heightTxt));
-	}
-	else
-	{
-		QString widthTxt = value2String(doc->m_Selection->width(), doc->unitIndex(), true, true);
-		QString heightTxt = value2String(doc->m_Selection->height(), doc->unitIndex(), true, true);
-		setStatusBarInfoText( tr("%1 Objects selected, Selection Size = %2 x %3").arg(docSelectionCount).arg(widthTxt).arg(heightTxt));
-	}
+
+	setStatusBarTextSelectedItemInfo();
+
 	actionManager->disconnectNewSelectionActions();
 	scrActions["editSelectAllOnLayer"]->setEnabled(true);
 	scrActions["editDeselectAll"]->setEnabled(SelectedType != -1);
@@ -3502,9 +3502,9 @@ void ScribusMainWindow::doPasteRecent(QString data)
 		}
 		else
 		{
-			UndoTransaction *pasteAction = NULL;
+			UndoTransaction pasteAction;
 			if(UndoManager::undoEnabled())
-				pasteAction = new UndoTransaction(undoManager->beginTransaction(Um::SelectionGroup, Um::IGroup, Um::Create,"",Um::ICreate));
+				pasteAction = undoManager->beginTransaction(Um::SelectionGroup, Um::IGroup, Um::Create,"",Um::ICreate);
 			view->Deselect(true);
 			uint ac = doc->Items->count();
 			bool savedAlignGrid = doc->SnapGrid;
@@ -3531,12 +3531,8 @@ void ScribusMainWindow::doPasteRecent(QString data)
 					AddBookMark(currItem);
 			}
 			doc->m_Selection->copy(tmpSelection, false);
-			if(pasteAction)
-			{
-				pasteAction->commit();
-				delete pasteAction;
-				pasteAction = NULL;
-			}
+			if (pasteAction)
+				pasteAction.commit();
 		}
 		slotDocCh(false);
 		doc->regionsChanged()->update(QRectF());
@@ -3707,9 +3703,9 @@ bool ScribusMainWindow::slotPageImport()
 	Q_ASSERT(!doc->masterPageMode());
 	bool ret = false;
 	MergeDoc *dia = new MergeDoc(this, false, doc->DocPages.count(), doc->currentPage()->pageNr() + 1);
-	UndoTransaction* activeTransaction = NULL;
+	UndoTransaction activeTransaction;
 	if(UndoManager::undoEnabled())
-		activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::ImportPage, Um::IGroup, Um::ImportPage, 0, Um::ILock));
+		activeTransaction = undoManager->beginTransaction(Um::ImportPage, Um::IGroup, Um::ImportPage, 0, Um::ILock);
 
 	if (dia->exec())
 	{
@@ -3796,11 +3792,7 @@ bool ScribusMainWindow::slotPageImport()
 		ret = doIt;
 	}
 	if (activeTransaction)
-	{
-		activeTransaction->commit();
-		delete activeTransaction;
-		activeTransaction = NULL;
-	}
+		activeTransaction.commit();
 	delete dia;
 	return ret;
 }
@@ -3875,7 +3867,7 @@ bool ScribusMainWindow::loadDoc(QString fileName)
 	t.start();
 	times(&tms1);
 #endif
-	undoManager->setUndoEnabled(false);
+	
 	QFileInfo fi(fileName);
 	if (!fi.exists())
 	{
@@ -3883,6 +3875,7 @@ bool ScribusMainWindow::loadDoc(QString fileName)
 		                           CommonStrings::tr_OK);
 		return false;
 	}
+	
 	qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 	if (HaveDoc)
 		outlinePalette->buildReopenVals();
@@ -3917,6 +3910,7 @@ bool ScribusMainWindow::loadDoc(QString fileName)
 		}
 	}
 
+	UndoBlocker undoBlocker;
 	if (!fileName.isEmpty())
 	{
 		QString FName = fi.absoluteFilePath();
@@ -3991,7 +3985,7 @@ bool ScribusMainWindow::loadDoc(QString fileName)
 		//This also gives the user the opportunity to cancel the load when finding theres a replacement required.
 		if (loadSuccess && ScCore->usingGUI())
 			loadSuccess = fileLoader->postLoad(doc);
-		if(!loadSuccess)
+		if (!loadSuccess)
 		{
 			view->close();
 			delete fileLoader;
@@ -4007,7 +4001,6 @@ bool ScribusMainWindow::loadDoc(QString fileName)
 			mainWindowStatusLabel->setText("");
 			mainWindowProgressBar->reset();
 			ActWin = NULL;
-			undoManager->setUndoEnabled(true);
 			if (windows.count() != 0)
 			{
 				newActWin(ActWinOld->getSubWin());
@@ -4292,7 +4285,6 @@ bool ScribusMainWindow::loadDoc(QString fileName)
 	undoManager->switchStack(doc->DocName);
 	pagePalette->Rebuild();
 	qApp->restoreOverrideCursor();
-	undoManager->setUndoEnabled(true);
 	doc->setModified(false);
 	foreach (NotesStyle* NS, doc->m_docNotesStylesList)
 		doc->updateNotesFramesStyles(NS);
@@ -4686,6 +4678,7 @@ bool ScribusMainWindow::slotFileClose()
 
 bool ScribusMainWindow::DoFileClose()
 {
+	slotEndSpecialEdit();
 	view->Deselect(false);
 	if (doc==storyEditor->currentDocument())
 		storyEditor->close();
@@ -4948,7 +4941,7 @@ void ScribusMainWindow::slotEditCut()
 	uint docSelectionCount=doc->m_Selection->count();
 	if ((HaveDoc) && (docSelectionCount != 0))
 	{
-		UndoTransaction* activeTransaction = NULL;
+		UndoTransaction activeTransaction;
 		PageItem *currItem;
 		for (uint i = 0; i < docSelectionCount; ++i)
 		{
@@ -4962,11 +4955,11 @@ void ScribusMainWindow::slotEditCut()
 		if (UndoManager::undoEnabled())
 		{
 			if (docSelectionCount > 1)
-				activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::SelectionGroup, Um::IGroup, Um::Cut,"",Um::ICut));
+				activeTransaction = undoManager->beginTransaction(Um::SelectionGroup, Um::IGroup, Um::Cut,"",Um::ICut);
 			else
 			{
 				PageItem* item=doc->m_Selection->itemAt(0);
-				activeTransaction = new UndoTransaction(undoManager->beginTransaction(item->getUName(), item->getUPixmap(), Um::Cut, "", Um::ICut));
+				activeTransaction = undoManager->beginTransaction(item->getUName(), item->getUPixmap(), Um::Cut, "", Um::ICut);
 			}
 		}
 		currItem = doc->m_Selection->itemAt(0);
@@ -5029,9 +5022,7 @@ void ScribusMainWindow::slotEditCut()
 		scrMenuMgr->setMenuEnabled("EditPasteRecent", scrapbookPalette->tempBView->objectMap.count() != 0);
 		if (activeTransaction)
 		{
-			activeTransaction->commit();
-			delete activeTransaction;
-			activeTransaction = NULL;
+			activeTransaction.commit();
 		}
 	}
 }
@@ -5118,11 +5109,11 @@ void ScribusMainWindow::slotEditPaste()
 		view->requestMode(submodeEndNodeEdit);
 	if (HaveDoc)
 	{
-		UndoTransaction* activeTransaction = NULL;
+		UndoTransaction activeTransaction;
 		if (!ScMimeData::clipboardHasScribusData() && (!internalCopy))
 			return;
 		if (UndoManager::undoEnabled())
-			activeTransaction = new UndoTransaction(undoManager->beginTransaction(doc->currentPage()->getUName(), 0, Um::Paste, "", Um::IPaste));
+			activeTransaction = undoManager->beginTransaction(doc->currentPage()->getUName(), 0, Um::Paste, "", Um::IPaste);
 		PageItem* selItem = doc->m_Selection->itemAt(0);
 		if (((doc->appMode == modeEdit) || (doc->appMode == modeEditTable)) && (selItem->isTextFrame() || selItem->isTable()))
 		{
@@ -5328,11 +5319,7 @@ void ScribusMainWindow::slotEditPaste()
 			view->DrawNew();
 		}
 		if (activeTransaction)
-		{
-			activeTransaction->commit();
-			delete activeTransaction;
-			activeTransaction = NULL;
-		}
+			activeTransaction.commit();
 		if (doc->notesChanged())
 			doc->notesFramesUpdate();
 		slotDocCh(false);
@@ -5660,10 +5647,10 @@ void ScribusMainWindow::slotNewPageM()
 
 void ScribusMainWindow::addNewPages(int wo, int where, int numPages, double height, double width, int orient, QString siz, bool mov, QStringList* basedOn, bool overrideMasterPageSizing)
 {
-	UndoTransaction* activeTransaction = NULL;
+	UndoTransaction activeTransaction;
 	if (UndoManager::undoEnabled())
 	{
-		activeTransaction = new UndoTransaction(undoManager->beginTransaction(doc->getUName(), Um::IDocument, (numPages == 1) ? Um::AddPage : Um::AddPages, "", Um::ICreate));
+		activeTransaction = undoManager->beginTransaction(doc->getUName(), Um::IDocument, (numPages == 1) ? Um::AddPage : Um::AddPages, "", Um::ICreate);
 		SimpleState *ss = new SimpleState(Um::AddPage, "", Um::ICreate);
 		ss->set("ADD_PAGE", "add_page");
 		ss->set("PAGE", wo);
@@ -5769,9 +5756,7 @@ void ScribusMainWindow::addNewPages(int wo, int where, int numPages, double heig
 
 	if (activeTransaction)
 	{
-		activeTransaction->commit();
-		delete activeTransaction;
-		activeTransaction = NULL;
+		activeTransaction.commit();
 	}
 }
 
@@ -6234,70 +6219,65 @@ void ScribusMainWindow::ToggleFrameEdit()
 {
 	if (!doc)
 		return;
+
 	if (doc->appMode == modeEditClip)
-		NoFrameEdit();
-	else
 	{
-		//CB Enable/Disable undo in frame edit mode
-// 		undoManager->setUndoEnabled(false);
-		scrActions["editUndoAction"]->setEnabled(false);
-		scrActions["editRedoAction"]->setEnabled(false);
-//done elsewhere now		slotSelect();
-		nodePalette->setDoc(doc, view);
-		nodePalette->MoveN();
-		nodePalette->HaveNode(false, false);
-		nodePalette->MoveNode->setChecked(true);
-		nodePalette->show();
-//		qDebug() << "nodepalette show:" << nodePalette->geometry();
-		connect(view, SIGNAL(HavePoint(bool, bool)), nodePalette, SLOT(HaveNode(bool, bool)));
-		connect(view, SIGNAL(PolyStatus(int, uint)), nodePalette, SLOT(PolyStatus(int, uint)));
-		doc->nodeEdit.reset();
-//done elsewhere now		doc->appMode = modeEditClip;
-		appModeHelper.setFrameEditMode(true);
-		layerPalette->setEnabled(false);
-		outlinePalette->setEnabled(false);
-		guidePalette->setEnabled(false);
-		scrapbookPalette->setEnabled(false);
-		pagePalette->setEnabled(false);
-		bookmarkPalette->setEnabled(false);
-		docCheckerPalette->setEnabled(false);
-		inlinePalette->setEnabled(false);
-		symbolPalette->setEnabled(false);
-		styleManager->setEnabled(false);
-		alignDistributePalette->setEnabled(false);
-		pageSelector->setEnabled(false);
-		layerMenu->setEnabled(false);
-		if (!doc->m_Selection->isEmpty())
-		{
-			PageItem *currItem = doc->m_Selection->itemAt(0);
+		NoFrameEdit();
+		return;
+	}
+
+	nodePalette->setDoc(doc, view);
+	nodePalette->MoveN();
+	nodePalette->HaveNode(false, false);
+	nodePalette->MoveNode->setChecked(true);
+	nodePalette->show();
+//	qDebug() << "nodepalette show:" << nodePalette->geometry();
+	connect(view, SIGNAL(HavePoint(bool, bool)), nodePalette, SLOT(HaveNode(bool, bool)));
+	connect(view, SIGNAL(PolyStatus(int, uint)), nodePalette, SLOT(PolyStatus(int, uint)));
+	doc->nodeEdit.reset();
+	appModeHelper.setFrameEditMode(true);
+	layerPalette->setEnabled(false);
+	outlinePalette->setEnabled(false);
+	guidePalette->setEnabled(false);
+	scrapbookPalette->setEnabled(false);
+	pagePalette->setEnabled(false);
+	bookmarkPalette->setEnabled(false);
+	docCheckerPalette->setEnabled(false);
+	inlinePalette->setEnabled(false);
+	symbolPalette->setEnabled(false);
+	styleManager->setEnabled(false);
+	alignDistributePalette->setEnabled(false);
+	pageSelector->setEnabled(false);
+	layerMenu->setEnabled(false);
+	if (!doc->m_Selection->isEmpty())
+	{
+		PageItem *currItem = doc->m_Selection->itemAt(0);
 //			view->MarkClip(currItem, currItem->PoLine, true);
-			nodePalette->EditCont->setEnabled(currItem->ContourLine.size() != 0);
-			nodePalette->ResetCont->setEnabled(false);
-			nodePalette->ResetContClip->setEnabled(false);
-			nodePalette->PolyStatus(currItem->itemType(), currItem->PoLine.size());
-			nodePalette->setDefaults(currItem);
-			if ((currItem->asImageFrame()) && (currItem->imageClip.size() != 0))
-			{
-				nodePalette->ResetContClip->setSizePolicy(QSizePolicy(static_cast<QSizePolicy::Policy>(3), static_cast<QSizePolicy::Policy>(3)));
-				nodePalette->ResetContClip->show();
-				nodePalette->ResetShape2Clip->setSizePolicy(QSizePolicy(static_cast<QSizePolicy::Policy>(3), static_cast<QSizePolicy::Policy>(3)));
-				nodePalette->ResetShape2Clip->show();
-				nodePalette->layout()->activate();
-				nodePalette->resize(QSize(170, 380).expandedTo(nodePalette->minimumSizeHint()));
-			}
-			else
-			{
-				nodePalette->ResetContClip->setSizePolicy(QSizePolicy(static_cast<QSizePolicy::Policy>(6), static_cast<QSizePolicy::Policy>(6)));
-				nodePalette->ResetShape2Clip->setSizePolicy(QSizePolicy(static_cast<QSizePolicy::Policy>(6), static_cast<QSizePolicy::Policy>(6)));
-				nodePalette->layout()->activate();
-				nodePalette->ResetContClip->hide();
-				nodePalette->ResetShape2Clip->hide();
-				nodePalette->layout()->activate();
-				nodePalette->resize(QSize(170, 380).expandedTo(nodePalette->minimumSizeHint()));
-			}
+		nodePalette->EditCont->setEnabled(currItem->ContourLine.size() != 0);
+		nodePalette->ResetCont->setEnabled(false);
+		nodePalette->ResetContClip->setEnabled(false);
+		nodePalette->PolyStatus(currItem->itemType(), currItem->PoLine.size());
+		nodePalette->setDefaults(currItem);
+		if ((currItem->asImageFrame()) && (currItem->imageClip.size() != 0))
+		{
+			nodePalette->ResetContClip->setSizePolicy(QSizePolicy(static_cast<QSizePolicy::Policy>(3), static_cast<QSizePolicy::Policy>(3)));
+			nodePalette->ResetContClip->show();
+			nodePalette->ResetShape2Clip->setSizePolicy(QSizePolicy(static_cast<QSizePolicy::Policy>(3), static_cast<QSizePolicy::Policy>(3)));
+			nodePalette->ResetShape2Clip->show();
+			nodePalette->layout()->activate();
+			nodePalette->resize(QSize(170, 380).expandedTo(nodePalette->minimumSizeHint()));
+		}
+		else
+		{
+			nodePalette->ResetContClip->setSizePolicy(QSizePolicy(static_cast<QSizePolicy::Policy>(6), static_cast<QSizePolicy::Policy>(6)));
+			nodePalette->ResetShape2Clip->setSizePolicy(QSizePolicy(static_cast<QSizePolicy::Policy>(6), static_cast<QSizePolicy::Policy>(6)));
+			nodePalette->layout()->activate();
+			nodePalette->ResetContClip->hide();
+			nodePalette->ResetShape2Clip->hide();
+			nodePalette->layout()->activate();
+			nodePalette->resize(QSize(170, 380).expandedTo(nodePalette->minimumSizeHint()));
 		}
 	}
-	scrActions["itemShapeEdit"]->setChecked(doc->appMode == modeEditClip);
 }
 
 void ScribusMainWindow::NoFrameEdit()
@@ -6311,7 +6291,6 @@ void ScribusMainWindow::NoFrameEdit()
 	scrActions["toolsSelect"]->setChecked(true);
 	scrActions["toolsEditContents"]->setChecked(false);
 	scrActions["toolsEditWithStoryEditor"]->setChecked(false);
-	scrActions["itemShapeEdit"]->setChecked(false);
 	layerPalette->setEnabled(true);
 	outlinePalette->setEnabled(true);
 	guidePalette->setEnabled(true);
@@ -6325,10 +6304,8 @@ void ScribusMainWindow::NoFrameEdit()
 	inlinePalette->setEnabled(true);
 	pageSelector->setEnabled(true);
 	layerMenu->setEnabled(true);
-// 	bool tmpClip = doc->EditClip; // for enabling undo if exiting shape edit mode
 	if (HaveDoc)
 	{
-// done elsewhere now:		doc->appMode = modeNormal;
 		doc->nodeEdit.reset();
 		HaveNewSel();
 		if (!doc->m_Selection->isEmpty())
@@ -6338,8 +6315,6 @@ void ScribusMainWindow::NoFrameEdit()
 		}
 	}
 	actionManager->connectModeActions();
-// 	if (tmpClip)
-// 		undoManager->setUndoEnabled(true);
 }
 
 /** This is the safest method to return to modeNormal
@@ -6824,16 +6799,16 @@ void ScribusMainWindow::deletePage()
 
 void ScribusMainWindow::deletePage(int from, int to)
 {
-	UndoTransaction* activeTransaction = NULL;
+	UndoTransaction activeTransaction;
 	assert( from > 0 );
 	assert( from <= to );
 	assert( to <= static_cast<int>(doc->Pages->count()) );
 	int oldPg = doc->currentPageNumber();
 	guidePalette->setDoc(NULL);
 	if (UndoManager::undoEnabled())
-		activeTransaction = new UndoTransaction(undoManager->beginTransaction(doc->DocName, Um::IDocument,
-																			  (from - to == 0) ? Um::DeletePage : Um::DeletePages, "",
-																			  Um::IDelete));
+		activeTransaction = undoManager->beginTransaction(doc->DocName, Um::IDocument,
+														  (from - to == 0) ? Um::DeletePage : Um::DeletePages, "",
+														  Um::IDelete);
 	PageItem* ite;
 	doc->m_Selection->clear();
 	Selection tmpSelection(this, false);
@@ -6906,9 +6881,7 @@ void ScribusMainWindow::deletePage(int from, int to)
 	pagePalette->rebuildMasters();
 	if (activeTransaction)
 	{
-		activeTransaction->commit();
-		delete activeTransaction;
-		activeTransaction = NULL;
+		activeTransaction.commit();
 	}
 }
 
@@ -7130,21 +7103,17 @@ void ScribusMainWindow::duplicateItem()
 	doc->SnapElement = false;
 	slotEditCopy();
 	view->Deselect(true);
-	UndoTransaction *trans = NULL;
-	if(UndoManager::undoEnabled())
-		trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IPolygon,Um::Duplicate,"",Um::IMultipleDuplicate));
+	UndoTransaction trans;
+	if (UndoManager::undoEnabled())
+		trans = undoManager->beginTransaction(Um::Selection,Um::IPolygon,Um::Duplicate,"",Um::IMultipleDuplicate);
 	slotEditPaste();
 	for (int b=0; b<doc->m_Selection->count(); ++b)
 	{
 		doc->m_Selection->itemAt(b)->setLocked(false);
 		doc->MoveItem(doc->opToolPrefs().dispX, doc->opToolPrefs().dispY, doc->m_Selection->itemAt(b));
 	}
-	if(trans)
-	{
-		trans->commit();
-		delete trans;
-		trans = NULL;
-	}
+	if (trans)
+		trans.commit();
 	doc->SnapGrid  = savedAlignGrid;
 	doc->SnapGuides = savedAlignGuides;
 	doc->SnapElement = savedAlignElement;
@@ -8157,11 +8126,6 @@ void ScribusMainWindow::editSymbolStart(QString temp)
 		doc->stored_maxCanvasCoordinate = doc->maxCanvasCoordinate;
 		view->showSymbolPage(temp);
 		appModeHelper.setSymbolEditMode(true, doc);
-		scrActions["fileClose"]->setToolTip( tr("Click here to leave symbol edit mode."));
-		scrActions["fileClose"]->setIcon(loadIcon("22/exit.png"));
-		scrMenuMgr->setMenuEnabled("FileOpenRecent", false);
-		scrMenuMgr->setMenuEnabled("FileExport", false);
-
 		pagePalette->enablePalette(false);
 		layerPalette->setEnabled(false);
 		patternsDependingOnThis.clear();
@@ -8244,16 +8208,12 @@ void ScribusMainWindow::editInlineStart(int id)
 		doc->stored_maxCanvasCoordinate = doc->maxCanvasCoordinate;
 		view->showInlinePage(id);
 		appModeHelper.setInlineEditMode(true, doc);
-		scrActions["fileClose"]->setToolTip( tr("Click here to leave inline frame edit mode."));
-		scrActions["fileClose"]->setIcon(loadIcon("22/exit.png"));
-		scrMenuMgr->setMenuEnabled("FileOpenRecent", false);
-		scrMenuMgr->setMenuEnabled("FileExport", false);
 		pagePalette->enablePalette(false);
 		layerPalette->setEnabled(false);
 		inlinePalette->editingStart(id);
 		if (outlinePalette->isVisible())
 			outlinePalette->BuildTree(false);
-		updateActiveWindowCaption( tr("Editing Inline Frame"));
+		updateActiveWindowCaption( tr("Editing Inline Item"));
 	}
 }
 
@@ -8330,9 +8290,6 @@ void ScribusMainWindow::editMasterPagesStart(QString temp)
 		scrActions["toolsPages"]->setChecked(true);
 	}
 	appModeHelper.setMasterPageEditMode(true, doc);
-	scrMenuMgr->setMenuEnabled("FileOpenRecent", false);
-	scrActions["fileClose"]->setToolTip( tr("Click here to leave master page edit mode."));
-	scrActions["fileClose"]->setIcon(loadIcon("22/exit.png"));
 }
 
 void ScribusMainWindow::editMasterPagesEnd()
@@ -9587,9 +9544,9 @@ void ScribusMainWindow::slotItemTransform()
 	TransformDialog td(this, doc);
 	if (td.exec() == 0)
 		return;
-	UndoTransaction *trans = NULL;
-	if(UndoManager::undoEnabled())
-		trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IPolygon,Um::Transform,"",Um::IMove));
+	UndoTransaction trans;
+	if (UndoManager::undoEnabled())
+		trans = undoManager->beginTransaction(Um::Selection,Um::IPolygon,Um::Transform,"",Um::IMove);
 	qApp->setOverrideCursor(QCursor(Qt::WaitCursor));
 	int count=td.getCount();
 	QTransform matrix(td.getTransformMatrix());
@@ -9598,9 +9555,7 @@ void ScribusMainWindow::slotItemTransform()
 	qApp->restoreOverrideCursor();
 	if (trans)
 	{
-		trans->commit();
-		delete trans;
-		trans = NULL;
+		trans.commit();
 	}
 }
 
@@ -9744,7 +9699,6 @@ void ScribusMainWindow::PutToPatterns()
 	doc->SnapGrid  = false;
 	doc->SnapGuides = false;
 	doc->SnapElement = false;
-	bool wasUndo = undoManager->undoEnabled();
 	undoManager->setUndoEnabled(false);
 	internalCopy = true;
 	slotEditCopy();
@@ -9822,7 +9776,7 @@ void ScribusMainWindow::PutToPatterns()
 		doc->maxCanvasCoordinate = maxSize;
 		if (outlinePalette->isVisible())
 			outlinePalette->BuildTree();
-		undoManager->setUndoEnabled(wasUndo);
+		undoManager->setUndoEnabled(true);
 		return;
 	}
 	ScPattern pat = ScPattern();
@@ -9868,7 +9822,7 @@ void ScribusMainWindow::PutToPatterns()
 	view->DrawNew();
 	if (outlinePalette->isVisible())
 		outlinePalette->BuildTree();
-	undoManager->setUndoEnabled(wasUndo);
+	undoManager->setUndoEnabled(true);
 }
 
 void ScribusMainWindow::ConvertToSymbol()
@@ -9879,7 +9833,6 @@ void ScribusMainWindow::ConvertToSymbol()
 	uint docSelectionCount = doc->m_Selection->count();
 	QString patternName = "Pattern_"+doc->m_Selection->itemAt(0)->itemName();
 	patternName = patternName.trimmed().simplified().replace(" ", "_");
-	bool wasUndo = undoManager->undoEnabled();
 	undoManager->setUndoEnabled(false);
 	PageItem* currItem;
 	Selection itemSelection(this, false);
@@ -9934,10 +9887,12 @@ void ScribusMainWindow::ConvertToSymbol()
 	dia.setForbiddenList(patternsDependingOnThis);
 	dia.setTestList(doc->docPatterns.keys());
 	dia.setCheckMode(true);
-	if (dia.exec())
-		patternName = dia.getEditText();
-	else
+	if (!dia.exec())
+	{
+		undoManager->setUndoEnabled(true);
 		return;
+	}
+	patternName = dia.getEditText();
 	ScPattern pat = ScPattern();
 	pat.setDoc(doc);
 	double minx =  std::numeric_limits<double>::max();
@@ -9996,7 +9951,7 @@ void ScribusMainWindow::ConvertToSymbol()
 	if (outlinePalette->isVisible())
 		outlinePalette->BuildTree();
 	view->DrawNew();
-	undoManager->setUndoEnabled(wasUndo);
+	undoManager->setUndoEnabled(true);
 }
 
 void ScribusMainWindow::managePaints()
@@ -10184,14 +10139,14 @@ void ScribusMainWindow::insertMark(MarkType mType)
 	if  (doc->appMode != modeEdit)
 		return;
 
-	UndoTransaction* trans = NULL;
+	UndoTransaction trans;
 	PageItem* currItem = doc->m_Selection->itemAt(0);
 	if (!currItem->isTextFrame())
 		return;
 	if (currItem->HasSel)
 	{
 		if (UndoManager::instance()->undoEnabled())
-			trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IDelete,Um::Delete,"",Um::IDelete));
+			trans = undoManager->beginTransaction(Um::Selection,Um::IDelete,Um::Delete,"",Um::IDelete);
 		//inserting mark replace some selected text
 		currItem->asTextFrame()->deleteSelectedTextFromFrame();
 	}
@@ -10218,9 +10173,7 @@ void ScribusMainWindow::insertMark(MarkType mType)
 	}
 	if (trans)
 	{
-		trans->commit();
-		delete trans;
-		trans = NULL;
+		trans.commit();
 	}
 }
 
@@ -10276,11 +10229,11 @@ void ScribusMainWindow::slotInsertMarkNote()
 	{ //fast insert note with the only default notes style avaiable
 		PageItem* currItem = doc->m_Selection->itemAt(0);
 		Q_ASSERT(currItem->isTextFrame() && !currItem->isNoteFrame());
-		UndoTransaction* trans = NULL;
+		UndoTransaction trans;
 		if (currItem->HasSel)
 		{
 			if (UndoManager::instance()->undoEnabled())
-				trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IDelete,Um::Delete,"",Um::IDelete));
+				trans = undoManager->beginTransaction(Um::Selection,Um::IDelete,Um::Delete,"",Um::IDelete);
 			//inserting mark replace some selected text
 			currItem->asTextFrame()->deleteSelectedTextFromFrame();
 		}
@@ -10327,11 +10280,7 @@ void ScribusMainWindow::slotInsertMarkNote()
 			undoManager->action(doc, is);
 		}
 		if (trans)
-		{
-			trans->commit();
-			delete trans;
-			trans = NULL;
-		}
+			trans.commit();
 	}
 	else
 		insertMark(MARKNoteMasterType);

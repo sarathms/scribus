@@ -444,12 +444,18 @@ void Cpalette::handleUpdateRequest(int updateFlags)
 
 void Cpalette::updateColorList()
 {
-	if (currentDoc)
-	{
-		this->setColors(currentDoc->PageColors);
-		this->setGradients(&currentDoc->docGradients);
-		this->setPatterns(&currentDoc->docPatterns);
-	}
+	if (!currentDoc)
+		return;
+	
+	if (currentItem)
+		disconnectSignals();
+
+	this->setColors(currentDoc->PageColors);
+	this->setGradients(&currentDoc->docGradients);
+	this->setPatterns(&currentDoc->docPatterns);
+
+	if (currentItem)
+		setCurrentItem(currentItem);
 }
 
 void Cpalette::updateCList()
@@ -621,26 +627,28 @@ void Cpalette::showColorValues(QString stroke, QString fill, int sShade, int fSh
 
 void Cpalette::selectColorS(QListWidgetItem *item)
 {
+	QString colorName;
 	ColorPixmapItem* c = dynamic_cast<ColorPixmapItem*>(item);
 	if (c != NULL)	
-		sFarbe = c->colorName();
+		colorName = c->colorName();
 	else if (! item->data(Qt::DisplayRole).toString().isEmpty()) 
-		sFarbe = item->data(Qt::DisplayRole).toString();
+		colorName = item->data(Qt::DisplayRole).toString();
 	else
 		return;
-	emit NewPen(sFarbe);
+	emit NewPen(colorName);
 }
 
 void Cpalette::selectColorF(QListWidgetItem *item)
 {
+	QString colorName;
 	ColorPixmapItem* c = dynamic_cast<ColorPixmapItem*>(item);
 	if (c != NULL)	
-		sFarbe = c->colorName();
+		colorName = c->colorName();
 	else if (! item->data(Qt::DisplayRole).toString().isEmpty()) 
-		sFarbe = item->data(Qt::DisplayRole).toString();
+		colorName = item->data(Qt::DisplayRole).toString();
 	else
 		return;
-	emit NewBrush(sFarbe);
+	emit NewBrush(colorName);
 }
 
 void Cpalette::setColors(ColorList newColorList)
@@ -738,18 +746,14 @@ void Cpalette::setGradientColors()
 	double t2 = color2Alpha->value() / 100.0;
 	double t3 = color3Alpha->value() / 100.0;
 	double t4 = color4Alpha->value() / 100.0;
-	UndoTransaction *trans = NULL;
-	if(UndoManager::undoEnabled())
-		trans = new UndoTransaction(undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill));
+	UndoTransaction trans;
+	if (UndoManager::undoEnabled())
+		trans = undoManager->beginTransaction(Um::Selection,Um::IFill,Um::GradVal,"",Um::IFill);
 	currentItem->set4ColorShade(static_cast<int>(color1Shade->value()), static_cast<int>(color2Shade->value()), static_cast<int>(color3Shade->value()), static_cast<int>(color4Shade->value()));
 	currentItem->set4ColorTransparency(t1, t2, t3, t4);
 	currentItem->set4ColorColors(color1, color2, color3, color4);
-	if(trans)
-	{
-		trans->commit();
-		delete trans;
-		trans = NULL;
-	}
+	if (trans)
+		trans.commit();
 	currentItem->update();
 }
 

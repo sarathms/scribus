@@ -75,8 +75,6 @@ public slots:
 
 	void editLineSelectorButton();
 	void editFillSelectorButton();
-	void updateCList();
-	void updateGradientList();
 	void slotGrad(int nr);
 	void slotGradType(int type);
 	void setNamedGradient(const QString &name);
@@ -85,7 +83,6 @@ public slots:
 	void editGradientVector();
 	void setActiveGradDia(bool active);
 	void hideEditedPatterns(QStringList names);
-	void updatePatternList();
 	void selectPattern(QListWidgetItem *c);
 	void setActPattern(QString pattern, double scaleX, double scaleY, double offsetX, double offsetY, double rotation, double skewX, double skewY, bool mirrorX, bool mirrorY);
 	void changePatternProps();
@@ -125,5 +122,12 @@ protected:
 	double m_Pattern_skewY;
 	bool m_Pattern_mirrorX;
 	bool m_Pattern_mirrorY;
+
+	void connectSignals();
+	void disconnectSignals();
+
+	void updateCList();
+	void updateGradientList();
+	void updatePatternList();
 };
 #endif

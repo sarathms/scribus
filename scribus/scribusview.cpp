@@ -155,7 +155,7 @@ ScribusView::ScribusView(QWidget* win, ScribusMainWindow* mw, ScribusDoc *doc) :
 	Ready(false),
 	oldX(0), oldY(0),
 	m_groupTransactions(0),
-	m_groupTransaction(NULL),
+	m_groupTransaction(),
 	_isGlobalMode(true),
 	linkAfterDraw(false),
 	ImageAfterDraw(false),
@@ -652,7 +652,7 @@ void ScribusView::contentsDropEvent(QDropEvent *e)
 	QString text;
 	QUrl url;
 	PageItem *currItem;
-	UndoTransaction* activeTransaction = NULL;
+	UndoTransaction activeTransaction;
 	bool img = false;
 	m_canvas->resetRenderMode();
 	redrawMode = 0;
@@ -676,7 +676,7 @@ void ScribusView::contentsDropEvent(QDropEvent *e)
 		url  = QUrl(text);
 	}
 	else*/
-	if (e->mimeData()->hasText())
+	if (e->mimeData()->hasText() && (!e->mimeData()->text().isEmpty()))
 	{
 		text = e->mimeData()->text();
 		url = QUrl(text);
@@ -845,8 +845,30 @@ void ScribusView::contentsDropEvent(QDropEvent *e)
 			PageItem *b = Doc->Items->at(z);
 			b->LayerID = Doc->activeLayer();
 			Doc->loadPict(url.toLocalFile(), b);
-			b->setWidth(static_cast<double>(b->OrigW * 72.0 / b->pixm.imgInfo.xres));
-			b->setHeight(static_cast<double>(b->OrigH * 72.0 / b->pixm.imgInfo.yres));
+
+			double iw = static_cast<double>(b->OrigW * 72.0 / b->pixm.imgInfo.xres);
+			double ih = static_cast<double>(b->OrigH * 72.0 / b->pixm.imgInfo.yres);
+			if (iw > ih)
+			{
+				double pw = Doc->currentPage()->width();
+				if (iw > pw)
+				{
+					ih = pw * (ih / iw);
+					iw = pw;
+				}
+			}
+			else
+			{
+				double ph = Doc->currentPage()->height();
+				if (ih > ph)
+				{
+					iw = ph * (iw / ih);
+					ih = ph;
+				}
+			}
+
+			b->setWidth(iw);
+			b->setHeight(ih);
 			b->OldB2 = b->width();
 			b->OldH2 = b->height();
 			b->updateClip();
@@ -896,7 +918,7 @@ void ScribusView::contentsDropEvent(QDropEvent *e)
 			uint oldDocItemCount = Doc->Items->count();
 			if (((!img) || (vectorFile)) && (Doc->DraggedElem == 0))
 			{
-				activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::SelectionGroup, Um::IGroup, Um::Create,"",Um::ICreate));
+				activeTransaction = undoManager->beginTransaction(Um::SelectionGroup, Um::IGroup, Um::Create, "", Um::ICreate);
 				if (fi.exists())
 				{
 					QString data;
@@ -966,9 +988,8 @@ void ScribusView::contentsDropEvent(QDropEvent *e)
 						emit AddBM(currItem);
 				}
 				Doc->m_Selection->copy(tmpSelection, false);
-				activeTransaction->commit();
-				delete activeTransaction;
-				activeTransaction = NULL;
+				activeTransaction.commit();
+				activeTransaction.reset();
 			}
 			else
 			{
@@ -1077,7 +1098,7 @@ void ScribusView::contentsDropEvent(QDropEvent *e)
 					nx = npx.x();
 					ny = npx.y();
 				}
-				activeTransaction = new UndoTransaction(undoManager->beginTransaction(Um::SelectionGroup, Um::IGroup, Um::Move,"",Um::IMove));
+				activeTransaction = undoManager->beginTransaction(Um::SelectionGroup, Um::IGroup, Um::Move, "", Um::IMove);
 				Doc->moveGroup(nx-gx, ny-gy);
 				Doc->m_Selection->setGroupRect();
 				Doc->m_Selection->getGroupRect(&gx, &gy, &gw, &gh);
@@ -1097,9 +1118,8 @@ void ScribusView::contentsDropEvent(QDropEvent *e)
 					currItem->gWidth = gw;
 					currItem->gHeight = gh;
 				}
-				activeTransaction->commit();
-				delete activeTransaction;
-				activeTransaction = NULL;
+				activeTransaction.commit();
+				activeTransaction.reset();
 				emit ItemGeom();
 			}
 			else if (Doc->m_Selection->count() == 1)
@@ -1708,10 +1728,10 @@ void ScribusView::Deselect(bool /*prop*/)
 //CB Remove emit/start pasting objects
 void ScribusView::PasteToPage()
 {
-	UndoTransaction* activeTransaction = NULL;
+	UndoTransaction activeTransaction;
 	int ac = Doc->Items->count();
 	if (UndoManager::undoEnabled())
-		activeTransaction = new UndoTransaction(undoManager->beginTransaction(Doc->currentPage()->getUName(), 0, Um::Paste, "", Um::IPaste));
+		activeTransaction = undoManager->beginTransaction(Doc->currentPage()->getUName(), 0, Um::Paste, "", Um::IPaste);
 /*	if (ScMimeData::clipboardHasScribusFragment())
 	{
 		bool savedAlignGrid = Doc->SnapGrid;
@@ -1792,18 +1812,16 @@ void ScribusView::PasteToPage()
 	{
 		if (activeTransaction)
 		{
-			activeTransaction->cancel();
-			delete activeTransaction;
-			activeTransaction = NULL;
+			activeTransaction.cancel();
+			activeTransaction.reset();
 		}
 		return;
 	}
 	newObjects.clear();
 	if (activeTransaction)
 	{
-		activeTransaction->commit();
-		delete activeTransaction;
-		activeTransaction = NULL;
+		activeTransaction.commit();
+		activeTransaction.reset();
 	}
 	emit DocChanged();
 }
@@ -1893,8 +1911,8 @@ void ScribusView::startGroupTransaction(const QString& action, const QString& de
 			target = itemSelection->itemAt(0)->getUName();
 			targetIcon = itemSelection->itemAt(0)->getUPixmap();
 		}
-		m_groupTransaction = new UndoTransaction(undoManager->beginTransaction(target, targetIcon,
-																			   action, tooltip, actionIcon));
+		m_groupTransaction = undoManager->beginTransaction(target, targetIcon,
+														   action, tooltip, actionIcon);
 	}
 	++m_groupTransactions;
 }
@@ -1905,15 +1923,14 @@ void ScribusView::startGroupTransaction(const QString& action, const QString& de
 */
 void ScribusView::endGroupTransaction()
 {
-	if(m_groupTransactions > 0)
+	if (m_groupTransactions > 0)
 	{
 		--m_groupTransactions;
 	}
 	if (m_groupTransaction && m_groupTransactions == 0)
 	{
-		m_groupTransaction->commit();
-		delete m_groupTransaction;
-		m_groupTransaction = NULL;
+		m_groupTransaction.commit();
+		m_groupTransaction.reset();
 	}
 }
 
@@ -1922,15 +1939,14 @@ void ScribusView::endGroupTransaction()
  */
 void ScribusView::cancelGroupTransaction()
 {
-	if(m_groupTransaction && m_groupTransactions == 1)
+	if (m_groupTransaction && m_groupTransactions == 1)
 	{
-		m_groupTransaction->cancel();
-		delete m_groupTransaction;
-		m_groupTransaction = NULL;
+		m_groupTransaction.cancel();
+		m_groupTransaction.reset();
 	}
 	else if (m_groupTransaction)
 	{
-		m_groupTransaction->markFailed();
+		m_groupTransaction.markFailed();
 	}
 	if (m_groupTransactions > 0)
 		--m_groupTransactions;

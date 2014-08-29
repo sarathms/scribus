@@ -208,9 +208,8 @@ void CreateMode::activate(bool fromGesture)
 		if (m_createTransaction)
 		{
 //			qDebug() << "canceling left over create Transaction";
-			m_createTransaction->cancel();
-			delete m_createTransaction;
-			m_createTransaction = NULL;
+			m_createTransaction.cancel();
+			m_createTransaction.reset();
 		}
 		canvasPressCoord.setXY(-1.0, -1.0);
 		mouseGlobalCoord.setXY(-1.0, -1.0);
@@ -227,9 +226,8 @@ void CreateMode::deactivate(bool forGesture)
 		if (m_createTransaction)
 		{
 //			qDebug() << "CreateMode::deactivate: canceling left over create Transaction";
-			m_createTransaction->cancel();
-			delete m_createTransaction;
-			m_createTransaction = NULL;
+			m_createTransaction.cancel();
+			m_createTransaction.reset();
 		}
 	}
 }
@@ -411,7 +409,7 @@ void CreateMode::mouseReleaseEvent(QMouseEvent *m)
 	m->accept();
 //	m_view->stopDragTimer();
 
-	m_createTransaction = new UndoTransaction(Um::instance()->beginTransaction("creating"));
+	m_createTransaction = Um::instance()->beginTransaction("creating");
 	currItem = doCreateNewObject();
 	if (m_createTransaction && currItem)
 	{
@@ -420,19 +418,17 @@ void CreateMode::mouseReleaseEvent(QMouseEvent *m)
 		QString targetName = Um::ScratchSpace;
 		if (currItem->OwnPage > -1)
 			targetName = m_doc->Pages->at(currItem->OwnPage)->getUName();
-		m_createTransaction->commit(targetName, currItem->getUPixmap(),
+		m_createTransaction.commit(targetName, currItem->getUPixmap(),
 									Um::Create + " " + currItem->getUName(),  "", Um::ICreate);
+		m_createTransaction.reset();
 		m_doc->changed();
-		delete m_createTransaction;
-		m_createTransaction = NULL;	
 		/*currItem->update();
 		currItem->emitAllToGUI();*/
 	}
 	else if (m_createTransaction)
 	{
-		m_createTransaction->cancel();
-		delete m_createTransaction;
-		m_createTransaction = NULL;
+		m_createTransaction.cancel();
+		m_createTransaction.reset();
 	}
 	if (!PrefsManager::instance()->appPrefs.uiPrefs.stickyTools)
 	{
@@ -879,17 +875,16 @@ bool CreateMode::doOneClick(FPoint& startPoint, FPoint& endPoint)
 		ySize = sizes->getDouble("defAngle", 0.0);
 		originPoint = sizes->getInt("OriginL", 0);
 	}
-
-//	qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-	OneClick *dia = new OneClick(m_view, ScribusView::tr("Enter Object Size"), m_doc->unitIndex(), xSize, ySize, doRemember, originPoint, lmode);
-	if (dia->exec())
+	//#12577 Remove one click dialog
+	//#12577 OneClick *dia = new OneClick(m_view, ScribusView::tr("Enter Object Size"), m_doc->unitIndex(), xSize, ySize, doRemember, originPoint, lmode);
+	//#12577 if (dia->exec())
 	{
-		doRemember = dia->checkRemember->isChecked();
+		//#12577 doRemember = dia->checkRemember->isChecked();
 		if (lmode == 0)
 		{
-			xSize = dia->spinWidth->value() / unitGetRatioFromIndex(m_doc->unitIndex());
-			ySize = dia->spinHeight->value() / unitGetRatioFromIndex(m_doc->unitIndex());
-			originPoint = dia->RotationGroup->checkedId();
+			//#12577 xSize = dia->spinWidth->value() / unitGetRatioFromIndex(m_doc->unitIndex());
+			//#12577 ySize = dia->spinHeight->value() / unitGetRatioFromIndex(m_doc->unitIndex());
+			//#12577 originPoint = dia->RotationGroup->checkedId();
 			if (doRemember)
 			{
 				sizes->set("defWidth", xSize);
@@ -922,9 +917,9 @@ bool CreateMode::doOneClick(FPoint& startPoint, FPoint& endPoint)
 		else
 		{
 			FPoint oldStart = startPoint;
-			xSize = dia->spinWidth->value() / unitGetRatioFromIndex(m_doc->unitIndex());
-			ySize = dia->spinHeight->value();
-			originPoint = dia->RotationGroup->checkedId();
+			//#12577 xSize = dia->spinWidth->value() / unitGetRatioFromIndex(m_doc->unitIndex());
+			//#12577 ySize = dia->spinHeight->value();
+			//#12577 originPoint = dia->RotationGroup->checkedId();
 			if (doRemember)
 			{
 				sizes->set("defLength", xSize);
@@ -950,7 +945,7 @@ bool CreateMode::doOneClick(FPoint& startPoint, FPoint& endPoint)
 		sizes->set("Remember", doRemember);
 		doCreate = true;
 	}
-	delete dia;
+	//delete dia;
 	return doCreate;
 }
 

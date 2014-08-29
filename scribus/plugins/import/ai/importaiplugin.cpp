@@ -136,7 +136,7 @@ bool ImportAIPlugin::import(QString fileName, int flags)
 			return true;
 	}
 	m_Doc=ScCore->primaryMainWindow()->doc;
-	UndoTransaction* activeTransaction = NULL;
+	UndoTransaction activeTransaction;
 	bool emptyDoc = (m_Doc == NULL);
 	bool hasCurrentPage = (m_Doc && m_Doc->currentPage());
 	TransactionSettings trSettings;
@@ -148,7 +148,7 @@ bool ImportAIPlugin::import(QString fileName, int flags)
 	if (emptyDoc || !(flags & lfInteractive) || !(flags & lfScripted))
 		UndoManager::instance()->setUndoEnabled(false);
 	if (UndoManager::undoEnabled())
-		activeTransaction = new UndoTransaction(UndoManager::instance()->beginTransaction(trSettings));
+		activeTransaction = UndoManager::instance()->beginTransaction(trSettings);
 #ifdef HAVE_POPPLER
 	if (!(flags & LoadSavePlugin::lfLoadAsPattern))
 	{
@@ -162,16 +162,16 @@ bool ImportAIPlugin::import(QString fileName, int flags)
 			if (tempBuf.startsWith("%PDF"))
 			{
 				qApp->changeOverrideCursor(QCursor(Qt::ArrowCursor));
-				QMessageBox msgBox(ScCore->primaryMainWindow());
-				msgBox.setText( tr("This file contains 2 versions of the data."));
-				msgBox.setInformativeText( tr("Choose which one should be imported"));
-				msgBox.setIcon(QMessageBox::Question);
-				QPushButton *pdfButton = msgBox.addButton( tr("Use the pdf part"), QMessageBox::ActionRole);
-				msgBox.addButton( tr("Use the ai part"), QMessageBox::ActionRole);
-				msgBox.setDefaultButton(pdfButton);
-				msgBox.exec();
-				if ((QPushButton *)msgBox.clickedButton() == pdfButton)
-				{
+			//	QMessageBox msgBox(ScCore->primaryMainWindow());
+			//	msgBox.setText( tr("This file contains 2 versions of the data."));
+			//	msgBox.setInformativeText( tr("Choose which one should be imported"));
+			//	msgBox.setIcon(QMessageBox::Question);
+			//	QPushButton *pdfButton = msgBox.addButton( tr("Use the pdf part"), QMessageBox::ActionRole);
+			//	msgBox.addButton( tr("Use the ai part"), QMessageBox::ActionRole);
+			//	msgBox.setDefaultButton(pdfButton);
+			//	msgBox.exec();
+			//	if ((QPushButton *)msgBox.clickedButton() == pdfButton)
+			//	{
 					//Import PDF
 					const FileFormat *fmt = LoadSavePlugin::getFormatByExt("pdf");
 					if (!fmt)
@@ -182,17 +182,13 @@ bool ImportAIPlugin::import(QString fileName, int flags)
 					qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
 					bool success = fmt->loadFile(fileName, flags);
 					if (activeTransaction)
-					{
-						activeTransaction->commit();
-						delete activeTransaction;
-						activeTransaction = NULL;
-					}
+						activeTransaction.commit();
 					if (emptyDoc || !(flags & lfInteractive) || !(flags & lfScripted))
 						UndoManager::instance()->setUndoEnabled(true);
 					if (!success)
 						QMessageBox::warning(ScCore->primaryMainWindow(), CommonStrings::trWarning, tr("The file could not be imported"), 1, 0, 0);
 					return success;
-				}
+			//	}
 				qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
 			}
 			else if (tempBuf.startsWith("%!PS-Adobe-3.0 EPSF-3.0"))
@@ -207,11 +203,7 @@ bool ImportAIPlugin::import(QString fileName, int flags)
 				qApp->changeOverrideCursor(QCursor(Qt::WaitCursor));
 				bool success = fmt->loadFile(fileName, flags);
 				if (activeTransaction)
-				{
-					activeTransaction->commit();
-					delete activeTransaction;
-					activeTransaction = NULL;
-				}
+					activeTransaction.commit();
 				if (emptyDoc || !(flags & lfInteractive) || !(flags & lfScripted))
 					UndoManager::instance()->setUndoEnabled(true);
 				if (!success)
@@ -225,11 +217,7 @@ bool ImportAIPlugin::import(QString fileName, int flags)
 	Q_CHECK_PTR(dia);
 	bool success = dia->import(fileName, trSettings, flags);
 	if (activeTransaction)
-	{
-		activeTransaction->commit();
-		delete activeTransaction;
-		activeTransaction = NULL;
-	}
+		activeTransaction.commit();
 	if (emptyDoc || !(flags & lfInteractive) || !(flags & lfScripted))
 		UndoManager::instance()->setUndoEnabled(true);
 	if (!success)

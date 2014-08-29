@@ -52,7 +52,6 @@ CanvasMode_EditSpiral::CanvasMode_EditSpiral(ScribusView* view) : CanvasMode(vie
 	Mxp = Myp = -1;
 	m_blockUpdateFromItem = 0;
 	m_arcPoint = noPointDefined;
-	trans = NULL;
 }
 
 inline bool CanvasMode_EditSpiral::GetItem(PageItem** pi)
@@ -361,8 +360,8 @@ void CanvasMode_EditSpiral::mousePressEvent(QMouseEvent *m)
 		m_arcPoint = useControlEnd;
 	else
 		m_arcPoint = noPointDefined;
-	if(m_arcPoint != noPointDefined)
-		trans = new UndoTransaction(undoManager->beginTransaction(Um::Polygon,Um::IPolygon,Um::EditSpiral,"",Um::IPolygon));
+	if (m_arcPoint != noPointDefined)
+		m_transaction = undoManager->beginTransaction(Um::Polygon, Um::IPolygon, Um::EditSpiral, "", Um::IPolygon);
 	m_canvas->m_viewMode.m_MouseButtonPressed = true;
 	m_view->setCursor(QCursor(Qt::CrossCursor));
 	m_doc->regionsChanged()->update(itemMatrix.mapRect(QRectF(0, 0, currItem->width(), currItem->height())).adjusted(-5, -5, 10, 10));
@@ -374,11 +373,10 @@ void CanvasMode_EditSpiral::mouseReleaseEvent(QMouseEvent *m)
 	m_canvas->resetRenderMode();
 	m->accept();
 	PageItem *currItem = m_doc->m_Selection->itemAt(0);
-	if(trans)
+	if (m_transaction)
 	{
-		trans->commit();
-		delete trans;
-		trans = NULL;
+		m_transaction.commit();
+		m_transaction.reset();
 	}
 	QTransform itemMatrix = currItem->getTransform();
 	m_doc->regionsChanged()->update(itemMatrix.mapRect(QRectF(0, 0, currItem->width(), currItem->height())).adjusted(-5, -5, 10, 10));
